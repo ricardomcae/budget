@@ -213,6 +213,25 @@
   .cat-actions button { background: transparent; border: 0; color: var(--text-muted); font-size: 13px; padding: 2px 5px; border-radius: 5px; }
   .cat-actions button:hover { background: var(--neutral-soft); color: var(--text); }
   /* Ocupa toda a largura da coluna da categoria, em qualquer ecrã. */
+  .pend { color: var(--warning); }
+  .op-intro { margin: 0 0 12px; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+  .op-fluxo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 9px 0 6px; font-weight: 700; font-size: 12.5px; color: var(--text); }
+  .op-fluxo > span:not(.seta) { background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 3px 9px; }
+  .op-fluxo .seta { color: var(--primary); font-size: 15px; }
+  .op-nota { display: block; font-size: 12px; }
+  .op-kpis { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; text-align: center; }
+  .op-kpi { padding: 12px 8px; }
+  .op-kpi .k-value { font-size: 17px; }
+  .cov-sum { padding: 9px 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+  .cov-list { max-height: 300px; overflow: auto; }
+  .cov-row { display: grid; grid-template-columns: 1fr 132px 84px; gap: 10px; align-items: center; padding: 8px 2px; border-bottom: 1px solid var(--border); }
+  .cov-row > * { min-width: 0; }
+  .cov-nome { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+  .cov-nome .tag { display: block; }
+  .cov-val { text-align: end; font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+  .cov-slider { width: 100%; accent-color: var(--primary); height: 26px; }
+  .prio-dot { font-size: 10px; }
+  .prio-dot.p-alta { color: var(--negative); } .prio-dot.p-normal { color: var(--text-muted); } .prio-dot.p-baixa { color: var(--primary); }
   .target-bar { height: 5px; border-radius: 4px; background: var(--neutral-soft); margin-top: 5px; overflow: hidden; width: 100%; }
   .target-bar > span { display: block; height: 100%; background: var(--primary); border-radius: 4px; transition: width .18s, background .18s; }
   .target-bar > span.full { background: var(--positive); }   /* alvo cumprido */
@@ -822,6 +841,14 @@
     }
     return round2(s);
   }
+  // Diferença entre o que registou e o que o banco já processou. É o número que diz
+  // se a app bate certo com o extrato: zero significa que está tudo reconciliado.
+  function porConfirmar(accId){
+    if (accId) return round2(accountBalance(accId) - accountBalance(accId, true));
+    var s=0;
+    for (var i=0;i<state.accounts.length;i++) s += accountBalance(state.accounts[i].id) - accountBalance(state.accounts[i].id, true);
+    return round2(s);
+  }
   function netWorth() { var s=0; for (var i=0;i<state.accounts.length;i++) s += accountBalance(state.accounts[i].id); return round2(s); }
 
   // ---------- Integridade do orçamento ----------
@@ -1294,6 +1321,62 @@
     return { entries:entries, total:total, rtaBefore:rta, rtaAfter:round2(rta - total) };
   }
 
+  // As quatro operações em bloco — financiar, repor, libertar e cobrir — movem dinheiro
+  // entre sítios do orçamento, e nenhuma toca nas contas. Estes dois ajudantes existem
+  // para que as quatro se expliquem sempre pela mesma ordem e com as mesmas palavras:
+  // o que se passa, de onde vem para onde vai, e a garantia de que nada sai do banco.
+  function opIntro(diagnostico, de, para) {
+    return '<p class="op-intro">'+diagnostico+
+      '<span class="op-fluxo"><span>'+de+'</span><span class="seta">→</span><span>'+para+'</span></span>'+
+      '<span class="op-nota">Nada sai das contas — o dinheiro só muda de função.</span></p>';
+  }
+  // Três números, sempre na mesma ordem: como está agora, quanto se mexe, como fica.
+  function opKpis(rotulo, agora, clsA, verbo, mexe, depois, clsD) {
+    function k(r, v, c){ return '<div class="kpi op-kpi"><div class="k-label">'+r+'</div><div class="k-value '+(c||"")+'">'+v+'</div></div>'; }
+    return '<div class="op-kpis">'+k(rotulo, agora, clsA)+k("A "+verbo, mexe, "")+k("Fica em", depois, clsD)+'</div>';
+  }
+
+  // Quem pode emprestar dinheiro para tapar um buraco. O Pronto a atribuir vem sempre
+  // primeiro nas sugestões automáticas: é dinheiro que ainda não tem função nenhuma.
+  function coverSources(alvoId, m) {
+    var out = [], rta = readyToAssign(m);
+    if (rta > 0.005) out.push({ id:RTA_ID, name:"Pronto a atribuir", prio:"baixa", max:round2(rta), rta:true });
+    var list = orderedCategories();
+    for (var i=0;i<list.length;i++){
+      var c = list[i];
+      if (c.id === alvoId) continue;
+      var tem = availableFor(c.id, m);
+      if (tem <= 0.005) continue;
+      var max = tem;
+      // Ao cartão só se tira a folga: o resto é preciso para o liquidar.
+      if (c.cardId) { var t = tetoDaCategoria(c, m); max = round2(tem - (t.teto || 0)); }
+      if (max <= 0.005) continue;
+      out.push({ id:c.id, name:c.name, prio:c.priority||"normal", max:round2(max), rta:false });
+    }
+    return out;
+  }
+
+  // Sugestão automática. "prio" tira primeiro de quem tem prioridade mais baixa,
+  // "folga" de quem tem mais dinheiro parado, "manual" não sugere nada.
+  function coverAuto(fontes, falta, modo) {
+    var sel = {};
+    if (modo === "manual") return sel;
+    var ord = fontes.slice();
+    ord.sort(function(a,b){
+      if (a.rta !== b.rta) return a.rta ? -1 : 1;
+      if (modo === "folga") return b.max - a.max;
+      return (PRIO_RANK[b.prio] - PRIO_RANK[a.prio]) || (b.max - a.max);
+    });
+    var resta = falta;
+    for (var i=0;i<ord.length && resta > 0.005;i++){
+      var t = Math.min(ord[i].max, resta);
+      if (t > 0.005) { sel[ord[i].id] = round2(t); resta = round2(resta - t); }
+    }
+    return sel;
+  }
+
+  function coverTotal(sel) { var s=0; for (var k in sel) if (sel.hasOwnProperty(k)) s += sel[k]||0; return round2(s); }
+
   // ---------- Desenho do ecrã ----------
   function applyTheme(){ if (document.body) document.body.classList.toggle("theme-rose", !!(state.settings && state.settings.theme==="rose")); }
   function render() {
@@ -1368,7 +1451,7 @@
         '<div class="rta-actions">' +
           (rta < -0.005 ? '<button data-action="recover-preview">↩ Repor a zero…</button>'
                         : '<button data-action="fund-preview">🎯 Financiar alvos…</button>') +
-          (excedente < -0.005 ? '<button data-action="surplus-preview">🧹 Libertar '+fmt(-excedente)+'</button>' : '') +
+          (excedente < -0.005 ? '<button data-action="surplus-preview">🧹 Libertar '+fmt(-excedente)+'…</button>' : '') +
           undoBtn +
         '</div>' +
       '</div>' + aviso + futuro;
@@ -1484,7 +1567,7 @@
             '<button data-action="move-money" data-id="'+cat.id+'" title="Mover dinheiro">↔</button>' +
             '<button data-action="edit-category" data-id="'+cat.id+'" title="Editar / alvo">✎</button>' +
             (ti && ti.need>0 ? '<button data-action="fund-one" data-id="'+cat.id+'" title="Financiar alvo">🎯</button>' : '') +
-            (avail < -0.005 ? '<button data-action="cover-overspend" data-id="'+cat.id+'" title="Cobrir excesso">⚠️</button>' : '') +
+            (avail < -0.005 ? '<button data-action="cover-overspend" data-id="'+cat.id+'" title="Cobrir o que gastou a mais…">⚠️</button>' : '') +
           '</span></div>' + (cat.note?'<div class="tag" style="margin-top:3px;">📝 '+esc(cat.note)+'</div>':'') + targetHtml +
           (upc[cat.id] ? '<div class="target-note">📅 Ainda por sair este mês: '+fmt(upc[cat.id])+
             (avail < upc[cat.id]-0.005 ? ' <b style="color:var(--warning)">— faltam '+fmt(round2(upc[cat.id]-avail))+'</b>' : '')+'</div>' : '') + '</td>' +
@@ -1577,7 +1660,7 @@
     var ascAll = state.transactions.filter(function(t){return t.accountId===accId;})
       .sort(function(a,b){ return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
     var txs = ascAll.slice().reverse();
-    var bal = accountBalance(accId), cl = accountBalance(accId, true);
+    var bal = accountBalance(accId), cl = accountBalance(accId, true), pend = porConfirmar(accId);
     var run=0, balOf={};
     for(var bi=0;bi<ascAll.length;bi++){ run=round2(run+(ascAll[bi].inflow||0)-(ascAll[bi].outflow||0)); balOf[ascAll[bi].id]=run; }
     var LIMR = state.ui.txLimit || PAGINA;
@@ -1592,7 +1675,8 @@
         '<button class="btn" data-action="transfer">↔ Transferir</button>'+
         (acc.type!=="budget" && bal<-0.005 ? '<button class="btn" data-action="pay-card" data-id="'+accId+'">💳 Pagar</button>' : '')+
         '<div class="spacer"></div>'+
-        '<span class="muted" style="font-size:12.5px;">Confirmado: <b>'+fmt(cl)+'</b> &nbsp;·&nbsp; Saldo: <b style="'+(bal<0?"color:var(--negative)":"")+'">'+fmt(bal)+'</b></span>'+
+        '<span class="muted" style="font-size:12.5px;">Confirmado: <b>'+fmt(cl)+'</b> &nbsp;·&nbsp; Saldo: <b style="'+(bal<0?"color:var(--negative)":"")+'">'+fmt(bal)+'</b>'+
+          (Math.abs(pend)>0.005 ? ' &nbsp;·&nbsp; <b class="pend" title="Registado mas ainda não confirmado no banco">Por confirmar: '+fmt(pend)+'</b>' : '')+'</span>'+
       '</div>'+
       '<h3 style="margin:4px 2px 12px;">'+esc(acc.name)+' <span class="pill '+(acc.type==="budget"?"budget":(acc.type==="credit"?"credit":"tracking"))+'">'+(acc.type==="budget"?"Orçamento":(acc.type==="credit"?"Cartão de crédito":"Acompanhamento"))+'</span></h3>'+
       '<div class="data-card"><table class="data"><thead><tr>'+
@@ -1667,6 +1751,10 @@
       (temFiltro ? '<button class="btn sm" data-action="tx-filter-clear" title="Ver todas as transações">✕ Limpar filtros</button>' : '')+
       '<div class="spacer"></div>'+
       '<button class="btn sm" data-action="export-csv">⬇ CSV</button>'+
+      (function(){ var pend = porConfirmar(f.account||null);
+        if (Math.abs(pend) <= 0.005) return '';
+        var qual = f.account ? "nesta conta" : "em todas as contas";
+        return '<span class="muted" style="font-size:12.5px;"><b class="pend" title="Registado mas ainda não confirmado no banco">Por confirmar: '+fmt(pend)+'</b> '+qual+'</span>'; })()+
       '<span class="muted" style="font-size:12.5px;">'+list.length+(temFiltro?' de '+state.transactions.length:'')+' transações</span></div>';
 
     if (!state.transactions.length) {
@@ -2494,9 +2582,12 @@
 
       sec("Distribuir o dinheiro")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
-        '<li><b>🎯 Financiar alvos</b> mostra o impacto antes de aplicar, e pode <b>Anular</b> a seguir. «Repartir o que está por atribuir» nunca o deixa negativo, e reparte de três maneiras: <b>por prioridade</b> (serve as Altas primeiro), <b>proporcional</b> (todas ficam igualmente perto do alvo — quem precisa de mais leva mais) ou <b>pela ordem da lista</b> (completa de cima para baixo até acabar).</li>'+
-        '<li><b>↩ Repor a zero:</b> se atribuir mais do que tem, o «Pronto a atribuir» fica <b>negativo</b> e aparece este botão. Retira das categorias que têm dinheiro até voltar a zero, com as mesmas três maneiras de repartir — mas ao contrário: <b>por prioridade</b> tira primeiro das <b>Baixas</b>, para proteger as Altas. Nenhuma categoria fica negativa, e pode <b>Anular</b> a seguir.</li>'+
-        '<li><b>🧹 Libertar excedente:</b> aparece na faixa do «Pronto a atribuir», ao lado das outras, quando alguma categoria tem <b>mais do que o alvo dela pede</b> — por exemplo «repor até 200 €» com 500 € lá dentro. No <b>cartão de crédito</b>, o teto é o que falta liquidar: se atribuiu 500 € e só deve 200 €, liberta os 300 € de folga. Mostra primeiro o que ia acontecer, e só liberta se confirmar. Estar <b>adiantado</b> num objetivo com data não conta como excedente: se quer 3.000 € e já juntou 2.000 €, o dinheiro é seu e fica onde está — esticar o prazo apenas <b>baixa a mensalidade</b>. As de «reservar todos os meses» nunca entram, porque aí o dinheiro é mesmo para acumular.</li>'+
+        '<li><b>🎯 Financiar alvos</b> — <i>Pronto a atribuir → categorias.</i> Está sempre disponível. Dá a cada categoria o que lhe falta para cumprir o alvo do mês. Pode <b>financiar tudo</b>, ou <b>repartir só o que está por atribuir</b> — esta nunca o deixa negativo, e reparte de três maneiras: <b>por prioridade</b> (serve as Altas primeiro), <b>proporcional</b> (todas ficam igualmente perto do alvo — quem precisa de mais leva mais) ou <b>pela ordem da lista</b> (completa de cima para baixo até acabar).</li>'+
+        '<li><b>↩ Repor a zero</b> — <i>categorias → Pronto a atribuir.</i> Aparece quando atribuiu mais do que tinha e o «Pronto a atribuir» ficou <b>negativo</b>. Retira às categorias com dinheiro parado até voltar a zero, com as mesmas três maneiras de repartir — mas ao contrário: <b>por prioridade</b> tira primeiro das <b>Baixas</b>, para proteger as Altas. Nenhuma categoria fica negativa.</li>'+
+        '<li><b>🧹 Libertar excedente</b> — <i>categorias → Pronto a atribuir.</i> Aparece quando alguma categoria tem <b>mais do que o alvo dela pede</b> — por exemplo «repor até 200 €» com 500 € lá dentro. No <b>cartão de crédito</b>, o teto é o que falta liquidar: se atribuiu 500 € e só deve 200 €, liberta os 300 € de folga. Estar <b>adiantado</b> num objetivo com data não conta como excedente: se quer 3.000 € e já juntou 2.000 €, o dinheiro é seu e fica onde está — esticar o prazo apenas <b>baixa a mensalidade</b>. As de «reservar todos os meses» nunca entram, porque aí o dinheiro é mesmo para acumular.</li>'+
+        '<li><b>⚠️ Cobrir</b> — <i>outras categorias → uma categoria.</i> Aparece na linha de uma categoria que ficou <b>negativa</b>, por ter gasto nela mais do que lá tinha. Mostra o que falta e quem tem dinheiro parado, cada um com um cursor. Escolha de onde tirar: <b>primeiro das prioridades mais baixas</b> (sai de onde faz menos falta), <b>primeiro de quem tem mais folga</b>, ou <b>manual</b>. O que ainda não está atribuído é sempre gasto primeiro. Ao cartão de crédito só se tira a folga, nunca o que é preciso para o liquidar.</li>'+
+        '<li>As quatro <b>mostram o que ia acontecer antes de mexer em alguma coisa</b>, nenhuma tira dinheiro das contas — só muda a função que ele tem — e todas se desfazem com o <b>↩ Anular</b> que fica no topo.</li>'+
+        '<li><b>O ✓ e o «Por confirmar»:</b> o ✓ marca que o banco já processou a transação. Mexe no <b>Confirmado</b>, não no <b>Saldo</b> — um café pago ontem está pago, tenha o banco lançado ou não, e o orçamento tem de contar com isso. A diferença entre os dois é o <b>Por confirmar</b>, que aparece no cabeçalho da conta e no ecrã das transações: quando chega a zero, a app bate certo com o extrato.</li>'+
         '<li><b>Esc</b> dentro de um campo desfaz o que estava a escrever e larga o campo, sem gravar. Dentro de uma janela, é preciso carregar duas vezes: a primeira sai do campo, a segunda fecha a janela.</li>'+
         '<li>O <b>↩ Anular</b> da faixa reverte a última alteração aos valores atribuídos — tanto as operações em bloco como um valor que tenha mudado à mão numa linha.</li>'+
         '<li><b>Prioridade</b> ▲ ● ▼ à frente de cada categoria, muda com um clique. Ao financiar por prioridade serve as <b>Altas</b> primeiro; entre iguais, manda a <b>ordem da lista</b>.</li>'+
@@ -2554,12 +2645,17 @@
       var pl = (e.prio && e.prio!=="normal") ? ' <span class="tag">('+PRIO_LABEL[e.prio]+')</span>' : '';
       return '<div style="display:flex;justify-content:space-between;padding:7px 2px;border-bottom:1px solid var(--border);"><span>'+esc(e.name)+pl+'</span><b style="font-variant-numeric:tabular-nums;">+'+fmt(e.add)+'</b></div>';
     }).join("");
-    else if (anyNeed && mode==="cap") rows = '<div class="muted" style="padding:14px 0;text-align:center;">Sem dinheiro disponível para financiar (o Pronto a atribuir está a zero ou negativo).</div>';
-    else rows = '<div class="muted" style="padding:14px 0;text-align:center;">Não há alvos por financiar este mês. 🎉</div>';
+    else if (anyNeed && mode==="cap") rows = '<div class="muted" style="padding:14px 0;text-align:center;">Não tem nada por atribuir. Liberte o excedente de alguma categoria, ou registe rendimento.</div>';
+    else rows = '<div class="muted" style="padding:14px 0;text-align:center;">Todos os alvos deste mês já estão cumpridos. 🎉</div>';
     var undoBtn = (state.ui.lastFunding && state.ui.lastFunding.month===m) ? '<button class="btn" data-action="undo-funding">↩ Reverter último</button>' : '<span></span>';
     openModal(
       '<div class="modal-head"><h2>🎯 Financiar alvos — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
+        opIntro(
+          anyNeed ? ('Tem <b>'+fmt(plan.rtaBefore)+'</b> por atribuir e '+fullPlan.entries.length+
+                     (fullPlan.entries.length===1?' categoria abaixo':' categorias abaixo')+' do alvo deste mês.')
+                  : 'Não há alvos por cumprir este mês.',
+          "Pronto a atribuir", "Categorias")+
         '<div class="seg" id="fundMode" style="margin-bottom:10px;">'+
           '<button data-m="full" class="'+(mode==="full"?"active":"")+'">Financiar tudo</button>'+
           '<button data-m="cap" class="'+(mode==="cap"?"active":"")+'">Repartir o que está por atribuir</button>'+
@@ -2571,17 +2667,13 @@
             '<option value="prop"'+(strat==="prop"?" selected":"")+'>Proporcional — todas ficam igualmente perto do alvo (quem precisa mais, leva mais)</option>'+
             '<option value="order"'+(strat==="order"?" selected":"")+'>Pela ordem da lista — completa de cima para baixo até acabar o dinheiro</option>'+
           '</select><div class="hint">A prioridade define-se em cada categoria (lápis ✎).</div></div>' : '')+
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;text-align:center;">'+
-          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">Disponível</div><div class="k-value" style="font-size:17px;">'+fmt(plan.rtaBefore)+'</div></div>'+
-          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">A atribuir</div><div class="k-value" style="font-size:17px;">'+fmt(plan.total)+'</div></div>'+
-          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">Depois</div><div class="k-value '+afterCls+'" style="font-size:17px;">'+fmt(after)+'</div></div>'+
-        '</div>'+
+        opKpis("Por atribuir", fmt(plan.rtaBefore), "", "financiar", fmt(plan.total), fmt(after), afterCls)+
         '<div class="hint" style="margin-bottom:12px;">'+afterMsg+'</div>'+
         '<div style="max-height:220px;overflow:auto;">'+rows+'</div>'+
       '</div>'+
       '<div class="modal-foot">'+undoBtn+
         '<span><button class="btn" data-action="close">Cancelar</button> '+
-        (plan.entries.length?'<button class="btn primary" data-action="apply-funding">Confirmar financiamento</button>':'')+'</span></div>');
+        (plan.entries.length?'<button class="btn primary" data-action="apply-funding">Financiar '+fmt(plan.total)+'</button>':'')+'</span></div>');
     var seg=el("fundMode");
     seg.addEventListener("click", function(e){ var b=e.target.closest("button"); if(!b) return; state.ui._fundMode=b.getAttribute("data-m"); fundModal(); });
     var fs=el("fundStrat");
@@ -2601,24 +2693,21 @@
       return '<div style="display:flex;justify-content:space-between;padding:7px 2px;border-bottom:1px solid var(--border);">'+
         '<span>'+esc(e.name)+pl+'</span><b class="tx-amt out" style="font-variant-numeric:tabular-nums;">'+fmt(e.add)+'</b></div>';
     }).join("");
-    else rows = '<div class="muted" style="padding:14px 0;text-align:center;">Não há categorias com dinheiro disponível para retirar.</div>';
+    else rows = '<div class="muted" style="padding:14px 0;text-align:center;">Nenhuma categoria tem dinheiro parado para devolver. Só registando mais rendimento.</div>';
 
     var undoBtn = (state.ui.lastFunding && state.ui.lastFunding.month===m) ? '<button class="btn" data-action="undo-funding">↩ Reverter último</button>' : '<span></span>';
     openModal(
       '<div class="modal-head"><h2>↩ Repor a zero — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
-        '<p class="muted" style="margin-top:0;">Atribuiu <b>'+fmt(falta)+'</b> a mais do que tinha. Isto retira esse valor das categorias que têm dinheiro disponível, até o «Pronto a atribuir» voltar a zero. Nenhuma categoria fica negativa.</p>'+
+        opIntro('Atribuiu <b>'+fmt(falta)+'</b> a mais do que tinha. Isto devolve esse valor às custas das categorias com dinheiro parado, até o Pronto a atribuir voltar a zero — nenhuma fica negativa.',
+          "Categorias", "Pronto a atribuir")+
         '<div class="field"><label>De onde tirar primeiro</label>'+
         '<select id="recStrat">'+
           '<option value="priority"'+(strat==="priority"?" selected":"")+'>Por prioridade — tira primeiro das Baixas, para proteger as Altas</option>'+
           '<option value="prop"'+(strat==="prop"?" selected":"")+'>Proporcional — todas perdem a mesma percentagem do que têm</option>'+
           '<option value="order"'+(strat==="order"?" selected":"")+'>Pela ordem da lista — tira de baixo para cima</option>'+
         '</select></div>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;text-align:center;">'+
-          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">Em falta</div><div class="k-value neg" style="font-size:17px;">'+fmt(plan.rtaBefore)+'</div></div>'+
-          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">A retirar</div><div class="k-value" style="font-size:17px;">'+fmt(plan.total)+'</div></div>'+
-          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">Depois</div><div class="k-value '+(chega?"":"neg")+'" style="font-size:17px;">'+fmt(plan.rtaAfter)+'</div></div>'+
-        '</div>'+
+        opKpis("Por atribuir", fmt(plan.rtaBefore), "neg", "repor", fmt(plan.total), fmt(plan.rtaAfter), chega?"":"neg")+
         '<div class="hint" style="margin-bottom:12px;">'+(chega
           ? 'Fica exatamente a zero. 🎯'
           : ('⚠️ As categorias só têm '+fmt(plan.disponivel)+' disponíveis ao todo — mesmo esvaziando-as fica em '+fmt(plan.rtaAfter)+'. Falta registar rendimento.'))+'</div>'+
@@ -2626,7 +2715,7 @@
       '</div>'+
       '<div class="modal-foot">'+undoBtn+
         '<span><button class="btn" data-action="close">Cancelar</button> '+
-        (plan.entries.length?'<button class="btn primary" data-action="apply-recover">Confirmar</button>':'')+'</span></div>');
+        (plan.entries.length?'<button class="btn primary" data-action="apply-recover">Repor '+fmt(plan.total)+'</button>':'')+'</span></div>');
     var rs=el("recStrat");
     if(rs) rs.addEventListener("change", function(){ state.ui.recoverStrategy=rs.value; save(); recoverModal(); });
   }
@@ -2642,17 +2731,16 @@
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 2px;border-bottom:1px solid var(--border);">'+
         '<span><b>'+esc(e.name)+'</b><br><span class="tag">'+det+'</span></span>'+
         '<b class="tx-amt in" style="font-variant-numeric:tabular-nums;">'+fmt(-e.add)+'</b></div>';
-    }).join("") : '<div class="muted" style="padding:14px 0;text-align:center;">Não há nada acima do que os alvos pedem. 👍</div>';
+    }).join("") : '<div class="muted" style="padding:14px 0;text-align:center;">Nenhuma categoria passou do que o alvo dela pede. 👍</div>';
 
     openModal(
       '<div class="modal-head"><h2>🧹 Libertar excedente — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
-        '<p class="muted" style="margin-top:0;">Devolve ao «Pronto a atribuir» o dinheiro que está numa categoria <b>acima do que o alvo dela pede</b>, para o poder usar noutro sítio. Não mexe em contas nem em transações — só desfaz a atribuição.</p>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;text-align:center;">'+
-          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">Por atribuir</div><div class="k-value" style="font-size:17px;">'+fmt(plan.rtaBefore)+'</div></div>'+
-          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">A libertar</div><div class="k-value pos" style="font-size:17px;">'+fmt(totalLivre)+'</div></div>'+
-          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">Depois</div><div class="k-value pos" style="font-size:17px;">'+fmt(plan.rtaAfter)+'</div></div>'+
-        '</div>'+
+        opIntro(plan.entries.length
+            ? ('Há <b>'+fmt(totalLivre)+'</b> parado em categorias que já têm mais do que o alvo delas pede. Isto devolve essa folga para a poder usar noutro sítio.')
+            : 'Nenhuma categoria tem mais do que o alvo dela pede.',
+          "Categorias", "Pronto a atribuir")+
+        opKpis("Por atribuir", fmt(plan.rtaBefore), "", "libertar", fmt(totalLivre), fmt(plan.rtaAfter), "pos")+
         '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;margin-bottom:6px;">'+
           '<input type="checkbox" data-action="surplus-toggle-semalvo" '+(incluir?"checked":"")+' style="width:auto;"> Incluir também as categorias sem alvo</label>'+
         '<div class="hint" style="margin-bottom:12px;">Sem alvo definido não há como saber o que é de mais, por isso essas ficam de fora por predefinição — ligando isto, é retirado <b>tudo</b> o que lá está. As de «reservar todos os meses» nunca entram: nessas o dinheiro é para juntar.</div>'+
@@ -2661,6 +2749,83 @@
       '<div class="modal-foot"><span></span>'+
         '<span><button class="btn" data-action="close">Cancelar</button> '+
         (plan.entries.length?'<button class="btn primary" data-action="apply-surplus">Libertar '+fmt(totalLivre)+'</button>':'')+'</span></div>');
+  }
+
+  var _covSel = null, _covAlvo = null, _covFalta = 0, _covFontes = null;
+
+  function coverModal(alvoId) {
+    var m = state.ui.month, cat = categoryById(alvoId);
+    if (!cat) return;
+    var falta = round2(-availableFor(alvoId, m));
+    if (falta <= 0.005) { toast("Esta categoria já não está negativa."); return; }
+    var modo = state.ui.coverMode || "prio";
+    var fontes = coverSources(alvoId, m);
+    _covAlvo = alvoId; _covFalta = falta; _covFontes = fontes;
+    _covSel = coverAuto(fontes, falta, modo);
+
+    if (!fontes.length) {
+      openModal(
+        '<div class="modal-head"><h2>⚠️ Cobrir «'+esc(cat.name)+'» — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+        '<div class="modal-body">'+
+        opIntro('Gastou <b>'+fmt(falta)+'</b> a mais nesta categoria, mas <b>nenhuma outra tem dinheiro parado</b> nem há nada por atribuir.',
+          "Nenhuma origem", "«"+esc(cat.name)+"»")+
+        '<p class="muted" style="margin:0;">Só há duas saídas: registar mais rendimento, ou aceitar o excesso e deixá-lo passar para o mês seguinte.</p></div>'+
+        '<div class="modal-foot"><span></span><button class="btn" data-action="close">Fechar</button></div>');
+      return;
+    }
+
+    var linhas = fontes.map(function(f){
+      var v = _covSel[f.id] || 0;
+      return '<div class="cov-row">'+
+        '<div class="cov-nome">'+(f.rta ? '💵 ' : '<span class="prio-dot p-'+f.prio+'">'+PRIO_ICON[f.prio]+'</span> ')+esc(f.name)+
+          '<span class="tag">tem '+fmt(f.max)+(f.rta?'':' · prioridade '+PRIO_LABEL[f.prio].toLowerCase())+'</span></div>'+
+        '<input type="range" class="cov-slider" data-cov="'+f.id+'" min="0" max="'+f.max+'" step="0.01" value="'+v+'">'+
+        '<b class="cov-val" id="cv_'+f.id+'">'+fmt(v)+'</b></div>';
+    }).join("");
+
+    openModal(
+      '<div class="modal-head"><h2>⚠️ Cobrir «'+esc(cat.name)+'» — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body">'+
+        opIntro('Gastou <b>'+fmt(falta)+'</b> a mais nesta categoria. Escolha de onde tirar esse valor.',
+          "Outras categorias", "«"+esc(cat.name)+"»")+
+        '<div class="field"><label>De onde tirar</label><select id="covModo">'+
+          '<option value="prio"'+(modo==="prio"?" selected":"")+'>Primeiro das prioridades mais baixas</option>'+
+          '<option value="folga"'+(modo==="folga"?" selected":"")+'>Primeiro de quem tem mais folga</option>'+
+          '<option value="manual"'+(modo==="manual"?" selected":"")+'>Manual — escolho eu</option>'+
+        '</select></div>'+
+        '<div id="covKpis">'+opKpis("Em falta", fmt(-falta), "neg", "cobrir", fmt(coverTotal(_covSel)), fmt(round2(coverTotal(_covSel)-falta)), "")+'</div>'+
+        '<div class="cov-sum"><span id="covFal"></span></div>'+
+        '<div class="cov-list">'+linhas+'</div>'+
+      '</div>'+
+      '<div class="modal-foot"><span></span><span><button class="btn" data-action="close">Cancelar</button> '+
+        '<button class="btn primary" id="covOk" data-action="apply-cover">Cobrir '+fmt(coverTotal(_covSel))+'</button></span></div>');
+
+    function pinta(){
+      var tot = coverTotal(_covSel), resta = round2(_covFalta - tot), fica = round2(tot - _covFalta);
+      el("covKpis").innerHTML = opKpis("Em falta", fmt(-_covFalta), "neg", "cobrir", fmt(tot), fmt(fica), fica < -0.005 ? "neg" : "pos");
+      el("covFal").textContent = resta > 0.005 ? ("Ainda faltam "+fmt(resta)+" — puxe mais algum cursor.") : "✅ Buraco tapado.";
+      el("covFal").className = resta > 0.005 ? "muted" : "pos";
+      el("covOk").disabled = tot <= 0.005;
+      el("covOk").textContent = "Cobrir "+fmt(tot);
+    }
+    var sliders = document.querySelectorAll("[data-cov]");
+    for (var i=0;i<sliders.length;i++) {
+      sliders[i].addEventListener("input", function(ev){
+        var id = ev.target.getAttribute("data-cov"), pedido = round2(parseFloat(ev.target.value)||0);
+        // Nunca deixar juntar mais do que o buraco: o que sobrar é devolvido ao cursor.
+        var outros = 0;
+        for (var k in _covSel) if (_covSel.hasOwnProperty(k) && k !== id) outros += _covSel[k]||0;
+        var tecto = round2(_covFalta - outros);
+        if (pedido > tecto) { pedido = Math.max(0, tecto); ev.target.value = pedido; }
+        _covSel[id] = pedido;
+        el("cv_"+id).textContent = fmt(pedido);
+        pinta();
+      });
+    }
+    el("covModo").addEventListener("change", function(ev){
+      state.ui.coverMode = ev.target.value; save(); coverModal(alvoId);
+    });
+    pinta();
   }
 
   var RTA_ID = "__rta__";
@@ -3240,13 +3405,27 @@
       state.ui.lastFunding=null;
       closeModal(); save(); render(); showUndo();
     },
-    "cover-overspend": function(id){
-      var m=state.ui.month; var avail=availableFor(id,m);
-      if (avail>=0) return;
-      var key=id+"|"+m;
-      state.ui.lastFunding={month:m, entries:[{key:key, prev: state.assignments.hasOwnProperty(key)?state.assignments[key]:null}]};
-      state.assignments[key]=round2((state.assignments[key]||0)+Math.abs(avail));
-      save(); render(); toast("Excesso coberto — pode anular no topo.");
+    "cover-overspend": function(id){ coverModal(id); },
+    "apply-cover": function(){
+      var m=state.ui.month, alvo=_covAlvo, sel=_covSel;
+      if(!alvo||!sel){ return; }
+      var tot=coverTotal(sel);
+      if(tot<=0.005){ toast("Escolha de onde tirar o dinheiro."); return; }
+      var snap=[], nFontes=0;
+      function guarda(key){ snap.push({key:key, prev: state.assignments.hasOwnProperty(key)?state.assignments[key]:null}); }
+      for(var id in sel){
+        if(!sel.hasOwnProperty(id)) continue;
+        var t=sel[id]; if(t<=0.005) continue;
+        nFontes++;
+        // Do «Pronto a atribuir» não há nada a descontar: é dinheiro ainda sem função.
+        if(id!==RTA_ID){ var kf=id+"|"+m; guarda(kf); state.assignments[kf]=round2((state.assignments[kf]||0)-t); }
+      }
+      var ka=alvo+"|"+m; guarda(ka); state.assignments[ka]=round2((state.assignments[ka]||0)+tot);
+      state.ui.lastFunding={month:m, entries:snap};
+      var nome=(categoryById(alvo)||{}).name||"";
+      _covSel=null; _covAlvo=null; _covFontes=null;
+      closeModal(); save(); render();
+      toast("Coberto "+fmt(tot)+" em «"+nome+"» — pode anular no topo.");
     },
     "fund-one": function(id){
       var m=state.ui.month; var c=categoryById(id); if(!c) return;
@@ -3271,7 +3450,7 @@
       }
       state.ui.lastFunding={month:m, entries:snap};
       closeModal(); save(); render();
-      toast("Libertado "+fmt(-plan.total)+" de "+plan.entries.length+" categorias.");
+      toast("Libertado "+fmt(-plan.total)+" de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
     },
     "apply-recover": function(){
       var m=state.ui.month, plan=recoverPlan(m, state.ui.recoverStrategy);
@@ -3284,12 +3463,12 @@
       }
       state.ui.lastFunding={month:m, entries:snap};
       closeModal(); save(); render();
-      toast("Retirado "+fmt(-plan.total)+" de "+plan.entries.length+" categorias.");
+      toast("Reposto "+fmt(-plan.total)+" a partir de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
     },
     "apply-funding": function(){
       var m=state.ui.month, mode=state.ui._fundMode||"full";
       var plan=fundingPlan(mode,m,state.ui.fundStrategy);
-      if(!plan.entries.length){ toast("Nada a financiar."); return; }
+      if(!plan.entries.length){ toast("Não há nada a financiar."); return; }
       var snap=[];
       for(var i=0;i<plan.entries.length;i++){
         var e=plan.entries[i], key=e.catId+"|"+m;
@@ -3298,7 +3477,7 @@
       }
       state.ui.lastFunding={month:m, entries:snap};
       closeModal(); save(); render();
-      toast("Financiado "+fmt(plan.total)+" em "+plan.entries.length+" categorias.");
+      toast("Financiado "+fmt(plan.total)+" em "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
     },
     "undo-funding": function(){
       var lf=state.ui.lastFunding;
