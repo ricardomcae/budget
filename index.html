@@ -214,6 +214,14 @@
   .cat-actions button:hover { background: var(--neutral-soft); color: var(--text); }
   /* Ocupa toda a largura da coluna da categoria, em qualquer ecrã. */
   .pend { color: var(--warning); }
+  .date-field { position: relative; display: inline-flex; align-items: center; width: 100%; }
+  .date-txt { width: 100%; padding-inline-end: 34px !important; font-variant-numeric: tabular-nums; }
+  .date-txt.erro { border-color: var(--negative); }
+  .date-nat { position: absolute; inset-inline-end: 4px; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+  .date-btn { position: absolute; inset-inline-end: 3px; background: none; border: 0; cursor: pointer; font-size: 15px; line-height: 1; padding: 4px 5px; border-radius: 6px; }
+  .date-btn:hover { background: var(--surface-2); }
+  .toolbar .date-field { width: auto; }
+  .toolbar .date-txt { width: 128px; }
   .op-intro { margin: 0 0 12px; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
   .op-fluxo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 9px 0 6px; font-weight: 700; font-size: 12.5px; color: var(--text); }
   .op-fluxo > span:not(.seta) { background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 3px 9px; }
@@ -1321,6 +1329,35 @@
     return { entries:entries, total:total, rtaBefore:rta, rtaAfter:round2(rta - total) };
   }
 
+  // ---------- Datas em dd/mm/aaaa ----------
+  // O <input type="date"> nativo mostra a data no idioma do *browser*, não no da página:
+  // quem tem o Chrome em inglês vê mm/dd/aaaa por muito lang="pt-PT" que aqui esteja.
+  // Por isso a data escreve-se num campo de texto nosso, e o calendário nativo fica
+  // atrás de um botão só para escolher. Guardado continua tudo em ISO, como antes.
+  function isoParaPt(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso||""));
+    return m ? m[3]+"/"+m[2]+"/"+m[1] : "";
+  }
+  function ptParaIso(txt) {
+    var m = /^(\d{1,2})[\/\-. ](\d{1,2})[\/\-. ](\d{4})$/.exec(String(txt||"").trim());
+    if (!m) return "";
+    var d = +m[1], mes = +m[2], ano = +m[3];
+    if (mes < 1 || mes > 12 || d < 1 || ano < 1900 || ano > 2999) return "";
+    var dt = new Date(Date.UTC(ano, mes-1, d));
+    // 31/02 seria empurrado para 03/03 sem dar nas vistas — é recusado.
+    if (dt.getUTCMonth() !== mes-1 || dt.getUTCDate() !== d) return "";
+    return ano+"-"+pad(mes)+"-"+pad(d);
+  }
+  function dateVal(id) { var e = el(id); return e ? ptParaIso(e.value) : ""; }
+  function dateField(id, iso, extra) {
+    return '<div class="date-field">'+
+      '<input id="'+id+'" class="date-txt" type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" '+
+        'value="'+esc(isoParaPt(iso))+'" '+(extra||"")+'>'+
+      '<input id="'+id+'__nat" class="date-nat" type="date" value="'+esc(iso||"")+'" tabindex="-1" aria-hidden="true">'+
+      '<button type="button" class="date-btn" data-cal="'+id+'" title="Escolher no calendário" aria-label="Escolher no calendário">📅</button>'+
+    '</div>';
+  }
+
   // As quatro operações em bloco — financiar, repor, libertar e cobrir — movem dinheiro
   // entre sítios do orçamento, e nenhuma toca nas contas. Estes dois ajudantes existem
   // para que as quatro se expliquem sempre pela mesma ordem e com as mesmas palavras:
@@ -1334,6 +1371,48 @@
   function opKpis(rotulo, agora, clsA, verbo, mexe, depois, clsD) {
     function k(r, v, c){ return '<div class="kpi op-kpi"><div class="k-label">'+r+'</div><div class="k-value '+(c||"")+'">'+v+'</div></div>'; }
     return '<div class="op-kpis">'+k(rotulo, agora, clsA)+k("A "+verbo, mexe, "")+k("Fica em", depois, clsD)+'</div>';
+  }
+
+  // Devolve ao Pronto a atribuir tudo o que foi atribuído *neste* mês. O que transitou
+  // de meses anteriores fica onde está — mexer nisso reescreveria o passado.
+  function clearPlan(m) {
+    var entries = [], total = 0;
+    var list = orderedCategories();
+    for (var i=0;i<list.length;i++) {
+      var c = list[i], k = c.id+"|"+m, v = round2(state.assignments[k] || 0);
+      if (Math.abs(v) <= 0.005) continue;
+      entries.push({ id:c.id, name:c.name, add:v, fica: round2(availableFor(c.id, m) - v) });
+      total = round2(total + v);
+    }
+    entries.sort(function(a,b){ return Math.abs(b.add) - Math.abs(a.add); });
+    var rtaBefore = readyToAssign(m);
+    return { entries:entries, total:total, rtaBefore:rtaBefore, rtaAfter: round2(rtaBefore + total) };
+  }
+
+  function clearModal() {
+    var m = state.ui.month, plan = clearPlan(m);
+    var negativas = plan.entries.filter(function(e){ return e.fica < -0.005; }).length;
+    var rows = plan.entries.length ? plan.entries.map(function(e){
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 2px;border-bottom:1px solid var(--border);">'+
+        '<span><b>'+esc(e.name)+'</b><br><span class="tag">fica em '+fmt(e.fica)+(e.fica < -0.005 ? ' — já gastou mais do que isso' : '')+'</span></span>'+
+        '<b class="tx-amt in" style="font-variant-numeric:tabular-nums;">'+fmt(e.add)+'</b></div>';
+    }).join("") : '<div class="muted" style="padding:14px 0;text-align:center;">Ainda não atribuiu nada neste mês. 👍</div>';
+
+    openModal(
+      '<div class="modal-head"><h2>🧽 Limpar atribuições — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body">'+
+        opIntro(plan.entries.length
+            ? ('Vai devolver <b>'+fmt(plan.total)+'</b> atribuídos a '+plan.entries.length+(plan.entries.length===1?' categoria':' categorias')+', para recomeçar o mês do zero.')
+            : 'Não há nada atribuído neste mês para devolver.',
+          "Categorias", "Pronto a atribuir")+
+        opKpis("Por atribuir", fmt(plan.rtaBefore), "", "devolver", fmt(plan.total), fmt(plan.rtaAfter), plan.rtaAfter < -0.005 ? "neg" : "pos")+
+        '<div class="hint" style="margin-bottom:12px;">Só mexe em <b>'+monthLabel(m)+'</b>: o que transitou dos meses anteriores fica onde está, e as transações não são tocadas.'+
+          (negativas ? ' <b style="color:var(--warning)">'+negativas+(negativas===1?' categoria fica negativa':' categorias ficam negativas')+'</b>, por já ter gasto nelas mais do que isso.' : '')+'</div>'+
+        '<div style="max-height:230px;overflow:auto;">'+rows+'</div>'+
+      '</div>'+
+      '<div class="modal-foot"><span></span>'+
+        '<span><button class="btn" data-action="close">Cancelar</button> '+
+        (plan.entries.length?'<button class="btn primary" data-action="apply-clear">Devolver '+fmt(plan.total)+'</button>':'')+'</span></div>');
   }
 
   // Quem pode emprestar dinheiro para tapar um buraco. O Pronto a atribuir vem sempre
@@ -1424,6 +1503,7 @@
   function renderRTA() {
     var rta = readyToAssign(state.ui.month);
     var excedente = surplusPlan(state.ui.month, !!state.ui.surplusSemAlvo).total;
+    var temAtribuido = clearPlan(state.ui.month).entries.length > 0;
     var cls = rta > 0.005 ? "" : (rta < -0.005 ? "over" : "zero");
     var msg = rta > 0.005 ? "Pronto a atribuir" : (rta < -0.005 ? "Atribuiu mais do que tinha" : "Tudo atribuído — cada euro tem uma função 🎉");
     var undoBtn = (state.ui.lastFunding && state.ui.lastFunding.month===state.ui.month) ? '<button data-action="undo-funding" title="Reverter a última alteração">↩ Anular</button>' : '';
@@ -1452,6 +1532,7 @@
           (rta < -0.005 ? '<button data-action="recover-preview">↩ Repor a zero…</button>'
                         : '<button data-action="fund-preview">🎯 Financiar alvos…</button>') +
           (excedente < -0.005 ? '<button data-action="surplus-preview">🧹 Libertar '+fmt(-excedente)+'…</button>' : '') +
+          (temAtribuido ? '<button data-action="clear-preview" title="Devolver tudo o que atribuiu neste mês">🧽 Limpar atribuições…</button>' : '') +
           undoBtn +
         '</div>' +
       '</div>' + aviso + futuro;
@@ -1600,6 +1681,7 @@
         fBtn('f-warn','budget-filter','warn',bf.warn,'🟡','Abaixo do alvo','Só as categorias com o alvo por cumprir') +
         fBtn('f-neg','budget-filter','neg',bf.neg,'🔴','Excedido','Só as categorias que gastaram mais do que tinham') +
         '<span class="sep"></span>' +
+        '<span class="muted hide-phone" style="font-size:12.5px;">Prioridade:</span>' +
         fBtn('f-alta','prio-filter','alta',bp.alta,'▲','Alta','Só as de prioridade alta') +
         fBtn('f-normal','prio-filter','normal',bp.normal,'●','Normal','Só as de prioridade normal') +
         fBtn('f-baixa','prio-filter','baixa',bp.baixa,'▼','Baixa','Só as de prioridade baixa') +
@@ -1746,8 +1828,8 @@
       '<select class="filter" id="txFilterAcc">'+accOpts+'</select>'+
       '<select class="filter" id="txFilterCat">'+catOpts+'</select>'+
       '<select class="filter" id="txFilterPer">'+perOpts+'</select>'+
-      (f.per==="custom" ? '<input class="filter" id="txFilterFrom" type="date" title="De" value="'+esc(f.from||"")+'">'+
-                          '<input class="filter" id="txFilterTo" type="date" title="Até" value="'+esc(f.to||"")+'">' : '')+
+      (f.per==="custom" ? dateField("txFilterFrom", f.from||"", 'class="date-txt filter" title="De"')+
+                          dateField("txFilterTo", f.to||"", 'class="date-txt filter" title="Até"') : '')+
       (temFiltro ? '<button class="btn sm" data-action="tx-filter-clear" title="Ver todas as transações">✕ Limpar filtros</button>' : '')+
       '<div class="spacer"></div>'+
       '<button class="btn sm" data-action="export-csv">⬇ CSV</button>'+
@@ -2081,7 +2163,7 @@
       '<div class="modal-head"><h2>'+(editing?"Editar transação":"Nova transação")+'</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
         '<div class="grid-2">'+
-          '<div class="field"><label>Data</label><input id="txDate" type="date" value="'+esc(tx.date)+'"></div>'+
+          '<div class="field"><label>Data</label>'+dateField("txDate", tx.date)+'</div>'+
           '<div class="field"><label>Conta</label><select id="txAcc">'+accOpts+'</select></div>'+
         '</div>'+
         '<div class="field"><label>Beneficiário</label><input id="txPayee" maxlength="100" list="payeeList" autocomplete="off" value="'+esc(tx.payee||"")+'" placeholder="Ex.: Continente, Salário, EDP…">'+
@@ -2586,8 +2668,10 @@
         '<li><b>↩ Repor a zero</b> — <i>categorias → Pronto a atribuir.</i> Aparece quando atribuiu mais do que tinha e o «Pronto a atribuir» ficou <b>negativo</b>. Retira às categorias com dinheiro parado até voltar a zero, com as mesmas três maneiras de repartir — mas ao contrário: <b>por prioridade</b> tira primeiro das <b>Baixas</b>, para proteger as Altas. Nenhuma categoria fica negativa.</li>'+
         '<li><b>🧹 Libertar excedente</b> — <i>categorias → Pronto a atribuir.</i> Aparece quando alguma categoria tem <b>mais do que o alvo dela pede</b> — por exemplo «repor até 200 €» com 500 € lá dentro. No <b>cartão de crédito</b>, o teto é o que falta liquidar: se atribuiu 500 € e só deve 200 €, liberta os 300 € de folga. Estar <b>adiantado</b> num objetivo com data não conta como excedente: se quer 3.000 € e já juntou 2.000 €, o dinheiro é seu e fica onde está — esticar o prazo apenas <b>baixa a mensalidade</b>. As de «reservar todos os meses» nunca entram, porque aí o dinheiro é mesmo para acumular.</li>'+
         '<li><b>⚠️ Cobrir</b> — <i>outras categorias → uma categoria.</i> Aparece na linha de uma categoria que ficou <b>negativa</b>, por ter gasto nela mais do que lá tinha. Mostra o que falta e quem tem dinheiro parado, cada um com um cursor. Escolha de onde tirar: <b>primeiro das prioridades mais baixas</b> (sai de onde faz menos falta), <b>primeiro de quem tem mais folga</b>, ou <b>manual</b>. O que ainda não está atribuído é sempre gasto primeiro. Ao cartão de crédito só se tira a folga, nunca o que é preciso para o liquidar.</li>'+
-        '<li>As quatro <b>mostram o que ia acontecer antes de mexer em alguma coisa</b>, nenhuma tira dinheiro das contas — só muda a função que ele tem — e todas se desfazem com o <b>↩ Anular</b> que fica no topo.</li>'+
+        '<li><b>🧽 Limpar atribuições</b> — <i>categorias → Pronto a atribuir.</i> Devolve <b>tudo</b> o que atribuiu neste mês, para recomeçar do zero. Só mexe no mês que está a ver: o que transitou de meses anteriores fica onde está, e as transações não são tocadas. Se já gastou numa categoria mais do que o que transitou, ela fica negativa — a janela avisa quantas, antes de confirmar.</li>'+
+                '<li>As cinco <b>mostram o que ia acontecer antes de mexer em alguma coisa</b>, nenhuma tira dinheiro das contas — só muda a função que ele tem — e todas se desfazem com o <b>↩ Anular</b> que fica no topo.</li>'+
         '<li><b>O ✓ e o «Por confirmar»:</b> o ✓ marca que o banco já processou a transação. Mexe no <b>Confirmado</b>, não no <b>Saldo</b> — um café pago ontem está pago, tenha o banco lançado ou não, e o orçamento tem de contar com isso. A diferença entre os dois é o <b>Por confirmar</b>, que aparece no cabeçalho da conta e no ecrã das transações: quando chega a zero, a app bate certo com o extrato.</li>'+
+        '<li><b>Datas e teclado:</b> as datas escrevem-se sempre em <b>dd/mm/aaaa</b>, mesmo que tenha o browser noutro idioma — pode escrever só os números, que as barras aparecem sozinhas, ou usar o 📅 para as escolher no calendário. Dentro de qualquer janela, o <b>Enter</b> vale por carregar no botão principal.</li>'+
         '<li><b>Esc</b> dentro de um campo desfaz o que estava a escrever e larga o campo, sem gravar. Dentro de uma janela, é preciso carregar duas vezes: a primeira sai do campo, a segunda fecha a janela.</li>'+
         '<li>O <b>↩ Anular</b> da faixa reverte a última alteração aos valores atribuídos — tanto as operações em bloco como um valor que tenha mudado à mão numa linha.</li>'+
         '<li><b>Prioridade</b> ▲ ● ▼ à frente de cada categoria, muda com um clique. Ao financiar por prioridade serve as <b>Altas</b> primeiro; entre iguais, manda a <b>ordem da lista</b>.</li>'+
@@ -2876,7 +2960,7 @@
           '<button data-action="rec-tipo" data-id="transf" class="'+(ehTransf?"active":"")+'">↔ Transferência</button>'+
         '</div></div>'+
         '<div class="grid-2">'+
-          '<div class="field"><label>Próxima data</label><input id="rcDate" type="date" value="'+esc(s.nextDate)+'"></div>'+
+          '<div class="field"><label>Próxima data</label>'+dateField("rcDate", s.nextDate)+'</div>'+
           '<div class="field"><label>Frequência</label><select id="rcFreq">'+fo("weekly","Semanal")+fo("biweekly","Quinzenal")+fo("monthly","Mensal")+fo("semiannual","Semestral")+fo("yearly","Anual")+'</select></div>'+
         '</div>'+
         '<div class="field"><label>'+(ehTransf?"De (sai desta conta)":"Conta")+'</label><select id="rcAcc">'+opts(s.accountId)+'</select></div>'+
@@ -2929,7 +3013,7 @@
   // Guarda no objeto de trabalho o que já está escrito, para não se perder ao trocar de tipo.
   function readRec(){
     if(!_rec) return;
-    if(el("rcDate")) _rec.nextDate=el("rcDate").value||todayISO();
+    if(el("rcDate")) _rec.nextDate=dateVal("rcDate")||todayISO();
     if(el("rcFreq")) _rec.freq=el("rcFreq").value;
     if(el("rcAcc")) _rec.accountId=el("rcAcc").value;
     if(el("rcTo")) _rec.toAccountId=el("rcTo").value||null;
@@ -2990,7 +3074,7 @@
           '<div class="hint" id="tfCatHint"></div></div>'+
         '<div class="grid-2">'+
           '<div class="field"><label>Valor</label><input id="tfAmt" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(amtDefault)+'" placeholder="0,00"></div>'+
-          '<div class="field"><label>Data</label><input id="tfDate" type="date" value="'+esc(dateDefault)+'"></div>'+
+          '<div class="field"><label>Data</label>'+dateField("tfDate", dateDefault)+'</div>'+
         '</div>'+
         '<div class="field"><label>Nota (opcional)</label><input id="tfMemo" maxlength="300" value="'+esc(memoDefault)+'"></div>'+
         '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;"><input type="checkbox" id="tfClear" '+(clDefault?"checked":"")+' style="width:auto;"> Confirmada nas duas contas</label>'+
@@ -3023,7 +3107,7 @@
 
   function readSplit(){
     if(!_split) return;
-    if(el("spDate")) _split.date=el("spDate").value||todayISO();
+    if(el("spDate")) _split.date=dateVal("spDate")||todayISO();
     if(el("spAcc")) _split.accountId=el("spAcc").value;
     if(el("spPayee")) _split.payee=corta(el("spPayee").value, LIM_PAYEE);
     if(el("spMemo")) _split.memo=corta(el("spMemo").value, LIM_NOTA);
@@ -3070,7 +3154,7 @@
       '<div class="modal-head"><h2>'+(editando?"✎ Editar transação dividida":"➗ Transação dividida")+'</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
         '<div class="grid-2">'+
-          '<div class="field"><label>Data</label><input id="spDate" type="date" value="'+esc(s.date)+'"></div>'+
+          '<div class="field"><label>Data</label>'+dateField("spDate", s.date)+'</div>'+
           '<div class="field"><label>Conta</label><select id="spAcc">'+accOpts+'</select></div>'+
         '</div>'+
         '<div class="field"><label>Beneficiário</label><input id="spPayee" maxlength="100" list="payeeList" autocomplete="off" value="'+esc(s.payee)+'" placeholder="Ex.: Continente">'+
@@ -3271,7 +3355,7 @@
     },
     "save-tx": function(id){
       var accId = val("txAcc"); if(!accId){ toast("Selecione uma conta."); return; }
-      var data = { date: val("txDate")||todayISO(), accountId: accId, payee: valLim("txPayee", LIM_PAYEE),
+      var data = { date: dateVal("txDate")||todayISO(), accountId: accId, payee: valLim("txPayee", LIM_PAYEE),
         categoryId: el("txCat").value || null, memo: valLim("txMemo", LIM_NOTA),
         outflow: num("txOut"), inflow: num("txIn"), cleared: el("txClear").checked };
       if (data.outflow===0 && data.inflow===0) { toast("Indique um valor de saída ou entrada."); return; }
@@ -3312,7 +3396,7 @@
     "add-split": function(){ _split=null; splitModal(); },
     "to-split": function(){
       var dir=(el("txIn")&&el("txIn").value&&!(el("txOut")&&el("txOut").value))?"in":"out";
-      _split={ date:(el("txDate")?el("txDate").value:todayISO())||todayISO(), accountId:(el("txAcc")?el("txAcc").value:(state.accounts[0]||{}).id),
+      _split={ date:dateVal("txDate")||todayISO(), accountId:(el("txAcc")?el("txAcc").value:(state.accounts[0]||{}).id),
         payee:(el("txPayee")?corta(el("txPayee").value, LIM_PAYEE):""), memo:(el("txMemo")?corta(el("txMemo").value, LIM_NOTA):""),
         cleared:(el("txClear")?el("txClear").checked:true), dir:dir, lines:[{categoryId:"",amount:""},{categoryId:"",amount:""}] };
       splitModal();
@@ -3404,6 +3488,20 @@
       for (var k in state.assignments) if(state.assignments.hasOwnProperty(k) && k.split("|")[0]===id) delete state.assignments[k];
       state.ui.lastFunding=null;
       closeModal(); save(); render(); showUndo();
+    },
+    "clear-preview": function(){ clearModal(); },
+    "apply-clear": function(){
+      var m=state.ui.month, plan=clearPlan(m);
+      if(!plan.entries.length){ toast("Não há nada para devolver."); return; }
+      var snap=[];
+      for(var i=0;i<plan.entries.length;i++){
+        var k=plan.entries[i].id+"|"+m;
+        snap.push({key:k, prev: state.assignments.hasOwnProperty(k)?state.assignments[k]:null});
+        delete state.assignments[k];
+      }
+      state.ui.lastFunding={month:m, entries:snap};
+      closeModal(); save(); render();
+      toast("Devolvido "+fmt(plan.total)+" de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
     },
     "cover-overspend": function(id){ coverModal(id); },
     "apply-cover": function(){
@@ -3574,7 +3672,7 @@
       transferModal({ payCard:true, to:id, from: card.payFrom||"", amount: debt<-0.005?round2(-debt):"" });
     },
     "do-transfer": function(){
-      var from=el("tfFrom").value, to=el("tfTo").value, amt=num("tfAmt"), date=val("tfDate")||todayISO(), cl=el("tfClear").checked;
+      var from=el("tfFrom").value, to=el("tfTo").value, amt=num("tfAmt"), date=dateVal("tfDate")||todayISO(), cl=el("tfClear").checked;
       if(from===to){ toast("Escolha contas diferentes."); return; }
       if(amt<=0){ toast("Indique um valor."); return; }
       var cruza = !el("tfCatField").classList.contains("hidden");
@@ -3584,7 +3682,7 @@
       else toast("Não foi possível transferir.");
     },
     "save-transfer": function(pair){
-      var from=el("tfFrom").value, to=el("tfTo").value, amt=num("tfAmt"), date=val("tfDate")||todayISO(), cl=el("tfClear").checked;
+      var from=el("tfFrom").value, to=el("tfTo").value, amt=num("tfAmt"), date=dateVal("tfDate")||todayISO(), cl=el("tfClear").checked;
       if(from===to){ toast("Escolha contas diferentes."); return; }
       if(amt<=0){ toast("Indique um valor."); return; }
       var cruza = !el("tfCatField").classList.contains("hidden");
@@ -4204,6 +4302,49 @@
 
   // Clicar no fundo escurecido fecha a janela
   el("modalOverlay").addEventListener("click", function(e){ if(e.target===el("modalOverlay")) closeModal(); });
+  // Vai pondo as barras enquanto se escreve, mas só quando o cursor está no fim —
+  // caso contrário corrigir um dígito no meio atirava o cursor para o fundo.
+  document.addEventListener("input", function(e){
+    var t = e.target;
+    if (!t || !t.classList || !t.classList.contains("date-txt")) return;
+    if (t.selectionStart === t.value.length) {
+      var d = t.value.replace(/[^\d]/g, "").slice(0, 8), out = d.slice(0, 2);
+      if (d.length > 2) out += "/" + d.slice(2, 4);
+      if (d.length > 4) out += "/" + d.slice(4, 8);
+      t.value = out;
+    }
+    var nat = el(t.id + "__nat"); if (nat) nat.value = ptParaIso(t.value);
+    t.classList.toggle("erro", t.value.length > 0 && !ptParaIso(t.value));
+  });
+  // O calendário nativo continua lá, só que agora é ele que serve o campo de texto.
+  document.addEventListener("click", function(e){
+    var b = e.target.closest && e.target.closest("[data-cal]");
+    if (!b) return;
+    var nat = el(b.getAttribute("data-cal") + "__nat"); if (!nat) return;
+    if (nat.showPicker) { try { nat.showPicker(); return; } catch(err){} }
+    nat.focus(); nat.click();
+  });
+  document.addEventListener("change", function(e){
+    var t = e.target;
+    if (!t || !t.classList || !t.classList.contains("date-nat")) return;
+    var txt = el(t.id.replace(/__nat$/, ""));
+    if (txt && t.value) { txt.value = isoParaPt(t.value); txt.classList.remove("erro"); }
+  });
+
+  // Enter vale por carregar no botão principal da janela — a validação é a mesma
+  // de sempre, quem avisa do que falta é a própria ação.
+  document.addEventListener("keydown", function(e){
+    if (e.key !== "Enter" || e.isComposing || e.shiftKey) return;
+    if (!el("modalOverlay").classList.contains("open")) return;
+    var t = e.target, tag = t && t.tagName;
+    if (tag === "TEXTAREA" || tag === "BUTTON" || tag === "A") return;   // já têm sentido próprio
+    var pri = el("modal").querySelector(".modal-foot .btn.primary");
+    if (!pri || pri.disabled) return;
+    e.preventDefault();
+    if (tag === "INPUT" || tag === "SELECT") t.blur();   // fecha sugestões e fixa o valor escrito
+    pri.click();
+  });
+
   document.addEventListener("keydown", function(e){
     if (e.key !== "Escape") return;
     // Dentro de um campo, o Esc desfaz o que se estava a escrever e larga o campo —
@@ -4245,8 +4386,8 @@
     }
     if (e.target.id==="txFilterAcc"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.account=e.target.value||null; render(); }
     if (e.target.id==="txFilterCat"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.category=e.target.value||null; render(); }
-    if (e.target.id==="txFilterFrom"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.from=e.target.value||null; render(); }
-    if (e.target.id==="txFilterTo"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.to=e.target.value||null; render(); }
+    if (e.target.id==="txFilterFrom"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.from=ptParaIso(e.target.value)||null; render(); }
+    if (e.target.id==="txFilterTo"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.to=ptParaIso(e.target.value)||null; render(); }
     if (e.target.id==="txFilterPer"){ state.ui.txFilter=state.ui.txFilter||{}; var pv=e.target.value; state.ui.txFilter.per=pv||null; if(pv!=="custom"){ state.ui.txFilter.from=null; state.ui.txFilter.to=null; } render(); }
     if (e.target.id==="repFrom"){ state.ui.reportFrom=e.target.value||null; if(state.ui.reportFrom&&!state.ui.reportTo) state.ui.reportTo=state.ui.month; render(); }
     if (e.target.id==="repTo"){ state.ui.reportTo=e.target.value||null; if(state.ui.reportTo&&!state.ui.reportFrom) state.ui.reportFrom=shiftMonth(state.ui.reportTo,-5); render(); }
