@@ -198,9 +198,11 @@
   /* Prioridade: sempre visível e clicável (alta → normal → baixa → alta). */
   .prio-btn { flex: 0 0 auto; width: 22px; height: 22px; padding: 0; border-radius: 6px; border: 1px solid transparent; background: transparent; font-size: 11px; line-height: 1; display: inline-grid; place-items: center; transition: background .12s, border-color .12s; }
   .prio-btn:hover { border-color: var(--border); background: var(--surface-2); }
-  .prio-btn.p-alta { color: var(--primary); font-size: 12px; }
+  /* Escala tipo semáforo. Verde/vermelho vêm de --positive/--negative (e não de --primary),
+     para se manterem iguais nos dois temas e não se confundirem com o rosa. */
+  .prio-btn.p-alta { color: var(--positive); font-size: 12px; }
   .prio-btn.p-normal { color: var(--text-muted); opacity: .4; }
-  .prio-btn.p-baixa { color: var(--text-muted); }
+  .prio-btn.p-baixa { color: var(--negative); font-size: 12px; }
   .cat-name-cell .cat-actions { display: flex; gap: 4px; opacity: 0; }
   tr.cat-row:hover .cat-actions { opacity: 1; }
   .cat-actions button { background: transparent; border: 0; color: var(--text-muted); font-size: 13px; padding: 2px 5px; border-radius: 5px; }
@@ -216,6 +218,10 @@
   .btn.f-warn.active { background: var(--warning-soft); border-color: var(--warning); color: var(--warning); }
   .btn.f-neg.active  { background: var(--negative-soft); border-color: var(--negative); color: var(--negative); }
   .btn.f-ok.active   { background: var(--positive-soft); border-color: var(--positive); color: var(--positive); }
+  .btn.f-alta.active   { background: var(--positive-soft); border-color: var(--positive); color: var(--positive); }
+  .btn.f-normal.active { background: var(--neutral-soft); border-color: var(--text-muted); color: var(--text); }
+  .btn.f-baixa.active  { background: var(--negative-soft); border-color: var(--negative); color: var(--negative); }
+  .toolbar .sep { width: 1px; align-self: stretch; background: var(--border); margin: 2px 4px; }
   .target-note { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
   .num { text-align: end; font-variant-numeric: tabular-nums; }
   .assign-input { width: 108px; text-align: end; padding: 7px 9px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -1170,6 +1176,17 @@
     return ti.met ? "ok" : "warn";
   }
 
+  // Filtros da barra do orçamento. Dentro de cada grupo é "ou"; entre os dois grupos é "e"
+  // (por exemplo «Abaixo do alvo» E «Alta»). Sem nada escolhido num grupo, esse grupo não filtra.
+  function passaFiltros(c, m, bf, bp){
+    bf = bf || {}; bp = bp || {};
+    var fEstado = !!(bf.warn || bf.neg || bf.ok);
+    var fPrio   = !!(bp.alta || bp.normal || bp.baixa);
+    if (fEstado && !bf[catStatus(c, m)]) return false;
+    if (fPrio && (c.cardId || !bp[c.priority||"normal"])) return false;   // as do cartão não têm prioridade
+    return true;
+  }
+
   function renderBudget() {
     var m = state.ui.month;
     if (!state.groups.length) {
@@ -1180,14 +1197,15 @@
     }
     var upc = upcomingTotals(m).porCat;   // o que cada categoria ainda tem por sair este mês
     var bf = state.ui.budgetFilters || {};
-    var filtering = !!(bf.warn || bf.neg || bf.ok);
+    var bp = state.ui.prioFilters || {};
+    var filtering = !!(bf.warn || bf.neg || bf.ok || bp.alta || bp.normal || bp.baixa);
     var nShown=0, nTotal=0;
     var rows = "";
     for (var g=0; g<state.groups.length; g++) {
       var grp = state.groups[g];
       var allCats = categoriesOfGroup(grp.id);
       nTotal += allCats.length;
-      var cats = filtering ? allCats.filter(function(c){ return !!bf[catStatus(c,m)]; }) : allCats;
+      var cats = filtering ? allCats.filter(function(c){ return passaFiltros(c, m, bf, bp); }) : allCats;
       nShown += cats.length;
       if (filtering && !cats.length) continue;
       var gAssigned=0, gActivity=0, gAvail=0;
@@ -1266,6 +1284,14 @@
           '<td class="num"><span class="avail-pill '+pillCls+'">'+fmt(avail)+'</span></td></tr>';
       }
     }
+    // Com dois grupos de filtros combinados é fácil chegar a zero resultados — dizê-lo.
+    if (filtering && !nShown) rows =
+      '<tr><td colspan="4" class="empty" style="padding:34px 20px;">'+
+        '<div class="big" style="font-size:30px;">🔍</div>'+
+        '<h3>Nada corresponde aos filtros</h3>'+
+        '<p style="max-width:360px;margin:0 auto;">Está a pedir categorias que sejam ao mesmo tempo de um dos estados <b>e</b> de uma das prioridades escolhidas. Desligue algum filtro, ou use <b>Limpar</b>.</p>'+
+      '</td></tr>';
+
     el("content").innerHTML =
       '<div class="toolbar">' +
         '<button class="btn primary" data-action="add-tx">➕ Nova transação</button>' +
@@ -1274,6 +1300,10 @@
         '<button class="btn sm f-ok'+(bf.ok?' active':'')+'" data-action="budget-filter" data-id="ok" title="Categorias com alvo cumprido">🟢 Alvo cumprido</button>' +
         '<button class="btn sm f-warn'+(bf.warn?' active':'')+'" data-action="budget-filter" data-id="warn" title="Categorias com alvo por cumprir">🟡 Abaixo do alvo</button>' +
         '<button class="btn sm f-neg'+(bf.neg?' active':'')+'" data-action="budget-filter" data-id="neg" title="Categorias que gastaram mais do que o disponível">🔴 Excedido</button>' +
+        '<span class="sep"></span>' +
+        '<button class="btn sm f-alta'+(bp.alta?' active':'')+'" data-action="prio-filter" data-id="alta" title="Só as de prioridade alta">▲ Alta</button>' +
+        '<button class="btn sm f-normal'+(bp.normal?' active':'')+'" data-action="prio-filter" data-id="normal" title="Só as de prioridade normal">● Normal</button>' +
+        '<button class="btn sm f-baixa'+(bp.baixa?' active':'')+'" data-action="prio-filter" data-id="baixa" title="Só as de prioridade baixa">▼ Baixa</button>' +
         (filtering ? '<button class="btn sm" data-action="budget-filter-clear">Limpar</button>' : '') +
         '<div class="spacer"></div>' +
         '<span class="muted" style="font-size:12.5px;">' + (filtering ? ('A mostrar '+nShown+' de '+nTotal+' categorias') : 'Clique num valor em <b>Atribuído</b> para editar') + '</span>' +
@@ -2103,7 +2133,7 @@
         '<li><b>Financiar alvos</b> mostra primeiro o impacto (quanto <b>sobra</b> ou fica <b>negativo</b>) e só aplica ao <b>Confirmar</b>. Pode <b>Anular</b> a seguir. A opção <b>«Até ao disponível»</b> financia por ordem, sem ficar negativo. O 🎯 de cada linha financia uma só categoria.</li>'+
         '<li><b>Mover dinheiro:</b> o <b>↔</b> numa categoria transfere saldo disponível para outra categoria (ou de/para o «Pronto a atribuir») sem tocar no rendimento.</li>'+
         '<li><b>Reordenar:</b> as setas <b>▲▼</b> mudam a ordem, ou <b>arraste</b> a linha da categoria/grupo para a posição pretendida (arrastar uma categoria para outro grupo também a muda de grupo).</li>'+
-        '<li><b>Prioridade:</b> cada categoria pode ser <b>Alta ▲</b>, <b>Normal ●</b> ou <b>Baixa ▼</b>. O ícone aparece à frente do nome no orçamento e <b>muda com um clique</b> — cada clique desce um nível e, do fundo, volta ao topo. Também se pode mudar no ✎ da categoria. Serve para financiar alvos «Até ao disponível» com a estratégia <b>por prioridade</b>, que enche primeiro as Altas, depois as Normais, depois as Baixas.</li>'+
+        '<li><b>Prioridade:</b> cada categoria pode ser <b>Alta ▲</b>, <b>Normal ●</b> ou <b>Baixa ▼</b>. O ícone aparece à frente do nome no orçamento e <b>muda com um clique</b> — cada clique desce um nível e, do fundo, volta ao topo. Também se pode mudar no ✎ da categoria. Serve para financiar alvos «Até ao disponível» com a estratégia <b>por prioridade</b>, que enche primeiro as Altas, depois as Normais, depois as Baixas — e dentro do mesmo nível segue a <b>ordem em que as categorias aparecem</b> no orçamento. Na barra de cima pode ainda <b>filtrar</b> por prioridade; combinada com os filtros de estado, mostra só as que cumprem as duas condições (por exemplo, «Abaixo do alvo» <b>e</b> «Alta»).</li>'+
         '<li><b>Beneficiários:</b> à medida que vai registando, a app aprende. Ao escrever no campo <b>Beneficiário</b> aparecem os que já usou, e ao escolher um a <b>categoria</b> é preenchida com a que lhe deu da última vez — se ainda não tiver escolhido nenhuma. Pode sempre trocar.</li>'+
         '<li><b>Importar do banco:</b> em <b>Dados e cópias</b> pode importar um <b>.csv</b> com as transações; a estrutura esperada está explicada nesse ecrã. Na pré-visualização, as linhas que já existem (mesma conta, data e valor) aparecem marcadas como <b>«já existe»</b> e são <b>saltadas por predefinição</b> — assim pode importar extratos que se sobrepõem sem duplicar nada.</li>'+
         '<li><b>Anular:</b> o botão <b>↩ Anular</b> repõe as últimas <b>5</b> ações (eliminações, importações, duplicações).</li>'+
@@ -2596,7 +2626,8 @@
     "toggle-group": function(id){ state.collapsed[id]=!state.collapsed[id]; save(); render(); },
     // Filtros acumuláveis: pode ver ao mesmo tempo, por exemplo, "abaixo do alvo" e "excedido".
     "budget-filter": function(id){ var f=state.ui.budgetFilters||{}; if(f[id]) delete f[id]; else f[id]=true; state.ui.budgetFilters=f; save(); render(); },
-    "budget-filter-clear": function(){ state.ui.budgetFilters={}; save(); render(); },
+    "prio-filter": function(id){ var f=state.ui.prioFilters||{}; if(f[id]) delete f[id]; else f[id]=true; state.ui.prioFilters=f; save(); render(); },
+    "budget-filter-clear": function(){ state.ui.budgetFilters={}; state.ui.prioFilters={}; save(); render(); },
 
     "add-category": function(id){ categoryModal(null, id); },
     "edit-category": function(id){ var c=categoryById(id); if(c&&c.cardId){ toast("Categoria de pagamento de cartão (automática)."); return; } categoryModal(c); },
