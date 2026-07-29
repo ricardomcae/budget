@@ -518,11 +518,30 @@
     } catch (e) { console.warn("Falha ao ler dados", e); }
     return JSON.parse(JSON.stringify(DEFAULT_STATE));
   }
+  // Se o armazenamento encher, o estado fica só em memória — perde-se ao fechar o separador.
+  // Por isso isto não pode ser um aviso que desaparece em dois segundos.
+  var _semEspaco = false;
   function save() {
     _idx = null; _payees = null;
+    var guardou = true;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-    catch (e) { toast("Não foi possível guardar (armazenamento cheio?)"); }
+    catch (e) { guardou = false; }
+    if (guardou) _semEspaco = false;
+    else if (!_semEspaco) { _semEspaco = true; try { storageFullModal(); } catch(e2){ toast("Não foi possível guardar — armazenamento cheio."); } }
     scheduleAutoSync();
+    return guardou;
+  }
+  // Quanto ocupa cada coisa no armazenamento deste navegador (aproximado: 2 bytes por caractere).
+  function espacoApp(){
+    try {
+      var dados=0, hist=0, outros=0;
+      for (var k in localStorage) {
+        if (!localStorage.hasOwnProperty(k)) continue;
+        var n = (((localStorage.getItem(k)||"").length) + k.length) * 2;
+        if (k===STORAGE_KEY) dados+=n; else if (k===SNAP_KEY) hist+=n; else outros+=n;
+      }
+      return { dados:dados, hist:hist, outros:outros, total:dados+hist+outros };
+    } catch(e){ return null; }
   }
 
   // ---------- Domain calculations ----------
@@ -1613,14 +1632,14 @@
     openModal(
       '<div class="modal-head"><h2>'+(editing?"Editar conta":"Nova conta")+'</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
-        '<div class="field"><label>Nome da conta</label><input id="acName" value="'+esc(acc.name)+'" placeholder="Ex.: Conta à ordem"></div>'+
+        '<div class="field"><label>Nome da conta</label><input id="acName" maxlength="60" value="'+esc(acc.name)+'" placeholder="Ex.: Conta à ordem"></div>'+
         '<div class="field"><label>Tipo</label><div class="seg" id="acType">'+
           '<button data-t="budget" class="'+(acc.type==="budget"?"active":"")+'">🏦 Orçamento</button>'+
           '<button data-t="credit" class="'+(acc.type==="credit"?"active":"")+'">💳 Cartão</button>'+
           '<button data-t="tracking" class="'+(acc.type==="tracking"?"active":"")+'">📉 Acompanhamento</button></div>'+
           '<div class="hint">Orçamento = à ordem, poupança, dinheiro. Cartão = cartão de crédito (com categoria de pagamento automática). Acompanhamento = empréstimos, investimentos.</div></div>'+
         (editing?'':'<div class="field"><label>Saldo inicial</label><input id="acStart" type="text" inputmode="decimal" value="'+amtStr(acc.start)+'" placeholder="0,00"><div class="hint">Use valor negativo para dívidas (ex.: saldo de cartão de crédito).</div></div>')+
-        '<div class="field"><label>Nota (opcional)</label><input id="acNote" value="'+esc(acc.note||"")+'"></div>'+
+        '<div class="field"><label>Nota (opcional)</label><input id="acNote" maxlength="300" value="'+esc(acc.note||"")+'"></div>'+
         '<div class="field'+((acc.type==="credit"||acc.type==="tracking")?"":" hidden")+'" id="acPayFromField"><label>Conta de pagamento predefinida</label><select id="acPayFrom">'+payFromOpts+'</select><div class="hint">Ao pagar este cartão/dívida, o dinheiro sai por predefinição desta conta.</div></div>'+
       '</div>'+
       '<div class="modal-foot"><span>'+(editing?'<button class="btn" data-action="archive-account" data-id="'+acc.id+'" title="Ocultar sem perder o histórico">🗄 Arquivar</button> <button class="btn danger" data-action="delete-account" data-id="'+acc.id+'">Eliminar</button>':'')+'</span>'+
@@ -1657,7 +1676,7 @@
           '<div class="field"><label>Data</label><input id="txDate" type="date" value="'+esc(tx.date)+'"></div>'+
           '<div class="field"><label>Conta</label><select id="txAcc">'+accOpts+'</select></div>'+
         '</div>'+
-        '<div class="field"><label>Beneficiário</label><input id="txPayee" list="payeeList" autocomplete="off" value="'+esc(tx.payee||"")+'" placeholder="Ex.: Continente, Salário, EDP…">'+
+        '<div class="field"><label>Beneficiário</label><input id="txPayee" maxlength="100" list="payeeList" autocomplete="off" value="'+esc(tx.payee||"")+'" placeholder="Ex.: Continente, Salário, EDP…">'+
           '<datalist id="payeeList">'+payeeListHTML()+'</datalist></div>'+
         '<div class="field"><label>Categoria</label><select id="txCat">'+catOpts+'</select>'+
           '<div class="hint hidden" id="txCatSug">💡 Categoria preenchida a partir da última vez que usou este beneficiário.</div>'+
@@ -1666,7 +1685,7 @@
           '<div class="field"><label>Saída (despesa)</label><input id="txOut" type="text" inputmode="decimal" value="'+amtStr(tx.outflow)+'" placeholder="0,00"></div>'+
           '<div class="field"><label>Entrada (receita)</label><input id="txIn" type="text" inputmode="decimal" value="'+amtStr(tx.inflow)+'" placeholder="0,00"></div>'+
         '</div>'+
-        '<div class="field"><label>Nota (opcional)</label><input id="txMemo" value="'+esc(tx.memo||"")+'"></div>'+
+        '<div class="field"><label>Nota (opcional)</label><input id="txMemo" maxlength="300" value="'+esc(tx.memo||"")+'"></div>'+
         '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;"><input type="checkbox" id="txClear" '+(tx.cleared?"checked":"")+' style="width:auto;"> Confirmada (reconciliada com o banco)</label>'+
       '</div>'+
       '<div class="modal-foot"><span>'+(editing?'<button class="btn danger" data-action="delete-tx" data-id="'+tx.id+'">Eliminar</button>':'<button class="btn sm" data-action="to-split">➗ Dividir</button>')+'</span>'+
@@ -1703,7 +1722,7 @@
     var editing = !!grp; grp = grp || { name:"" };
     openModal(
       '<div class="modal-head"><h2>'+(editing?"Editar grupo":"Novo grupo de categorias")+'</h2><button class="x" data-action="close">×</button></div>'+
-      '<div class="modal-body"><div class="field"><label>Nome do grupo</label><input id="grpName" value="'+esc(grp.name)+'" placeholder="Ex.: Despesas fixas"></div></div>'+
+      '<div class="modal-body"><div class="field"><label>Nome do grupo</label><input id="grpName" maxlength="60" value="'+esc(grp.name)+'" placeholder="Ex.: Despesas fixas"></div></div>'+
       '<div class="modal-foot"><span>'+(editing?'<button class="btn danger" data-action="delete-group" data-id="'+grp.id+'">Eliminar</button>':'')+'</span>'+
         '<span><button class="btn" data-action="close">Cancelar</button> <button class="btn primary" data-action="save-group" data-id="'+(grp.id||"")+'">Guardar</button></span></div>');
   }
@@ -1724,9 +1743,9 @@
     openModal(
       '<div class="modal-head"><h2>'+(editing?"Editar categoria":"Nova categoria")+'</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
-        '<div class="field"><label>Nome</label><input id="catName" value="'+esc(cat.name)+'" placeholder="Ex.: Supermercado"></div>'+
+        '<div class="field"><label>Nome</label><input id="catName" maxlength="60" value="'+esc(cat.name)+'" placeholder="Ex.: Supermercado"></div>'+
         '<div class="field"><label>Grupo</label><select id="catGroup">'+grpOpts+'</select></div>'+
-        '<div class="field"><label>Nota (opcional)</label><input id="catNote" value="'+esc(cat.note||"")+'" placeholder="Ex.: rever no fim do mês"></div>'+
+        '<div class="field"><label>Nota (opcional)</label><input id="catNote" maxlength="300" value="'+esc(cat.note||"")+'" placeholder="Ex.: rever no fim do mês"></div>'+
         '<div class="field"><label>Prioridade</label><select id="catPrio">'+
           ['alta','normal','baixa'].map(function(p){ return '<option value="'+p+'"'+((cat.priority||"normal")===p?" selected":"")+'>'+PRIO_LABEL[p]+'</option>'; }).join("")+
         '</select><div class="hint">Usada ao financiar alvos «Até ao disponível» com a estratégia por prioridade.</div></div>'+
@@ -1819,6 +1838,9 @@
         '<div class="field"><button class="btn" data-action="archived-menu" style="width:100%;justify-content:center;">🗄 Ver arquivados</button></div>'+
         '<div class="field"><button class="btn" data-action="load-sample" style="width:100%;justify-content:center;">🧪 Carregar dados de exemplo</button></div>'+
         '<div class="field"><button class="btn danger" data-action="reset-data" style="width:100%;justify-content:center;">🗑 Apagar todos os dados</button></div>'+
+        (function(){ var e=espacoApp(); if(!e) return "";
+          return '<div class="hint" style="border-top:1px solid var(--border);padding-top:10px;">Espaço usado neste navegador: <b>'+mb(e.total)+
+            '</b> (orçamento '+mb(e.dados)+' · histórico '+mb(e.hist)+'). Costumam estar disponíveis cerca de 5 MB por site.</div>'; })()+
       '</div>'+
       '<div class="modal-foot"><span class="muted" style="font-size:12px;">Versão 1.0 · Orçamento base-zero</span><button class="btn" data-action="close">Fechar</button></div>');
     el("importFile").addEventListener("change", function(e){ importJSON(e.target.files[0]); });
@@ -1842,11 +1864,11 @@
           '<div class="hint">Apaga o token e a palavra-passe deste aparelho. Os seus dados locais e o gist ficam intactos.</div></div>';
     } else {
       body = '<p class="muted" style="margin-top:0;">Guarda uma cópia <b>cifrada</b> do seu orçamento num <b>gist privado</b> do GitHub. Assim, o telemóvel e o PC partilham os mesmos dados. O GitHub <b>nunca</b> vê nada em claro.</p>'+
-        '<div class="field"><label>1 · Token de acesso do GitHub</label><input id="syncToken" type="password" placeholder="github_pat_… ou ghp_…" value="'+esc(_sync.token||"")+'">'+
+        '<div class="field"><label>1 · Token de acesso do GitHub</label><input id="syncToken" maxlength="255" type="password" placeholder="github_pat_… ou ghp_…" value="'+esc(_sync.token||"")+'">'+
           '<div class="hint">GitHub → Settings → Developer settings → <b>Personal access tokens</b>, com permissão <b>Gists</b>.</div></div>'+
-        '<div class="field"><label>2 · Palavra-passe de cifra</label><input id="syncPass" type="password" placeholder="uma frase forte só sua">'+
+        '<div class="field"><label>2 · Palavra-passe de cifra</label><input id="syncPass" maxlength="255" type="password" placeholder="uma frase forte só sua">'+
           '<div class="hint">⚠️ Guarde-a bem: se a esquecer, a cópia na nuvem fica <b>irrecuperável</b>. Use a <b>mesma</b> em todos os dispositivos.</div></div>'+
-        '<div class="field"><label>3 · ID de um gist existente <span class="muted">(opcional)</span></label><input id="syncGist" placeholder="deixe vazio para criar um novo" value="'+esc(_sync.gistId||"")+'">'+
+        '<div class="field"><label>3 · ID de um gist existente <span class="muted">(opcional)</span></label><input id="syncGist" maxlength="100" placeholder="deixe vazio para criar um novo" value="'+esc(_sync.gistId||"")+'">'+
           '<div class="hint">No <b>1.º</b> dispositivo deixe vazio (cria um novo). No <b>2.º</b>, cole aqui o ID que apareceu no 1.º.</div></div>';
     }
     openModal(
@@ -1870,7 +1892,7 @@
             : 'Como este aparelho ainda não tinha sincronizado, o mais provável é o <b>ID estar errado</b>.')+
           '<br><br><b>Não criei nenhum gist novo automaticamente.</b> Se cada aparelho criasse o seu, ficaria com dois orçamentos separados a divergir sem dar por isso. Escolha o que fazer:</div>'+
         '<div class="field"><label>Usar outro gist que já exista</label>'+
-          '<input id="glId" placeholder="cole aqui o ID do gist" value="">'+
+          '<input id="glId" maxlength="100" placeholder="cole aqui o ID do gist" value="">'+
           '<div class="hint">Se já criou um novo no outro aparelho, cole aqui o ID que lá aparece.</div></div>'+
         '<div class="field"><button class="btn" data-action="gist-create-new" style="width:100%;justify-content:center;">☁️ Criar um gist novo com os dados deste aparelho</button>'+
           '<div class="hint">Os outros aparelhos vão precisar do ID novo para voltarem a sincronizar.</div></div>'+
@@ -1907,6 +1929,30 @@
       '<div class="modal-head"><h2>🗄 Arquivados</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body"><p class="muted" style="margin-top:0;">Itens ocultos do orçamento e das contas. O histórico mantém-se; reponha para voltarem a aparecer.</p>'+body+'</div>'+
       '<div class="modal-foot"><span></span><button class="btn" data-action="close">Fechar</button></div>');
+  }
+
+  function storageFullModal(){
+    var e = espacoApp();
+    var detalhe = e ? (
+      '<div class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">'+
+        '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Orçamento</span><b style="font-variant-numeric:tabular-nums;">'+mb(e.dados)+'</b></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Histórico (até 5 dias)</span><b style="font-variant-numeric:tabular-nums;">'+mb(e.hist)+'</b></div>'+
+        (e.outros?'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Outros</span><b style="font-variant-numeric:tabular-nums;">'+mb(e.outros)+'</b></div>':'')+
+        '<div style="display:flex;justify-content:space-between;padding:7px 0 0;margin-top:5px;border-top:1px solid var(--border);font-weight:700;"><span>Total</span><b style="font-variant-numeric:tabular-nums;">'+mb(e.total)+'</b></div>'+
+        '<div class="hint" style="margin-top:6px;">Os navegadores costumam dar cerca de 5 MB por site.</div>'+
+      '</div>') : '';
+    openModal(
+      '<div class="modal-head"><h2>⚠️ Não foi possível guardar</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body">'+
+        '<p style="margin-top:0;">O armazenamento deste navegador está cheio. <b>A última alteração não ficou gravada</b> — está apenas na memória e perde-se se fechar ou recarregar a página.</p>'+
+        detalhe+
+        '<div class="field"><button class="btn primary" data-action="export-json" style="width:100%;justify-content:center;">⬇ Guardar cópia de segurança agora</button>'+
+          '<div class="hint">Faça isto <b>primeiro</b>: põe os dados a salvo num ficheiro, fora do navegador.</div></div>'+
+        (e && e.hist>0 ? '<div class="field"><button class="btn" data-action="limpar-historico" style="width:100%;justify-content:center;">🗑 Apagar o histórico e libertar '+mb(e.hist)+'</button>'+
+          '<div class="hint">Os seus dados não são tocados — perde só a possibilidade de voltar a um dia anterior.</div></div>' : '')+
+        '<div class="hint">Se mesmo assim não chegar, exporte tudo, apague transações de anos antigos e volte a importar. Ativar a <b>sincronização</b> não ajuda aqui: a cópia na nuvem não substitui o armazenamento local.</div>'+
+      '</div>'+
+      '<div class="modal-foot"><span></span><button class="btn" data-action="close">Continuar sem guardar</button></div>');
   }
 
   function integrityModal(){
@@ -2059,6 +2105,7 @@
         '<li><b>Contas de orçamento</b> (à ordem, poupança, dinheiro) entram no orçamento. <b>Contas de acompanhamento</b> (cartões, empréstimos, investimentos) não afetam o «Pronto a atribuir».</li>'+
         '<li><b>Excesso</b> (Disponível a vermelho) significa que gastou mais do que atribuiu — atribua mais a essa categoria para o cobrir.</li>'+
         '<li><b>Orçamento vs. contas:</b> o dinheiro nas contas de orçamento tem de ser sempre igual ao «Pronto a atribuir» mais o «Disponível» de todas as categorias. Se algum movimento ficar <b>sem categoria</b>, ou se transferir dinheiro para uma <b>conta de acompanhamento</b> sem lhe dar categoria, aparece um aviso ⚠️ por baixo do «Pronto a atribuir» — carregue em <b>Ver porquê</b> para ver e corrigir os movimentos em causa.</li>'+
+        '<li><b>Limites:</b> os nomes ficam por 60 caracteres, os beneficiários por 100 e as notas por 300; cada importação de <b>.csv</b> lê no máximo 20 000 linhas. Isto existe porque tudo o que escreve ocupa espaço no navegador, que dá cerca de <b>5 MB</b> por site — e esse espaço é partilhado com o histórico. Pode ver quanto está a usar no fim do ecrã <b>Dados e cópias</b>. Se alguma vez encher, a aplicação avisa-o de forma bem visível: nessa altura <b>as alterações deixam de ser gravadas</b>, e a primeira coisa a fazer é guardar uma cópia em ficheiro.</li>'+
         '<li><b>Onde vivem os dados:</b> só <b>neste aparelho</b>, dentro do navegador — que os pode limpar ao fim de algum tempo sem uso, sobretudo no iPhone. Em <b>Dados e cópias</b> há três níveis de proteção, e convém não os confundir:<br>'+
           '<b>1 · Histórico</b> — a app guarda sozinha o estado do orçamento uma vez por dia, <b>dentro dela própria</b> (nunca descarrega ficheiros, funciona igual no iPhone e no PC), ao abrir e ao sair. Ficam os <b>5 dias</b> mais recentes e servem para <b>voltar a um dia anterior</b>. Como ficam no mesmo sítio que os dados, <b>não</b> o salvam se perder o aparelho.<br>'+
           '<b>2 · Cópia de segurança em ficheiro (.json)</b> — <b>sempre manual</b>, só quando carrega no botão. É a única que sobrevive a perder o aparelho; guarde-a fora daqui. A app avisa quando já vai com uns dias.<br>'+
@@ -2156,14 +2203,14 @@
           '<div class="field"><label>Frequência</label><select id="rcFreq">'+fo("weekly","Semanal")+fo("biweekly","Quinzenal")+fo("monthly","Mensal")+fo("yearly","Anual")+'</select></div>'+
         '</div>'+
         '<div class="field"><label>Conta</label><select id="rcAcc">'+accOpts+'</select></div>'+
-        '<div class="field"><label>Beneficiário</label><input id="rcPayee" list="payeeList" autocomplete="off" value="'+esc(r.payee||"")+'" placeholder="Ex.: Senhorio, Salário, Netflix…">'+
+        '<div class="field"><label>Beneficiário</label><input id="rcPayee" maxlength="100" list="payeeList" autocomplete="off" value="'+esc(r.payee||"")+'" placeholder="Ex.: Senhorio, Salário, Netflix…">'+
           '<datalist id="payeeList">'+payeeListHTML()+'</datalist></div>'+
         '<div class="field"><label>Categoria</label><select id="rcCat">'+catOpts+'</select></div>'+
         '<div class="grid-2">'+
           '<div class="field"><label>Saída (despesa)</label><input id="rcOut" type="text" inputmode="decimal" value="'+amtStr(r.outflow)+'" placeholder="0,00"></div>'+
           '<div class="field"><label>Entrada (receita)</label><input id="rcIn" type="text" inputmode="decimal" value="'+amtStr(r.inflow)+'" placeholder="0,00"></div>'+
         '</div>'+
-        '<div class="field"><label>Nota (opcional)</label><input id="rcMemo" value="'+esc(r.memo||"")+'"></div>'+
+        '<div class="field"><label>Nota (opcional)</label><input id="rcMemo" maxlength="300" value="'+esc(r.memo||"")+'"></div>'+
         '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;"><input type="checkbox" id="rcActive" '+(r.active?"checked":"")+' style="width:auto;"> Ativa (lança automaticamente na data)</label>'+
       '</div>'+
       '<div class="modal-foot"><span>'+(editing?'<button class="btn danger" data-action="delete-recurring" data-id="'+r.id+'">Eliminar</button>':'')+'</span>'+
@@ -2213,7 +2260,7 @@
           '<div class="field"><label>Valor</label><input id="tfAmt" type="text" inputmode="decimal" value="'+amtStr(amtDefault)+'" placeholder="0,00"></div>'+
           '<div class="field"><label>Data</label><input id="tfDate" type="date" value="'+esc(dateDefault)+'"></div>'+
         '</div>'+
-        '<div class="field"><label>Nota (opcional)</label><input id="tfMemo" value="'+esc(memoDefault)+'"></div>'+
+        '<div class="field"><label>Nota (opcional)</label><input id="tfMemo" maxlength="300" value="'+esc(memoDefault)+'"></div>'+
         '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;"><input type="checkbox" id="tfClear" '+(clDefault?"checked":"")+' style="width:auto;"> Confirmada nas duas contas</label>'+
         '<div class="hint" style="margin-top:8px;">'+(editPair
           ? 'As duas metades são guardadas em conjunto — valor, data e contas ficam sempre a condizer. Na lista, o <b>✓</b> de cada linha continua a permitir confirmar um lado de cada vez.'
@@ -2246,8 +2293,8 @@
     if(!_split) return;
     if(el("spDate")) _split.date=el("spDate").value||todayISO();
     if(el("spAcc")) _split.accountId=el("spAcc").value;
-    if(el("spPayee")) _split.payee=el("spPayee").value.trim();
-    if(el("spMemo")) _split.memo=el("spMemo").value.trim();
+    if(el("spPayee")) _split.payee=corta(el("spPayee").value, LIM_PAYEE);
+    if(el("spMemo")) _split.memo=corta(el("spMemo").value, LIM_NOTA);
     if(el("spClear")) _split.cleared=el("spClear").checked;
     for(var i=0;i<_split.lines.length;i++){
       var cs=el("spCat"+i), as=el("spAmt"+i);
@@ -2294,14 +2341,14 @@
           '<div class="field"><label>Data</label><input id="spDate" type="date" value="'+esc(s.date)+'"></div>'+
           '<div class="field"><label>Conta</label><select id="spAcc">'+accOpts+'</select></div>'+
         '</div>'+
-        '<div class="field"><label>Beneficiário</label><input id="spPayee" list="payeeList" autocomplete="off" value="'+esc(s.payee)+'" placeholder="Ex.: Continente">'+
+        '<div class="field"><label>Beneficiário</label><input id="spPayee" maxlength="100" list="payeeList" autocomplete="off" value="'+esc(s.payee)+'" placeholder="Ex.: Continente">'+
           '<datalist id="payeeList">'+payeeListHTML()+'</datalist></div>'+
         '<div class="field"><label>Tipo</label><div class="seg" id="spDir">'+
           '<button data-action="split-dir" data-id="out" class="'+(s.dir==="out"?"active":"")+'">Saída (despesa)</button>'+
           '<button data-action="split-dir" data-id="in" class="'+(s.dir==="in"?"active":"")+'">Entrada (receita)</button></div></div>'+
         '<div class="field"><label>Repartição por categorias</label>'+lineRows+
           '<button class="btn sm" data-action="split-add-line">+ Adicionar categoria</button></div>'+
-        '<div class="field"><label>Nota (opcional)</label><input id="spMemo" value="'+esc(s.memo)+'"></div>'+
+        '<div class="field"><label>Nota (opcional)</label><input id="spMemo" maxlength="300" value="'+esc(s.memo)+'"></div>'+
         '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;"><input type="checkbox" id="spClear" '+(s.cleared?"checked":"")+' style="width:auto;"> Confirmada</label>'+
         '<div class="hint" style="margin-top:10px;font-size:13px;">Total: <b id="splitTotal">'+fmt(total)+'</b> em '+s.lines.length+' categorias.'+
           (editando?'<br>As partes são guardadas <b>todas em conjunto</b>, por isso o total nunca fica a meio. Se deixar só uma categoria com valor, deixa de ser uma transação dividida.':'')+'</div>'+
@@ -2326,11 +2373,35 @@
     else { intp = s.slice(0, di).replace(/[.,]/g, ""); frac = s.slice(di+1).replace(/[.,]/g, ""); }
     var v = parseFloat((intp || "0") + (frac ? ("." + frac) : ""));
     if (isNaN(v)) return NaN;
+    // Fora de escala conta como inválido. Este é o único sítio por onde passam TODOS os
+    // valores (formulários e importação de CSV) — sem isto, um número absurdo vindo de um
+    // ficheiro tornava-se Infinity e envenenava todas as somas do orçamento.
+    if (!isFinite(v) || v > MAX_VALOR) return NaN;
     return neg ? -v : v;
   }
   function amtStr(n){ if (n===""||n===null||n===undefined||n===0) return ""; return String(n).replace(".", ","); }
-  function num(id) { var v = parseAmount(el(id).value); return isNaN(v) ? 0 : round2(v); }
+
+  // ---------- Limites do que pode entrar ----------
+  // Tudo o que se escreve vai parar ao armazenamento do navegador (~5 MB), ao ficheiro de
+  // cópia e ao gist. Sem tecto, um texto colado por engano ou um ficheiro enorme enchem tudo.
+  var LIM_NOME = 60, LIM_PAYEE = 100, LIM_NOTA = 300, LIM_TOKEN = 255;
+  var MAX_VALOR = 1e12;                    // chega para qualquer orçamento pessoal
+  var MAX_FICH_JSON = 20*1024*1024;        // 20 MB
+  var MAX_FICH_CSV  = 10*1024*1024;        // 10 MB
+  var MAX_LINHAS_CSV = 20000;
+  function corta(s, n){ s=String(s==null?"":s).trim(); return s.length>n ? s.slice(0,n) : s; }
+  function mb(bytes){ return (bytes/1048576).toFixed(1).replace(".", ",")+" MB"; }
+
+  function num(id) {
+    var bruto = el(id).value, v = parseAmount(bruto);
+    if (isNaN(v)) {
+      if (/\d/.test(bruto)) toast("Valor inválido ou demasiado grande — confirme o que escreveu.");
+      return 0;
+    }
+    return round2(v);
+  }
   function val(id) { return el(id).value.trim(); }
+  function valLim(id, n) { return corta(el(id).value, n); }
 
   var actions = {
     "prev-month": function(){ state.ui.month = shiftMonth(state.ui.month,-1); render(); },
@@ -2341,6 +2412,13 @@
     "help": helpModal,
     "data-menu": dataModal,
     "integrity": function(){ integrityModal(); },
+    "limpar-historico": function(){
+      if(!confirm("Apagar os pontos de histórico guardados?\nOs seus dados atuais não são afetados — perde apenas a possibilidade de voltar a um dia anterior.")) return;
+      try { localStorage.removeItem(SNAP_KEY); } catch(e){}
+      _semEspaco=false;
+      if (save()) { closeModal(); render(); toast("Histórico apagado — já há espaço para guardar."); }
+      else toast("Ainda não chega. Guarde uma cópia em ficheiro e apague transações antigas.");
+    },
     "upcoming": function(){ upcomingModal(); },
     "fix-transfer": function(id){ fixTransferModal(id); },
     "save-fix-transfer": function(id){
@@ -2355,9 +2433,9 @@
     "add-account": function(){ accountModal(); },
     "edit-account": function(id){ accountModal(accountById(id)); },
     "save-account": function(id){
-      var name = val("acName"); if(!name){ toast("Indique um nome."); return; }
+      var name = valLim("acName", LIM_NOME); if(!name){ toast("Indique um nome."); return; }
       var type = _tmpAccType || "budget";
-      var note = val("acNote");
+      var note = valLim("acNote", LIM_NOTA);
       var payFrom = el("acPayFrom") ? (el("acPayFrom").value||null) : null;
       if (id) {
         var a=accountById(id); a.name=name; a.type=type; a.note=note; a.payFrom = type!=="budget"?payFrom:null;
@@ -2410,8 +2488,8 @@
     },
     "save-tx": function(id){
       var accId = val("txAcc"); if(!accId){ toast("Selecione uma conta."); return; }
-      var data = { date: val("txDate")||todayISO(), accountId: accId, payee: val("txPayee"),
-        categoryId: el("txCat").value || null, memo: val("txMemo"),
+      var data = { date: val("txDate")||todayISO(), accountId: accId, payee: valLim("txPayee", LIM_PAYEE),
+        categoryId: el("txCat").value || null, memo: valLim("txMemo", LIM_NOTA),
         outflow: num("txOut"), inflow: num("txIn"), cleared: el("txClear").checked };
       if (data.outflow===0 && data.inflow===0) { toast("Indique um valor de saída ou entrada."); return; }
       if (data.outflow>0 && data.inflow>0) { toast("Preencha só a Saída OU a Entrada, não as duas."); return; }
@@ -2452,7 +2530,7 @@
     "to-split": function(){
       var dir=(el("txIn")&&el("txIn").value&&!(el("txOut")&&el("txOut").value))?"in":"out";
       _split={ date:(el("txDate")?el("txDate").value:todayISO())||todayISO(), accountId:(el("txAcc")?el("txAcc").value:(state.accounts[0]||{}).id),
-        payee:(el("txPayee")?el("txPayee").value.trim():""), memo:(el("txMemo")?el("txMemo").value.trim():""),
+        payee:(el("txPayee")?corta(el("txPayee").value, LIM_PAYEE):""), memo:(el("txMemo")?corta(el("txMemo").value, LIM_NOTA):""),
         cleared:(el("txClear")?el("txClear").checked:true), dir:dir, lines:[{categoryId:"",amount:""},{categoryId:"",amount:""}] };
       splitModal();
     },
@@ -2492,7 +2570,7 @@
     "add-group": function(){ groupModal(); },
     "edit-group": function(id){ groupModal(groupById(id)); },
     "save-group": function(id){
-      var name=val("grpName"); if(!name){ toast("Indique um nome."); return; }
+      var name=valLim("grpName", LIM_NOME); if(!name){ toast("Indique um nome."); return; }
       if (id){ groupById(id).name=name; } else { state.groups.push({id:uid(), name:name}); }
       closeModal(); save(); render(); toast("Grupo guardado.");
     },
@@ -2513,7 +2591,7 @@
     "add-category": function(id){ categoryModal(null, id); },
     "edit-category": function(id){ var c=categoryById(id); if(c&&c.cardId){ toast("Categoria de pagamento de cartão (automática)."); return; } categoryModal(c); },
     "save-category": function(id){
-      var name=val("catName"); if(!name){ toast("Indique um nome."); return; }
+      var name=valLim("catName", LIM_NOME); if(!name){ toast("Indique um nome."); return; }
       var groupId=el("catGroup").value;
       var tType=el("catTType").value, tv=num("catTarget");
       var target=null;
@@ -2524,7 +2602,7 @@
         if (tType==="monthly") target.fund = el("catFund").value;
         if (tType==="quarterly" || tType==="yearly") { var dd=el("catTargetDue").value; if(dd) target.due=dd; }
       }
-      var note=val("catNote");
+      var note=valLim("catNote", LIM_NOTA);
       var prio=el("catPrio")?el("catPrio").value:"normal";
       if (id){ var c=categoryById(id); c.name=name; c.groupId=groupId; c.target=target; c.note=note; c.priority=prio; }
       else { state.categories.push({id:uid(), name:name, groupId:groupId, target:target, note:note, priority:prio}); }
@@ -2610,8 +2688,8 @@
     "edit-recurring": function(id){ recurringModal(recById(id)); },
     "save-recurring": function(id){
       var accId=el("rcAcc").value; if(!accId){ toast("Selecione uma conta."); return; }
-      var data={ nextDate: val("rcDate")||todayISO(), freq: el("rcFreq").value, accountId:accId, payee:val("rcPayee"),
-        categoryId: el("rcCat").value||null, memo:val("rcMemo"), outflow:num("rcOut"), inflow:num("rcIn"), active: el("rcActive").checked };
+      var data={ nextDate: val("rcDate")||todayISO(), freq: el("rcFreq").value, accountId:accId, payee:valLim("rcPayee", LIM_PAYEE),
+        categoryId: el("rcCat").value||null, memo:valLim("rcMemo", LIM_NOTA), outflow:num("rcOut"), inflow:num("rcIn"), active: el("rcActive").checked };
       if(data.outflow===0 && data.inflow===0){ toast("Indique um valor de saída ou entrada."); return; }
       if(data.outflow>0 && data.inflow>0){ toast("Preencha só a Saída OU a Entrada, não as duas."); return; }
       if(id){ var r=recById(id); for(var k in data) r[k]=data[k]; }
@@ -2646,7 +2724,7 @@
       var cruza = !el("tfCatField").classList.contains("hidden");
       var cat = cruza ? (el("tfCat").value||null) : null;
       if(cruza && !cat){ toast("Escolha a categoria — este movimento entra ou sai do orçamento."); return; }
-      if(createTransfer(from,to,amt,date,cl,cat,val("tfMemo"))){ closeModal(); save(); render(); toast("Transferência registada."); }
+      if(createTransfer(from,to,amt,date,cl,cat,valLim("tfMemo", LIM_NOTA))){ closeModal(); save(); render(); toast("Transferência registada."); }
       else toast("Não foi possível transferir.");
     },
     "save-transfer": function(pair){
@@ -2657,7 +2735,7 @@
       var cat = cruza ? (el("tfCat").value||null) : null;
       if(cruza && !cat){ toast("Escolha a categoria — este movimento entra ou sai do orçamento."); return; }
       pushUndo("Transferência alterada.");
-      if(updateTransfer(pair,from,to,amt,date,cl,cat,val("tfMemo"))){ closeModal(); save(); render(); toast("Transferência alterada."); showUndo(); }
+      if(updateTransfer(pair,from,to,amt,date,cl,cat,valLim("tfMemo", LIM_NOTA))){ closeModal(); save(); render(); toast("Transferência alterada."); showUndo(); }
       else { _undo.pop(); toast("Não foi possível alterar esta transferência."); }
     },
 
@@ -3071,7 +3149,7 @@
       var ke=te.accountId+"|"+te.date+"|"+round2(te.outflow||0).toFixed(2)+"|"+round2(te.inflow||0).toFixed(2);
       jaExiste[ke]=(jaExiste[ke]||0)+1;
     }
-    var rows=[], skipped=0, semCat=0, dups=0;
+    var rows=[], skipped=0, semCat=0, dups=0, cortado=0;
     for(var i=1;i<lines.length;i++){
       var f=splitCSVLine(lines[i],d);
       var date=parseCSVDate(f[idx.data]);
@@ -3090,10 +3168,11 @@
       var kr=accId+"|"+date+"|"+round2(out).toFixed(2)+"|"+round2(inf).toFixed(2);
       var repetida=false;
       if(jaExiste[kr]>0){ repetida=true; jaExiste[kr]--; dups++; }
-      rows.push({ date:date, accountId:accId, payee:(f[idx.payee]||"").trim(), categoryId:catId,
-        memo:("nota" in idx ? (f[idx.nota]||"").trim() : ""), outflow:round2(out), inflow:round2(inf), cleared:cl, dup:repetida });
+      rows.push({ date:date, accountId:accId, payee:corta(f[idx.payee]||"", LIM_PAYEE), categoryId:catId,
+        memo:("nota" in idx ? corta(f[idx.nota]||"", LIM_NOTA) : ""), outflow:round2(out), inflow:round2(inf), cleared:cl, dup:repetida });
+      if(rows.length>=MAX_LINHAS_CSV){ cortado=(lines.length-1)-i; break; }
     }
-    return { rows:rows, skipped:skipped, semCat:semCat, dups:dups, error:null };
+    return { rows:rows, skipped:skipped, semCat:semCat, dups:dups, cortado:cortado, error:null };
   }
 
   function importCSVModal(){
@@ -3121,7 +3200,10 @@
           '<div class="hint" style="margin-top:4px;">Mesma conta, mesma data e mesmo valor de transações que já tem registadas — costuma acontecer quando os extratos se sobrepõem. Desligue só se souber que são movimentos mesmo repetidos.</div>':'')+
         '<div class="hint" style="margin-top:8px;"><b>'+aImportar+'</b> transações a importar'+
         (_csv.skipped?' · <b>'+_csv.skipped+'</b> linhas ignoradas (sem data ou sem valor)':'')+
-        (_csv.semCat?' · <b>'+_csv.semCat+'</b> ficam sem categoria':'')+'</div></div>';
+        (_csv.semCat?' · <b>'+_csv.semCat+'</b> ficam sem categoria':'')+'</div>'+
+        (_csv.cortado?'<div class="hint" style="color:var(--warning);font-weight:600;">⚠️ O ficheiro tem mais linhas do que o limite de '+MAX_LINHAS_CSV+
+          ' por importação — ficaram <b>'+_csv.cortado+'</b> por ler. Importe o resto num segundo ficheiro.</div>':'')+
+        '</div>';
     } else if(_csv && _csv.error){
       prev='<div class="field"><div class="hint" style="color:var(--negative);font-weight:600;">'+esc(_csv.error)+'</div></div>';
     }
@@ -3155,6 +3237,7 @@
     });
     el("csvFile").addEventListener("change", function(e){
       var file=e.target.files[0]; if(!file) return;
+      if(file.size>MAX_FICH_CSV){ e.target.value=""; toast("Esse ficheiro tem "+mb(file.size)+" — o limite é "+mb(MAX_FICH_CSV)+". Divida-o por períodos."); return; }
       var acc=el("csvAcc").value;
       var rd=new FileReader();
       rd.onload=function(ev){ var raw=ev.target.result; _csv=parseCSV(raw, acc); _csv.raw=raw; _csv.accountId=acc; importCSVModal(); };
@@ -3164,6 +3247,7 @@
 
   function importJSON(file) {
     if (!file) return;
+    if (file.size > MAX_FICH_JSON) { toast("Essa cópia tem "+mb(file.size)+" — o limite é "+mb(MAX_FICH_JSON)+". Não parece um ficheiro desta aplicação."); return; }
     var reader = new FileReader();
     reader.onload = function(e){
       try {
