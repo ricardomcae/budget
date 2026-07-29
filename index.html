@@ -1239,6 +1239,39 @@
     return { entries:entries, total:total, rtaBefore:rta, rtaAfter:round2(rta - total), disponivel:totalTem };
   }
 
+  // Tecto de cada categoria: quanto é que ela precisa de ter, no máximo, segundo o seu alvo.
+  //   "alvo"    -> há um tecto; o que passe disso é excedente
+  //   "acumula" -> «reservar todos os meses» junta de propósito, não há tecto
+  //   "sem"     -> sem alvo, não há como saber o que é de mais
+  function tetoDaCategoria(cat, m) {
+    var tg = cat.target;
+    if (!tg || !(tg.amount > 0)) return { teto:null, tipo:"sem" };
+    var t = tg.type || "monthly";
+    if (t === "monthly" && tg.fund === "setAside") return { teto:null, tipo:"acumula" };
+    if (t === "weekly") return { teto: round2(tg.amount * weekdayCount(m, (tg.weekday==null?1:tg.weekday))), tipo:"alvo" };
+    return { teto: round2(tg.amount), tipo:"alvo" };
+  }
+
+  // Dinheiro que está numa categoria ACIMA do que o alvo dela exige. Devolvê-lo ao
+  // «Pronto a atribuir» não mexe em contas nem em transações — só desfaz a atribuição.
+  function surplusPlan(m, incluirSemAlvo) {
+    var list = orderedCategories(), entries = [], total = 0;
+    for (var i=0;i<list.length;i++){
+      var c = list[i];
+      if (c.cardId) continue;                                  // a do cartão é automática
+      var tem = availableFor(c.id, m);
+      if (tem <= 0.005) continue;
+      var t = tetoDaCategoria(c, m), excesso = 0;
+      if (t.tipo === "acumula") continue;                      // é para juntar, não é excedente
+      if (t.tipo === "sem") { if (!incluirSemAlvo) continue; excesso = tem; }
+      else excesso = round2(tem - t.teto);
+      if (excesso > 0.005) { entries.push({ catId:c.id, name:c.name, add:round2(-excesso), tem:round2(tem), teto:t.teto }); total -= excesso; }
+    }
+    total = round2(total);
+    var rta = readyToAssign(m);
+    return { entries:entries, total:total, rtaBefore:rta, rtaAfter:round2(rta - total) };
+  }
+
   // ---------- Desenho do ecrã ----------
   function applyTheme(){ if (document.body) document.body.classList.toggle("theme-rose", !!(state.settings && state.settings.theme==="rose")); }
   function render() {
@@ -1455,6 +1488,8 @@
       '<div class="toolbar">' +
         '<button class="btn primary hide-phone" data-action="add-tx">➕ Nova transação</button>' +
         '<button class="btn" data-action="add-group">+ Grupo</button>' +
+        (function(){ var ex=surplusPlan(m, !!state.ui.surplusSemAlvo).total;
+          return ex < -0.005 ? '<button class="btn" data-action="surplus-preview" title="Devolver ao Pronto a atribuir o que está acima dos alvos">🧹 Libertar '+fmt(-ex)+'</button>' : ''; })() +
         '<span class="muted hide-phone" style="font-size:12.5px;margin-inline-start:6px;">Mostrar:</span>' +
         fBtn('f-ok','budget-filter','ok',bf.ok,'🟢','Alvo cumprido','Só as categorias com o alvo cumprido') +
         fBtn('f-warn','budget-filter','warn',bf.warn,'🟡','Abaixo do alvo','Só as categorias com o alvo por cumprir') +
@@ -2439,6 +2474,7 @@
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li><b>🎯 Financiar alvos</b> mostra o impacto antes de aplicar, e pode <b>Anular</b> a seguir. «Repartir o que está por atribuir» nunca o deixa negativo, e reparte de três maneiras: <b>por prioridade</b> (serve as Altas primeiro), <b>proporcional</b> (todas ficam igualmente perto do alvo — quem precisa de mais leva mais) ou <b>pela ordem da lista</b> (completa de cima para baixo até acabar).</li>'+
         '<li><b>↩ Repor a zero:</b> se atribuir mais do que tem, o «Pronto a atribuir» fica <b>negativo</b> e aparece este botão. Retira das categorias que têm dinheiro até voltar a zero, com as mesmas três maneiras de repartir — mas ao contrário: <b>por prioridade</b> tira primeiro das <b>Baixas</b>, para proteger as Altas. Nenhuma categoria fica negativa, e pode <b>Anular</b> a seguir.</li>'+
+        '<li><b>🧹 Libertar excedente:</b> aparece na barra do orçamento quando alguma categoria tem <b>mais do que o alvo dela pede</b> — por exemplo «repor até 200 €» com 500 € lá dentro. Mostra primeiro o que ia acontecer, e só liberta se confirmar. Estar <b>adiantado</b> num objetivo com data não conta como excedente: se quer 3.000 € e já juntou 2.000 €, o dinheiro é seu e fica onde está — esticar o prazo apenas <b>baixa a mensalidade</b>. As de «reservar todos os meses» nunca entram, porque aí o dinheiro é mesmo para acumular.</li>'+
         '<li><b>Prioridade</b> ▲ ● ▼ à frente de cada categoria, muda com um clique. Ao financiar por prioridade serve as <b>Altas</b> primeiro; entre iguais, manda a <b>ordem da lista</b>.</li>'+
         '<li><b>↔</b> move dinheiro entre categorias (ou de/para o «Pronto a atribuir») sem mexer no rendimento.</li>'+
       '</ul>'+
@@ -2569,6 +2605,38 @@
         (plan.entries.length?'<button class="btn primary" data-action="apply-recover">Confirmar</button>':'')+'</span></div>');
     var rs=el("recStrat");
     if(rs) rs.addEventListener("change", function(){ state.ui.recoverStrategy=rs.value; save(); recoverModal(); });
+  }
+
+  function surplusModal() {
+    var m = state.ui.month;
+    var incluir = !!state.ui.surplusSemAlvo;
+    var plan = surplusPlan(m, incluir);
+    var totalLivre = round2(-plan.total);
+
+    var rows = plan.entries.length ? plan.entries.map(function(e){
+      var det = (e.teto===null) ? "sem alvo" : ("tem "+fmt(e.tem)+", precisa de "+fmt(e.teto));
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 2px;border-bottom:1px solid var(--border);">'+
+        '<span><b>'+esc(e.name)+'</b><br><span class="tag">'+det+'</span></span>'+
+        '<b class="tx-amt in" style="font-variant-numeric:tabular-nums;">'+fmt(-e.add)+'</b></div>';
+    }).join("") : '<div class="muted" style="padding:14px 0;text-align:center;">Não há nada acima do que os alvos pedem. 👍</div>';
+
+    openModal(
+      '<div class="modal-head"><h2>🧹 Libertar excedente — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body">'+
+        '<p class="muted" style="margin-top:0;">Devolve ao «Pronto a atribuir» o dinheiro que está numa categoria <b>acima do que o alvo dela pede</b>, para o poder usar noutro sítio. Não mexe em contas nem em transações — só desfaz a atribuição.</p>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;text-align:center;">'+
+          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">Por atribuir</div><div class="k-value" style="font-size:17px;">'+fmt(plan.rtaBefore)+'</div></div>'+
+          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">A libertar</div><div class="k-value pos" style="font-size:17px;">'+fmt(totalLivre)+'</div></div>'+
+          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">Depois</div><div class="k-value pos" style="font-size:17px;">'+fmt(plan.rtaAfter)+'</div></div>'+
+        '</div>'+
+        '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;margin-bottom:6px;">'+
+          '<input type="checkbox" data-action="surplus-toggle-semalvo" '+(incluir?"checked":"")+' style="width:auto;"> Incluir também as categorias sem alvo</label>'+
+        '<div class="hint" style="margin-bottom:12px;">Sem alvo definido não há como saber o que é de mais, por isso essas ficam de fora por predefinição — ligando isto, é retirado <b>tudo</b> o que lá está. As de «reservar todos os meses» nunca entram: nessas o dinheiro é para juntar.</div>'+
+        '<div style="max-height:230px;overflow:auto;">'+rows+'</div>'+
+      '</div>'+
+      '<div class="modal-foot"><span></span>'+
+        '<span><button class="btn" data-action="close">Cancelar</button> '+
+        (plan.entries.length?'<button class="btn primary" data-action="apply-surplus">Libertar '+fmt(totalLivre)+'</button>':'')+'</span></div>');
   }
 
   var RTA_ID = "__rta__";
@@ -3167,6 +3235,21 @@
     },
     "fund-preview": function(){ if(!state.categories.length){ toast("Crie categorias com alvos primeiro."); return; } state.ui._fundMode="full"; fundModal(); },
     "recover-preview": function(){ recoverModal(); },
+    "surplus-preview": function(){ surplusModal(); },
+    "surplus-toggle-semalvo": function(){ state.ui.surplusSemAlvo = !state.ui.surplusSemAlvo; save(); surplusModal(); },
+    "apply-surplus": function(){
+      var m=state.ui.month, plan=surplusPlan(m, !!state.ui.surplusSemAlvo);
+      if(!plan.entries.length){ toast("Não há nada a libertar."); return; }
+      var snap=[];
+      for(var i=0;i<plan.entries.length;i++){
+        var e=plan.entries[i], key=e.catId+"|"+m;
+        snap.push({key:key, prev: state.assignments.hasOwnProperty(key)?state.assignments[key]:null});
+        state.assignments[key]=round2((state.assignments[key]||0)+e.add);
+      }
+      state.ui.lastFunding={month:m, entries:snap};
+      closeModal(); save(); render();
+      toast("Libertado "+fmt(-plan.total)+" de "+plan.entries.length+" categorias.");
+    },
     "apply-recover": function(){
       var m=state.ui.month, plan=recoverPlan(m, state.ui.recoverStrategy);
       if(!plan.entries.length){ toast("Não há de onde tirar."); return; }
