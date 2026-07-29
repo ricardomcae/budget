@@ -90,7 +90,7 @@
 
   .app { display: grid; grid-template-columns: 250px 1fr; min-height: 100vh; }
 
-  /* Sidebar */
+  /* Barra lateral */
   .sidebar {
     background: var(--sidebar);
     color: var(--sidebar-text);
@@ -129,7 +129,7 @@
   .side-footer button > span:first-child { flex: 0 0 20px; text-align: center; }
   .side-footer button:hover { background: rgba(255,255,255,.06); color: var(--sidebar-text-strong); }
 
-  /* Main */
+  /* Zona principal */
   .main { padding: 0; min-width: 0; display: flex; flex-direction: column; }
   .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 26px; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 20; flex-wrap: wrap; }
   .view-title { font-size: 19px; font-weight: 700; margin: 0; }
@@ -180,7 +180,7 @@
   .search { padding: 8px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); min-width: 180px; }
   select.filter, input.filter { padding: 8px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font-weight: 600; }
 
-  /* Budget table */
+  /* Tabela do orçamento */
   .budget-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
   table.budget { width: 100%; border-collapse: collapse; }
   table.budget thead th { text-align: end; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; padding: 12px 18px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
@@ -242,7 +242,7 @@
   .avail-pill.neg { background: var(--negative-soft); color: var(--negative); }
   .avail-pill.warn { background: var(--warning-soft); color: var(--warning); }
 
-  /* Generic table (transactions / accounts) */
+  /* Tabela genérica (transações / contas) */
   .data-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
   table.data { width: 100%; border-collapse: collapse; }
   table.data th { text-align: start; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; padding: 11px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2); white-space: nowrap; }
@@ -267,7 +267,7 @@
   .empty .big { font-size: 40px; margin-bottom: 10px; }
   .empty h3 { margin: 0 0 6px; color: var(--text); }
 
-  /* KPI cards */
+  /* Cartões de indicadores */
   .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 14px; margin-bottom: 22px; }
   .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow); }
   .kpi .k-label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; }
@@ -275,7 +275,7 @@
   .kpi .k-value.pos { color: var(--positive); }
   .kpi .k-value.neg { color: var(--negative); }
 
-  /* Report bars */
+  /* Barras dos relatórios */
   .report-block { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; box-shadow: var(--shadow); margin-bottom: 20px; }
   .report-block h3 { margin: 0 0 16px; font-size: 15px; }
   .bar-row { display: grid; grid-template-columns: 150px 1fr 90px; align-items: center; gap: 12px; margin-bottom: 10px; }
@@ -296,7 +296,7 @@
   .chart-tip { position: fixed; z-index: 300; background: var(--sidebar); color: #fff; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; pointer-events: none; opacity: 0; white-space: nowrap; box-shadow: var(--shadow-lg); transition: opacity .1s; }
   .chart-tip.show { opacity: 1; }
 
-  /* Modal */
+  /* Janelas */
   .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; z-index: 100; overflow-y: auto; }
   .modal-overlay.open { display: flex; }
   .modal { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-lg); width: 100%; max-width: 460px; overflow: hidden; animation: pop .16s ease; }
@@ -352,7 +352,7 @@
     .nav button { flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 1px; font-size: 9px; letter-spacing: -.2px; border-radius: 9px; min-width: 0; }
     .nav button .ic { font-size: 19px; width: auto; }
 
-    /* Cabeçalho — respeita a área segura do iPhone (notch/Dynamic Island) na app instalada */
+    /* Cabeçalho — respeita a área segura do iPhone (notch/Dynamic Island) na aplicação instalada */
     .topbar { padding: calc(11px + env(safe-area-inset-top)) calc(13px + env(safe-area-inset-right)) 11px calc(13px + env(safe-area-inset-left)); flex-wrap: wrap; }
     .view-title { order: 1; font-size: 17px; }
     .mobile-only { display: flex; }
@@ -471,10 +471,11 @@
 <script>
 "use strict";
 (function () {
-  // ---------- Constants & helpers ----------
+  // ---------- Constantes e auxiliares ----------
   var STORAGE_KEY = "meu-orcamento-v1";
-  var INCOME = "__income__"; // special category id for "Pronto a atribuir"
+  var INCOME = "__income__"; // identificador da categoria especial do «Pronto a atribuir»
 
+  var PAGINA = 50;   // linhas por página nas listas de transações
   var MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
   var REPORT_COLORS = ["#0d9488","#6366f1","#f59e0b","#ef4444","#0891b2","#db2777","#65a30d","#8b5cf6"];
 
@@ -518,18 +519,18 @@
     return out;
   }
 
-  // ---------- State ----------
+  // ---------- Estado ----------
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
     accounts: [],
     groups: [],
     categories: [],
-    assignments: {},   // "catId|YYYY-MM": number
+    assignments: {},   // "idCategoria|AAAA-MM": valor
     transactions: [],
     recurring: [],     // regras recorrentes
     backup: { at:null, sig:null, autoDay:null },  // controlo da cópia de segurança em ficheiro
-    collapsed: {},     // groupId: true
+    collapsed: {},     // idGrupo: true
     ui: { view: "budget", month: nowMonthKey() }
   };
 
@@ -578,7 +579,7 @@
     } catch(e){ return null; }
   }
 
-  // ---------- Domain calculations ----------
+  // ---------- Cálculos do orçamento ----------
   function accountById(id) { for (var i=0;i<state.accounts.length;i++) if (state.accounts[i].id===id) return state.accounts[i]; return null; }
   function categoryById(id) { for (var i=0;i<state.categories.length;i++) if (state.categories[i].id===id) return state.categories[i]; return null; }
   function groupById(id) { for (var i=0;i<state.groups.length;i++) if (state.groups[i].id===id) return state.groups[i]; return null; }
@@ -618,6 +619,7 @@
   // Índice de UM varrimento das transações para o mês apresentado — evita O(categorias × transações) por render.
   var _idx = null;
   var _split = null; // estado de trabalho da transação dividida (não é guardado)
+  var _rec = null;   // estado de trabalho da regra recorrente (não é guardado)
   var _undo = [], _undoTimer = null, UNDO_MAX = 5; // histórico de anulação (até 5 passos)
   var _csv = null;   // pré-visualização da importação de CSV
   var _drag = null;  // arrastar para reordenar
@@ -810,42 +812,86 @@
   function integrityDelta(m){ return round2(budgetCashUpto(m) - budgetedTotal(m)); }
 
   // Lista as transações responsáveis pela diferença. A soma dos "delta" dá o integrityDelta.
+  // Contribuição de UMA transação para cada lado da invariante.
+  // Somando isto sobre todas as transações obtém-se exatamente o integrityDelta — por
+  // construção, não por enumeração de casos. É isso que garante que nenhum tipo de
+  // movimento, por invulgar que seja, escapa à explicação do painel.
+  function contribuicao(t){
+    var acc = lkAcc(t.accountId);
+    if (!acc) return null;
+    var net = (t.inflow||0) - (t.outflow||0);
+    var real = acc.type==="budget" ? net : 0;            // lado do dinheiro nas contas
+    var esperado = 0;                                     // lado do orçamento
+    if (t.categoryId === INCOME) esperado += net;         // entra no «Pronto a atribuir»
+    else if (t.categoryId) {
+      var c = lkCat(t.categoryId);
+      if (c && !c.cardId) esperado += net;                // categoria normal
+    }
+    // Reserva para a fatura do cartão, quando a conta é um cartão com categoria de pagamento viva.
+    if (acc.type==="credit" && acc.paymentCatId) {
+      var pc = lkCat(acc.paymentCatId);
+      if (pc && pc.cardId === acc.id) {
+        esperado += t.transfer ? -net : ((t.categoryId && t.categoryId!==INCOME) ? -net : 0);
+      }
+    }
+    return { acc:acc, net:net, delta: round2(real - esperado) };
+  }
+
+  // Lista os movimentos que desequilibram o orçamento, já com o motivo identificado.
+  // A soma dos "delta" é, por construção, igual ao integrityDelta.
   function integrityIssues(m){
-    var semCat=[], paraFora=[], rendFora=[], cartaoSemCat=0;
-    var pares={};
+    var itens=[], cartaoSemCat=0;
+    var pares={}, deltaPar={};
     for(var i=0;i<state.transactions.length;i++){ var tp=state.transactions[i]; if(tp.transfer){ (pares[tp.transfer]=pares[tp.transfer]||[]).push(tp); } }
+    // Uma transferência tem de ser julgada pelo PAR: cada metade sozinha parece desequilibrar
+    // (sai de um lado, entra no outro), mas juntas normalmente fecham.
+    for(var q=0;q<state.transactions.length;q++){
+      var tq=state.transactions[q];
+      if(!tq.transfer || monthOf(tq.date) > m) continue;
+      var cq=contribuicao(tq); if(!cq) continue;
+      deltaPar[tq.transfer]=round2((deltaPar[tq.transfer]||0)+cq.delta);
+    }
+    var parJaVisto={};
     for(var j=0;j<state.transactions.length;j++){
       var t=state.transactions[j];
       if(monthOf(t.date) > m) continue;
-      var acc=lkAcc(t.accountId); if(!acc) continue;
-      var net=(t.inflow||0)-(t.outflow||0);
+      var cb = contribuicao(t);
+      if(!cb) continue;
+      var acc = cb.acc;
+      // Compras no cartão sem categoria não desequilibram nada, mas também não reservam
+      // dinheiro para a fatura — vale a pena contá-las à parte.
+      if(!t.transfer && !t.categoryId && acc.type==="credit") cartaoSemCat++;
       if(t.transfer){
-        // Uma transferência só é problema quando tira (ou traz) dinheiro do orçamento
-        // para uma conta de acompanhamento sem lhe dar uma categoria.
-        if(acc.type!=="budget" || t.categoryId) continue;
-        var hs=pares[t.transfer]||[], outra=null;
+        if(parJaVisto[t.transfer]) continue;
+        if(Math.abs(deltaPar[t.transfer]||0) < 0.005) continue;
+        // representa-se o par pela metade do lado do orçamento, que é onde se corrige
+        var hs0=pares[t.transfer]||[], repr=t;
+        for(var z=0;z<hs0.length;z++){ var az=lkAcc(hs0[z].accountId); if(az && az.type==="budget"){ repr=hs0[z]; break; } }
+        if(repr!==t) continue;
+        parJaVisto[t.transfer]=true;
+        cb = { acc:lkAcc(t.accountId), net:0, delta:deltaPar[t.transfer] };
+        acc = cb.acc;
+      }
+      else if(Math.abs(cb.delta) < 0.005) continue;
+
+      var motivo, outra=null, oa=null;
+      if(t.transfer){
+        var hs=pares[t.transfer]||[];
         for(var h=0;h<hs.length;h++) if(hs[h].id!==t.id) outra=hs[h];
-        var oa=outra?lkAcc(outra.accountId):null;
-        // Sem a outra metade (dados truncados) o dinheiro também desaparece do orçamento.
-        if(!oa || oa.type==="tracking") paraFora.push({t:t, acc:acc, outra:oa, delta:net});
-        continue;
+        oa = outra ? lkAcc(outra.accountId) : null;
+        if(!oa) motivo="meia";
+        else if(t.categoryId) motivo="transfCat";
+        else if(acc.type==="budget" || oa.type==="budget") motivo="paraFora";
+        else motivo="transfCartao";
       }
-      if(t.categoryId===INCOME){
-        if(acc.type!=="budget") rendFora.push({t:t, acc:acc, delta:round2(-net)});
-        continue;
-      }
-      if(t.categoryId && !lkCat(t.categoryId)){          // categoria que já não existe
-        if(acc.type==="budget") semCat.push({t:t, acc:acc, delta:net, orfa:true});
-        continue;
-      }
-      if(!t.categoryId){
-        if(acc.type==="budget") semCat.push({t:t, acc:acc, delta:net});
-        else if(acc.type==="credit") cartaoSemCat++;      // não desequilibra, mas não reserva para a fatura
-      }
+      else if(t.categoryId === INCOME) motivo="rendFora";
+      else if(t.categoryId && !lkCat(t.categoryId)) motivo="orfa";
+      else if(t.categoryId) motivo="categFora";
+      else motivo="semCat";
+      itens.push({ t:t, acc:acc, outra:oa, delta:cb.delta, motivo:motivo });
     }
-    function porData(a,b){ return a.t.date<b.t.date?1:(a.t.date>b.t.date?-1:0); }
-    semCat.sort(porData); paraFora.sort(porData); rendFora.sort(porData);
-    return { semCat:semCat, paraFora:paraFora, rendFora:rendFora, cartaoSemCat:cartaoSemCat };
+    itens.sort(function(a,b){ return a.t.date<b.t.date?1:(a.t.date>b.t.date?-1:0); });
+    return { itens:itens, cartaoSemCat:cartaoSemCat };
   }
 
   // Transferência entre contas: cria duas metades ligadas pelo mesmo id 'transfer'. Sem categoria (não afeta o orçamento).
@@ -886,7 +932,7 @@
     var f=fromKey.split("-"), t=toKey.split("-");
     return (parseInt(t[0],10)-parseInt(f[0],10))*12 + (parseInt(t[1],10)-parseInt(f[1],10));
   }
-  // How many times a given weekday (0=Dom .. 6=Sáb) occurs in a month → 4 or 5
+  // Quantas vezes um dia da semana (0=Dom .. 6=Sáb) acontece num mês → 4 ou 5
   function weekdayCount(monthKey, weekday) {
     var p=monthKey.split("-"), year=parseInt(p[0],10), month=parseInt(p[1],10)-1;
     var days=new Date(year, month+1, 0).getDate(), count=0;
@@ -905,14 +951,31 @@
     var lastM=new Date(ny,nm+1,0).getDate();
     return ny+"-"+pad(nm+1)+"-"+pad(Math.min(d,lastM));
   }
+  // Uma regra com conta de destino lança uma TRANSFERÊNCIA (as duas metades de uma vez);
+  // sem destino, lança uma transação normal. É o mesmo caminho em ambos os casos.
+  function lancarRecorrente(r, data){
+    if (r.toAccountId) {
+      var v = round2((r.outflow||0) || (r.inflow||0));
+      return createTransfer(r.accountId, r.toAccountId, v, data, false, r.categoryId||null, r.memo||"");
+    }
+    state.transactions.push({id:uid(), date:data, accountId:r.accountId, payee:r.payee||"",
+      categoryId:r.categoryId||null, memo:r.memo||"", outflow:r.outflow||0, inflow:r.inflow||0, cleared:false});
+    return true;
+  }
+  // Uma regra só é lançável se as contas envolvidas ainda existirem e forem diferentes.
+  function recValida(r){
+    if (!accountById(r.accountId)) return false;
+    if (r.toAccountId && (!accountById(r.toAccountId) || r.toAccountId===r.accountId)) return false;
+    return true;
+  }
   function processRecurring(){
     var today=todayISO(), created=0, list=state.recurring||[];
     for(var i=0;i<list.length;i++){
       var r=list[i]; if(!r.active) continue;
-      if(!accountById(r.accountId)) continue;
+      if(!recValida(r)) continue;
       var guard=0;
       while(r.nextDate && r.nextDate<=today && guard<120){
-        state.transactions.push({id:uid(), date:r.nextDate, accountId:r.accountId, payee:r.payee||"", categoryId:r.categoryId||null, memo:r.memo||"", outflow:r.outflow||0, inflow:r.inflow||0, cleared:false});
+        lancarRecorrente(r, r.nextDate);
         r.nextDate=advanceDate(r.nextDate, r.freq);
         created++; guard++;
       }
@@ -943,6 +1006,7 @@
     var l=upcomingRecurring(m), sai=0, entra=0, porCat={};
     for(var i=0;i<l.length;i++){
       var r=l[i].r;
+      if(r.toAccountId && !r.categoryId) continue;      // transferência interna: não mexe no orçamento
       sai+=(r.outflow||0); entra+=(r.inflow||0);
       if(r.categoryId && r.categoryId!==INCOME && r.outflow) porCat[r.categoryId]=(porCat[r.categoryId]||0)+r.outflow;
     }
@@ -988,7 +1052,8 @@
     if(gi<0||gj<0) return;
     var t=state.categories[gi]; state.categories[gi]=state.categories[gj]; state.categories[gj]=t;
   }
-  // Target cadences: monthly | quarterly | yearly | byDate. Returns {need, met, progress, label} or null.
+  // Cadências de alvo: mensal | semanal | trimestral | anual | até uma data.
+  // Devolve {need, met, progress, label} ou null quando a categoria não tem alvo.
   function targetInfo(cat, m) {
     if (!cat.target || !(cat.target.amount>0)) return null;
     var tg = cat.target, type = tg.type || "monthly", amt = tg.amount;
@@ -1107,7 +1172,7 @@
     return { entries:entries, total:total, rtaBefore:round2(rta), rtaAfter:round2(rta-total) };
   }
 
-  // ---------- Rendering ----------
+  // ---------- Desenho do ecrã ----------
   function applyTheme(){ if (document.body) document.body.classList.toggle("theme-rose", !!(state.settings && state.settings.theme==="rose")); }
   function render() {
     applyTheme();
@@ -1121,7 +1186,7 @@
     el("viewTitle").textContent = ({budget:"Orçamento",accounts:"Contas",transactions:"Transações",recurring:"Recorrentes",reports:"Relatórios"})[v];
     el("monthLabel").textContent = monthLabel(state.ui.month);
     el("monthNav").style.display = (v === "budget" || v === "reports") ? "flex" : "none";
-    // nav active
+    // separador ativo
     var nb = el("nav").querySelectorAll("button");
     for (var i=0;i<nb.length;i++) nb[i].classList.toggle("active", nb[i].getAttribute("data-view") === v);
 
@@ -1390,11 +1455,11 @@
     var bal = accountBalance(accId), cl = accountBalance(accId, true);
     var run=0, balOf={};
     for(var bi=0;bi<ascAll.length;bi++){ run=round2(run+(ascAll[bi].inflow||0)-(ascAll[bi].outflow||0)); balOf[ascAll[bi].id]=run; }
-    var LIMR = state.ui.txLimit || 300;
+    var LIMR = state.ui.txLimit || PAGINA;
     var body = txs.length ? txs.slice(0,LIMR).map(function(t){ return txRow(t, balOf[t.id]); }).join("") :
       '<tr><td colspan="9" class="empty" style="padding:30px;">Sem transações nesta conta.</td></tr>';
     if (txs.length > LIMR) body += '<tr><td colspan="9" style="text-align:center;padding:14px;">'+
-      '<button class="btn" data-action="show-more-tx">Mostrar mais (a apresentar '+LIMR+' de '+txs.length+')</button></td></tr>';
+      '<button class="btn" data-action="show-more-tx">Mostrar mais '+PAGINA+' (a ver '+LIMR+' de '+txs.length+')</button></td></tr>';
     el("content").innerHTML =
       '<div class="toolbar">'+
         '<button class="btn" data-action="back-accounts">‹ Contas</button>'+
@@ -1483,12 +1548,12 @@
         '<button class="btn primary" data-action="add-tx">➕ Nova transação</button>');
       return;
     }
-    var LIM = state.ui.txLimit || 300;
+    var LIM = state.ui.txLimit || PAGINA;
     var visiveis = list.slice(0, LIM);
     var body = list.length ? visiveis.map(function(t){ return txRow(t, undefined, true); }).join("")
                            : '<tr><td colspan="9" class="empty">Nada corresponde ao filtro.</td></tr>';
     if (list.length > LIM) body += '<tr><td colspan="9" style="text-align:center;padding:14px;">'+
-      '<button class="btn" data-action="show-more-tx">Mostrar mais (a apresentar '+LIM+' de '+list.length+')</button></td></tr>';
+      '<button class="btn" data-action="show-more-tx">Mostrar mais '+PAGINA+' (a ver '+LIM+' de '+list.length+')</button></td></tr>';
 
     el("content").innerHTML = head +
       '<div class="data-card"><table class="data"><thead><tr>'+
@@ -1686,12 +1751,15 @@
     }
     var rows=list.map(function(r){
       var acc=accountById(r.accountId);
-      var cat=r.categoryId===INCOME?'<span class="pill budget">Rendimento</span>':(r.categoryId?esc((categoryById(r.categoryId)||{name:"(apagada)"}).name):'<span class="muted">—</span>');
+      var ehTr=!!r.toAccountId, dest=ehTr?accountById(r.toAccountId):null;
+      var cat=ehTr
+        ? ('<span class="pill tracking">↔ Transferência</span>'+(r.categoryId?' <span class="tag">'+esc((lkCat(r.categoryId)||{name:"(apagada)"}).name)+'</span>':''))
+        : (r.categoryId===INCOME?'<span class="pill budget">Rendimento</span>':(r.categoryId?esc((categoryById(r.categoryId)||{name:"(apagada)"}).name):'<span class="muted">—</span>'));
       var amt=r.outflow?'<span class="tx-amt out">'+fmt(r.outflow)+'</span>':(r.inflow?'<span class="tx-amt in">'+fmt(r.inflow)+'</span>':'');
       return '<tr class="hoverable" data-action="edit-recurring" data-id="'+r.id+'" style="cursor:pointer;'+(r.active?'':'opacity:.5;')+'">'+
         '<td style="white-space:nowrap;font-weight:600;">'+fmtDate(r.nextDate)+'</td>'+
         '<td><span class="pill tracking">'+(FREQ_LABEL[r.freq]||r.freq)+'</span></td>'+
-        '<td style="font-weight:600;">'+esc(r.payee||"")+'</td>'+
+        '<td style="font-weight:600;">'+(ehTr?('↔ '+esc(dest?dest.name:"—")):esc(r.payee||""))+'</td>'+
         '<td>'+cat+'</td>'+
         '<td class="tag">'+esc(acc?acc.name:"—")+'</td>'+
         '<td class="num">'+amt+'</td>'+
@@ -1708,7 +1776,7 @@
     return '<div class="empty"><div class="big">'+icon+'</div><h3>'+title+'</h3><p style="max-width:420px;margin:0 auto 16px;">'+text+'</p><div>'+(actions||"")+'</div></div>';
   }
 
-  // ---------- Modals ----------
+  // ---------- Janelas ----------
   function focusaveis(){
     var n = el("modal").querySelectorAll('button, input, select, textarea, [href], [tabindex]:not([tabindex="-1"])'), out=[];
     for (var i=0;i<n.length;i++) if (!n[i].disabled && n[i].offsetParent !== null) out.push(n[i]);
@@ -1739,8 +1807,15 @@
         (editing?'':'<div class="field"><label>Saldo inicial</label><input id="acStart" class="money" data-neg="1" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(acc.start)+'" placeholder="0,00"><div class="hint">Use valor negativo para dívidas (ex.: saldo de cartão de crédito).</div></div>')+
         '<div class="field"><label>Nota (opcional)</label><input id="acNote" maxlength="300" value="'+esc(acc.note||"")+'"></div>'+
         '<div class="field'+((acc.type==="credit"||acc.type==="tracking")?"":" hidden")+'" id="acPayFromField"><label>Conta de pagamento predefinida</label><select id="acPayFrom">'+payFromOpts+'</select><div class="hint">Ao pagar este cartão/dívida, o dinheiro sai por predefinição desta conta.</div></div>'+
+        (editing?'<div class="field" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;">'+
+          '<label>Deixar de usar esta conta</label>'+
+          '<div style="display:flex;gap:8px;">'+
+            '<button class="btn" data-action="archive-account" data-id="'+acc.id+'" style="flex:1;justify-content:center;">🗄 Arquivar</button>'+
+            '<button class="btn danger" data-action="delete-account" data-id="'+acc.id+'" style="flex:1;justify-content:center;">🗑 Eliminar</button>'+
+          '</div>'+
+          '<div class="hint"><b>Arquivar</b> esconde a conta das listas e do orçamento mas guarda tudo — pode repô-la em <b>Dados e cópias</b>. <b>Eliminar</b> apaga a conta e as suas transações para sempre.</div></div>':'')+
       '</div>'+
-      '<div class="modal-foot"><span>'+(editing?'<button class="btn" data-action="archive-account" data-id="'+acc.id+'" title="Ocultar sem perder o histórico">🗄 Arquivar</button> <button class="btn danger" data-action="delete-account" data-id="'+acc.id+'">Eliminar</button>':'')+'</span>'+
+      '<div class="modal-foot"><span></span>'+
         '<span><button class="btn" data-action="close">Cancelar</button> <button class="btn primary" data-action="save-account" data-id="'+(acc.id||"")+'">Guardar</button></span></div>');
     var seg = el("acType"); _tmpAccType = acc.type;
     seg.addEventListener("click", function(e){ var b=e.target.closest("button"); if(!b)return; _tmpAccType=b.getAttribute("data-t"); var bs=seg.querySelectorAll("button"); for(var i=0;i<bs.length;i++)bs[i].classList.toggle("active",bs[i]===b); el("acPayFromField").classList.toggle("hidden", _tmpAccType==="budget"); });
@@ -1893,8 +1968,15 @@
           '<option value="setAside"'+(curFund==="setAside"?" selected":"")+'>Reservar este valor — sempre, todos os meses</option>'+
         '</select></div>'+
         '<div class="hint" id="catTargetHint" style="margin-top:-6px;"></div>'+
+        (editing?'<div class="field" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;">'+
+          '<label>Deixar de usar esta categoria</label>'+
+          '<div style="display:flex;gap:8px;">'+
+            '<button class="btn" data-action="archive-category" data-id="'+cat.id+'" style="flex:1;justify-content:center;">🗄 Arquivar</button>'+
+            '<button class="btn danger" data-action="delete-category" data-id="'+cat.id+'" style="flex:1;justify-content:center;">🗑 Eliminar</button>'+
+          '</div>'+
+          '<div class="hint"><b>Arquivar</b> esconde-a do orçamento mas guarda o histórico — pode repô-la em <b>Dados e cópias</b>. <b>Eliminar</b> apaga-a e as transações ficam sem categoria.</div></div>':'')+
       '</div>'+
-      '<div class="modal-foot"><span>'+(editing?'<button class="btn" data-action="archive-category" data-id="'+cat.id+'" title="Ocultar sem perder o histórico">🗄 Arquivar</button> <button class="btn danger" data-action="delete-category" data-id="'+cat.id+'">Eliminar</button>':'')+'</span>'+
+      '<div class="modal-foot"><span></span>'+
         '<span><button class="btn" data-action="close">Cancelar</button> <button class="btn primary" data-action="save-category" data-id="'+(cat.id||"")+'">Guardar</button></span></div>');
     var sel = el("catTType");
     function syncTargetUI(){
@@ -1906,8 +1988,8 @@
       var perio = (v==="quarterly"||v==="yearly");
       el("catDueField").classList.toggle("hidden", !perio);
       if (perio) el("catDueHint").textContent = v==="quarterly"
-        ? "Ex.: o mês em que paga o seguro trimestral. Indicando-o, a app reparte o que ainda falta pelos meses até lá e avança sozinha para o trimestre seguinte. Em branco, reserva 1/3 por mês."
-        : "Ex.: o mês em que paga o IUC. Indicando-o, a app reparte o que ainda falta pelos meses até lá e avança sozinha para o ano seguinte. Em branco, reserva 1/12 por mês.";
+        ? "Ex.: o mês em que paga o seguro trimestral. Indicando-o, a aplicação reparte o que ainda falta pelos meses até lá e avança sozinha para o trimestre seguinte. Em branco, reserva 1/3 por mês."
+        : "Ex.: o mês em que paga o IUC. Indicando-o, a aplicação reparte o que ainda falta pelos meses até lá e avança sozinha para o ano seguinte. Em branco, reserva 1/12 por mês.";
       var hints = { none:"Sem alvo — a categoria não mostra progresso.",
         monthly:"Quer ter este valor disponível todos os meses (ex.: renda, supermercado).",
         weekly:"Valor por semana. O total do mês = valor × nº desse dia da semana no mês (4 ou 5).",
@@ -1954,9 +2036,15 @@
         '<div class="field"><label>Importar cópia de segurança (.json)</label><input id="importFile" type="file" accept="application/json,.json"><div class="hint">Substitui todos os dados atuais por este ficheiro.</div></div>'+
         '<div class="field"><button class="btn" data-action="import-csv" style="width:100%;justify-content:center;">📥 Importar transações do banco (.csv)</button><div class="hint">Acrescenta transações às existentes, sem substituir nada.</div></div>'+
         '<hr style="border:0;border-top:1px solid var(--border);margin:18px 0;">'+
-        '<div class="field"><label>3 · Sincronização entre dispositivos</label><button class="btn" data-action="open-sync" style="width:100%;justify-content:center;">☁️ Sincronizar telemóvel e PC</button>'+
-          '<div class="hint">'+(syncReady()?('Ligada — '+esc(_syncStatus||"pronta")):'Cópia cifrada num gist privado do GitHub.')+'</div></div>'+
-        '<div class="field"><button class="btn" data-action="archived-menu" style="width:100%;justify-content:center;">🗄 Ver arquivados</button></div>'+
+        '<div class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">'+
+          '<div style="font-weight:700;font-size:13px;">3 · Sincronização entre dispositivos</div>'+
+          '<div style="font-size:12.5px;font-weight:600;margin-top:8px;">'+
+            (syncReady() ? ('Ligada — '+esc(_syncStatus||"pronta")) : 'Desligada neste aparelho.')+'</div>'+
+          '<div class="hint" style="margin-top:4px;">Mantém o telemóvel e o PC com os mesmos dados, numa cópia cifrada guardada num gist privado do GitHub.</div>'+
+          '<button class="btn" data-action="open-sync" style="width:100%;justify-content:center;margin-top:10px;">☁️ '+(syncReady()?"Gerir sincronização":"Ligar sincronização")+'</button>'+
+        '</div>'+
+        '<div class="field"><button class="btn" data-action="archived-menu" style="width:100%;justify-content:center;">🗄 Contas e categorias arquivadas</button>'+
+          '<div class="hint">Repor o que escondeu do orçamento sem apagar o histórico.</div></div>'+
         '<div class="field"><button class="btn" data-action="load-sample" style="width:100%;justify-content:center;">🧪 Carregar dados de exemplo</button></div>'+
         '<div class="field"><button class="btn danger" data-action="reset-data" style="width:100%;justify-content:center;">🗑 Apagar todos os dados</button></div>'+
         (function(){ var e=espacoApp(); if(!e) return "";
@@ -2060,7 +2148,7 @@
         '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Histórico (até 5 dias)</span><b style="font-variant-numeric:tabular-nums;">'+mb(e.hist)+'</b></div>'+
         (e.outros?'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Outros</span><b style="font-variant-numeric:tabular-nums;">'+mb(e.outros)+'</b></div>':'')+
         '<div style="display:flex;justify-content:space-between;padding:7px 0 0;margin-top:5px;border-top:1px solid var(--border);font-weight:700;"><span>Total</span><b style="font-variant-numeric:tabular-nums;">'+mb(e.total)+'</b></div>'+
-        '<div class="hint" style="margin-top:6px;">Os navegadores costumam dar cerca de 5 MB por site.</div>'+
+        '<div class="hint" style="margin-top:6px;">Os navegadores costumam dar cerca de 5 MB por sítio.</div>'+
       '</div>') : '';
     openModal(
       '<div class="modal-head"><h2>⚠️ Não foi possível guardar</h2><button class="x" data-action="close">×</button></div>'+
@@ -2122,18 +2210,34 @@
     var dv=integrityDelta(m), iss=integrityIssues(m);
     var caixa=budgetCashUpto(m), orc=budgetedTotal(m);
 
-    function linha(x, motivo, accao){
+    var GRUPOS = [
+      ["semCat",       "Movimentos sem categoria",
+                       "Mexeram no saldo da conta mas não passaram por nenhuma categoria, por isso o orçamento não deu por eles."],
+      ["orfa",         "Categoria apagada entretanto",
+                       "A categoria destes movimentos já não existe, e o dinheiro deles ficou sem destino no orçamento."],
+      ["paraFora",     "Transferências que entram ou saem do orçamento",
+                       "Movem dinheiro entre uma conta de orçamento e uma de acompanhamento. Dê-lhes categoria para o orçamento acompanhar."],
+      ["rendFora",     "Rendimento fora das contas de orçamento",
+                       "Foram marcados como «Rendimento» numa conta que não entra no orçamento, por isso aumentaram o Pronto a atribuir sem haver dinheiro que lhe corresponda."],
+      ["categFora",    "Categoria numa conta fora do orçamento",
+                       "Contas de acompanhamento estão fora do orçamento. Dar-lhes categoria mexe no «Disponível» dessa categoria sem haver dinheiro do orçamento por trás."],
+      ["transfCat",    "Transferências com categoria a mais",
+                       "Só devem ter categoria as transferências que atravessam a fronteira do orçamento. Estas têm-na sem a atravessar, e por isso contam o movimento duas vezes."],
+      ["transfCartao", "Transferências entre cartão e conta de acompanhamento",
+                       "Mexem na reserva para a fatura do cartão sem que saia dinheiro do orçamento. Registe o pagamento do cartão a partir de uma conta de orçamento."],
+      ["meia",         "Transferências a que falta a outra metade",
+                       "Só existe um dos dois lados — normalmente de dados importados de um ficheiro alterado à mão."]
+    ];
+
+    function linha(x){
+      var accao = (x.motivo==="paraFora" || x.motivo==="transfCat")
+        ? '<button class="btn sm" data-action="fix-transfer" data-id="'+x.t.id+'">Categorizar</button>'
+        : '<button class="btn sm" data-action="edit-tx" data-id="'+x.t.id+'">Corrigir</button>';
+      var onde = x.outra ? ("para "+esc(x.outra.name)) : esc(x.acc.name);
       return '<div class="int-row"><span class="who"><b>'+esc(x.t.payee||"(sem beneficiário)")+'</b>'+
-        '<span class="tag">'+fmtDate(x.t.date)+' · '+esc(x.acc.name)+' · '+motivo+'</span></span>'+
+        '<span class="tag">'+fmtDate(x.t.date)+' · '+esc(x.acc.name)+(x.outra?(' → '+esc(x.outra.name)):'')+'</span></span>'+
         '<span class="amt '+(x.delta<0?"tx-amt out":"tx-amt in")+'">'+fmt(x.delta)+'</span>'+
         accao+'</div>';
-    }
-    function bloco(titulo, explica, lista, fab){
-      if(!lista.length) return "";
-      var soma=0; lista.forEach(function(x){ soma+=x.delta; });
-      return '<div class="field"><label>'+titulo+' ('+lista.length+' · '+fmt(round2(soma))+')</label>'+
-        '<div class="hint" style="margin:-2px 0 8px;">'+explica+'</div>'+
-        '<div style="max-height:210px;overflow:auto;">'+lista.map(fab).join("")+'</div></div>';
     }
 
     var corpo =
@@ -2144,35 +2248,22 @@
           '<span>Diferença</span><b class="'+(dv<0?"tx-amt out":"tx-amt in")+'" style="font-variant-numeric:tabular-nums;">'+fmt(dv)+'</b></div>'+
       '</div>';
 
-    if (Math.abs(dv) < 0.005 && !iss.semCat.length && !iss.paraFora.length && !iss.rendFora.length) {
+    if (!iss.itens.length && Math.abs(dv) < 0.005) {
       corpo += '<div class="muted" style="text-align:center;padding:18px 0;">✅ Está tudo certo — cada euro nas contas de orçamento tem uma função.</div>';
     } else {
-      corpo +=
-        bloco("Despesas e receitas sem categoria",
-          "Mexeram no saldo da conta mas não passaram por nenhuma categoria, por isso o orçamento não deu por elas.",
-          iss.semCat,
-          function(x){ return linha(x, x.orfa?"a categoria foi apagada":"sem categoria",
-            '<button class="btn sm" data-action="edit-tx" data-id="'+x.t.id+'">Categorizar</button>'); }) +
-        bloco("Transferências para fora do orçamento",
-          "Saiu (ou entrou) dinheiro de uma conta de acompanhamento. Dê-lhe uma categoria para o orçamento acompanhar o movimento.",
-          iss.paraFora,
-          function(x){ return linha(x, x.outra ? ("para "+esc(x.outra.name)) : "a outra metade da transferência desapareceu",
-            '<button class="btn sm" data-action="fix-transfer" data-id="'+x.t.id+'">Categorizar</button>'); }) +
-        bloco("Rendimento fora das contas de orçamento",
-          "Foi registado como «Rendimento» numa conta que não entra no orçamento, por isso aumentou o Pronto a atribuir sem haver dinheiro para lhe corresponder.",
-          iss.rendFora,
-          function(x){ return linha(x, "conta de "+(x.acc.type==="credit"?"cartão":"acompanhamento"),
-            '<button class="btn sm" data-action="edit-tx" data-id="'+x.t.id+'">Corrigir</button>'); });
-
-      // Rede de segurança: se os movimentos listados não explicarem toda a diferença, dizê-lo
-      // em vez de deixar o utilizador a pensar que a lista está completa.
-      var explicado=0;
-      [iss.semCat, iss.paraFora, iss.rendFora].forEach(function(l){ l.forEach(function(x){ explicado+=x.delta; }); });
+      GRUPOS.forEach(function(g){
+        var lista = iss.itens.filter(function(x){ return x.motivo===g[0]; });
+        if(!lista.length) return;
+        var soma=0; lista.forEach(function(x){ soma+=x.delta; });
+        corpo += '<div class="field"><label>'+g[1]+' ('+lista.length+' · '+fmt(round2(soma))+')</label>'+
+          '<div class="hint" style="margin:-2px 0 8px;">'+g[2]+'</div>'+
+          '<div style="max-height:210px;overflow:auto;">'+lista.map(linha).join("")+'</div></div>';
+      });
+      var explicado=0; iss.itens.forEach(function(x){ explicado+=x.delta; });
       var resto=round2(dv-explicado);
       if (Math.abs(resto) >= 0.005) {
         corpo += '<div class="hint" style="color:var(--negative);font-weight:600;">Faltam '+fmt(resto)+
-          ' que os movimentos acima não explicam. Costuma acontecer com dados importados de um ficheiro alterado à mão. '+
-          'Exporte uma cópia de segurança antes de mexer.</div>';
+          ' que os movimentos acima não explicam. Exporte uma cópia de segurança antes de mexer.</div>';
       }
     }
 
@@ -2184,7 +2275,7 @@
     openModal(
       '<div class="modal-head"><h2>🔍 Orçamento vs. contas — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
-        '<p class="muted" style="margin-top:0;">Num orçamento base-zero, o dinheiro que está nas contas de orçamento tem de ser exatamente igual ao que está por atribuir mais o disponível de todas as categorias. Quando não bate, é porque houve movimentos que não passaram por nenhuma categoria.</p>'+
+        '<p class="muted" style="margin-top:0;">Num orçamento base-zero, o dinheiro nas contas de orçamento tem de ser exatamente igual ao que está por atribuir mais o disponível de todas as categorias. Quando não bate, é porque houve movimentos que o orçamento não conseguiu acompanhar.</p>'+
         corpo+
       '</div>'+
       '<div class="modal-foot"><span></span><button class="btn primary" data-action="close">Fechar</button></div>');
@@ -2281,9 +2372,10 @@
       sec("Contas e transações")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li>Contas de <b>orçamento</b> (à ordem, poupança) entram no orçamento. De <b>acompanhamento</b> (investimentos, empréstimos) não.</li>'+
-        '<li><b>Cartão de crédito:</b> ao gastar, a app reserva logo o valor para a fatura. O <b>💳 Pagar</b> usa essa reserva.</li>'+
+        '<li><b>Cartão de crédito:</b> ao gastar, a aplicação reserva logo o valor para a fatura. O <b>💳 Pagar</b> usa essa reserva.</li>'+
         '<li><b>↔ Transferir</b> move entre contas — está no ecrã <b>Contas</b>, na barra lateral e dentro da janela de nova transação. Se o dinheiro sair do orçamento para uma conta de acompanhamento, leva categoria.</li>'+
-        '<li><b>➗ Dividir</b> reparte uma compra por várias categorias. <b>📅 Recorrentes</b> lançam-se sozinhas na data.</li>'+
+        '<li><b>➗ Dividir</b> reparte uma compra por várias categorias.</li>'+
+        '<li><b>📅 Recorrentes</b> lançam-se sozinhas na data — semanal, quinzenal, mensal, semestral ou anual. Podem ser uma <b>despesa/receita</b> ou uma <b>↔ transferência</b> entre contas, útil para pôr dinheiro de lado na poupança todos os meses.</li>'+
         '<li>Clique numa transação para a editar. Transferências e divididas editam-se <b>por inteiro</b>, nunca metade.</li>'+
         '<li><b>Campos de valor:</b> algarismos e um separador decimal. Em <b>Saída/Entrada</b>, o «-» troca de lado.</li>'+
         '<li><b>🏷️ Beneficiários:</b> mudar um nome altera todas as transações; dar-lhe um nome que já existe <b>junta</b> os dois.</li>'+
@@ -2381,38 +2473,94 @@
 
   function recurringModal(r){
     if(!state.accounts.length){ toast("Crie primeiro uma conta."); accountModal(); return; }
-    var editing=!!r;
-    r=r||{ nextDate:todayISO(), freq:"monthly", accountId:(state.accounts[0]||{}).id, payee:"", categoryId:"", memo:"", outflow:0, inflow:0, active:true };
-    var accOpts=state.accounts.filter(function(a){return !a.hidden || a.id===r.accountId;}).map(function(a){return '<option value="'+a.id+'"'+(r.accountId===a.id?" selected":"")+'>'+esc(a.name)+'</option>';}).join("");
-    var catOpts=catOptionsHTML(r.categoryId);
-    function fo(v,l){ return '<option value="'+v+'"'+(r.freq===v?" selected":"")+'>'+l+'</option>'; }
+    // r definido = abrir de novo (nova regra se for null); r indefinido = redesenhar o que está.
+    if (r !== undefined) {
+      _rec = r ? JSON.parse(JSON.stringify(r))
+               : { nextDate:todayISO(), freq:"monthly", accountId:(state.accounts[0]||{}).id, payee:"",
+                   categoryId:"", memo:"", outflow:0, inflow:0, active:true };
+      _rec._id = r ? r.id : null;
+      _rec.tipo = (r && r.toAccountId) ? "transf" : "normal";
+    }
+    var s = _rec, editing = !!s._id, ehTransf = s.tipo==="transf";
+    if (ehTransf && state.accounts.length<2){ toast("Precisa de pelo menos duas contas para transferir."); s.tipo="normal"; ehTransf=false; }
+    function opts(sel){ return state.accounts.filter(function(a){return !a.hidden || a.id===sel;}).map(function(a){ return '<option value="'+a.id+'"'+(sel===a.id?" selected":"")+'>'+esc(a.name)+'</option>'; }).join(""); }
+    if (ehTransf && !s.toAccountId) { for(var j=0;j<state.accounts.length;j++){ if(state.accounts[j].id!==s.accountId){ s.toAccountId=state.accounts[j].id; break; } } }
+    function fo(v,l){ return '<option value="'+v+'"'+(s.freq===v?" selected":"")+'>'+l+'</option>'; }
+    var valorTransf = round2((s.outflow||0) || (s.inflow||0));
     openModal(
-      '<div class="modal-head"><h2>'+(editing?"Editar recorrente":"Nova transação recorrente")+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>'+(editing?"Editar recorrente":"Nova regra recorrente")+'</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
+        '<div class="field"><label>Tipo</label><div class="seg">'+
+          '<button data-action="rec-tipo" data-id="normal" class="'+(!ehTransf?"active":"")+'">Despesa / Receita</button>'+
+          '<button data-action="rec-tipo" data-id="transf" class="'+(ehTransf?"active":"")+'">↔ Transferência</button>'+
+        '</div></div>'+
         '<div class="grid-2">'+
-          '<div class="field"><label>Próxima data</label><input id="rcDate" type="date" value="'+esc(r.nextDate)+'"></div>'+
+          '<div class="field"><label>Próxima data</label><input id="rcDate" type="date" value="'+esc(s.nextDate)+'"></div>'+
           '<div class="field"><label>Frequência</label><select id="rcFreq">'+fo("weekly","Semanal")+fo("biweekly","Quinzenal")+fo("monthly","Mensal")+fo("semiannual","Semestral")+fo("yearly","Anual")+'</select></div>'+
         '</div>'+
-        '<div class="field"><label>Conta</label><select id="rcAcc">'+accOpts+'</select></div>'+
-        '<div class="field"><label>Beneficiário</label><input id="rcPayee" maxlength="100" list="payeeList" autocomplete="off" value="'+esc(r.payee||"")+'" placeholder="Ex.: Senhorio, Salário, Netflix…">'+
-          '<datalist id="payeeList">'+payeeListHTML()+'</datalist></div>'+
-        '<div class="field"><label>Categoria</label><select id="rcCat">'+catOpts+'</select></div>'+
-        '<div class="grid-2">'+
-          '<div class="field"><label>Saída (despesa)</label><input id="rcOut" class="money" data-par="rcIn" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(r.outflow)+'" placeholder="0,00"></div>'+
-          '<div class="field"><label>Entrada (receita)</label><input id="rcIn" class="money" data-par="rcOut" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(r.inflow)+'" placeholder="0,00"></div>'+
-        '</div>'+
-        '<div class="field"><label>Nota (opcional)</label><input id="rcMemo" maxlength="300" value="'+esc(r.memo||"")+'"></div>'+
-        '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;"><input type="checkbox" id="rcActive" '+(r.active?"checked":"")+' style="width:auto;"> Ativa (lança automaticamente na data)</label>'+
+        '<div class="field"><label>'+(ehTransf?"De (sai desta conta)":"Conta")+'</label><select id="rcAcc">'+opts(s.accountId)+'</select></div>'+
+        (ehTransf
+          ? '<div class="field"><label>Para (entra nesta conta)</label><select id="rcTo">'+opts(s.toAccountId)+'</select></div>'
+          : '<div class="field"><label>Beneficiário</label><input id="rcPayee" maxlength="100" list="payeeList" autocomplete="off" value="'+esc(s.payee||"")+'" placeholder="Ex.: Senhorio, Salário, Netflix…">'+
+            '<datalist id="payeeList">'+payeeListHTML()+'</datalist></div>')+
+        '<div class="field'+(ehTransf?" hidden":"")+'" id="rcCatField"><label id="rcCatLabel">Categoria</label><select id="rcCat">'+catOptionsHTML(s.categoryId)+'</select>'+
+          '<div class="hint" id="rcCatHint"></div></div>'+
+        (ehTransf
+          ? '<div class="field"><label>Valor</label><input id="rcAmt" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(valorTransf)+'" placeholder="0,00"></div>'
+          : '<div class="grid-2">'+
+              '<div class="field"><label>Saída (despesa)</label><input id="rcOut" class="money" data-par="rcIn" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(s.outflow)+'" placeholder="0,00"></div>'+
+              '<div class="field"><label>Entrada (receita)</label><input id="rcIn" class="money" data-par="rcOut" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(s.inflow)+'" placeholder="0,00"></div>'+
+            '</div>')+
+        '<div class="field"><label>Nota (opcional)</label><input id="rcMemo" maxlength="300" value="'+esc(s.memo||"")+'"></div>'+
+        '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;"><input type="checkbox" id="rcActive" '+(s.active?"checked":"")+' style="width:auto;"> Ativa (lança automaticamente na data)</label>'+
+        (ehTransf?'<div class="hint" style="margin-top:8px;">Lança as duas metades de uma vez, tal como uma transferência feita à mão. Ideal para pôr dinheiro de lado na poupança todos os meses.</div>':'')+
       '</div>'+
-      '<div class="modal-foot"><span>'+(editing?'<button class="btn danger" data-action="delete-recurring" data-id="'+r.id+'">Eliminar</button>':'')+'</span>'+
-        '<span><button class="btn" data-action="close">Cancelar</button> <button class="btn primary" data-action="save-recurring" data-id="'+(r.id||"")+'">Guardar</button></span></div>');
-    function sugerirRc(){
-      if (el("rcCat").value) return;
-      var c = payeeCategoria(el("rcPayee").value);
-      if (c) el("rcCat").value = c;
+      '<div class="modal-foot"><span>'+(editing?'<button class="btn danger" data-action="delete-recurring" data-id="'+s._id+'">Eliminar</button>':'')+'</span>'+
+        '<span><button class="btn" data-action="close">Cancelar</button> <button class="btn primary" data-action="save-recurring" data-id="'+(s._id||"")+'">Guardar</button></span></div>');
+
+    if (ehTransf) {
+      // Só leva categoria quando o dinheiro entra ou sai do orçamento — igual à transferência manual.
+      var sync = function(){
+        var f=lkAcc(el("rcAcc").value), t=lkAcc(el("rcTo").value);
+        var cruza = !!(f && t && crossesBudget(f,t));
+        el("rcCatField").classList.toggle("hidden", !cruza);
+        if(!cruza) return;
+        var sai = f.type==="budget";
+        el("rcCatLabel").textContent = sai ? "Categoria de onde sai o dinheiro" : "Categoria onde entra o dinheiro";
+        el("rcCatHint").textContent = sai
+          ? "Este dinheiro deixa o orçamento. Escolha a categoria que o suporta."
+          : "Este dinheiro entra no orçamento. Escolha «Rendimento» para ficar pronto a atribuir.";
+        if(!sai && !el("rcCat").value) el("rcCat").value = INCOME;
+      };
+      el("rcAcc").addEventListener("change", sync);
+      el("rcTo").addEventListener("change", sync);
+      sync();
+    } else {
+      var sugerir = function(){
+        if (el("rcCat").value) return;
+        var c = payeeCategoria(el("rcPayee").value);
+        if (c) el("rcCat").value = c;
+      };
+      el("rcPayee").addEventListener("change", sugerir);
+      el("rcPayee").addEventListener("blur", sugerir);
     }
-    el("rcPayee").addEventListener("change", sugerirRc);
-    el("rcPayee").addEventListener("blur", sugerirRc);
+  }
+  // Guarda no objeto de trabalho o que já está escrito, para não se perder ao trocar de tipo.
+  function readRec(){
+    if(!_rec) return;
+    if(el("rcDate")) _rec.nextDate=el("rcDate").value||todayISO();
+    if(el("rcFreq")) _rec.freq=el("rcFreq").value;
+    if(el("rcAcc")) _rec.accountId=el("rcAcc").value;
+    if(el("rcTo")) _rec.toAccountId=el("rcTo").value||null;
+    if(el("rcPayee")) _rec.payee=corta(el("rcPayee").value, LIM_PAYEE);
+    if(el("rcCat")) _rec.categoryId=el("rcCat").value||null;
+    if(el("rcMemo")) _rec.memo=corta(el("rcMemo").value, LIM_NOTA);
+    if(el("rcActive")) _rec.active=el("rcActive").checked;
+    if(el("rcAmt")){ var v=parseAmount(el("rcAmt").value); _rec.outflow=isNaN(v)?0:round2(v); _rec.inflow=0; }
+    else {
+      if(el("rcOut")){ var o=parseAmount(el("rcOut").value); _rec.outflow=isNaN(o)?0:round2(o); }
+      if(el("rcIn")){ var e2=parseAmount(el("rcIn").value); _rec.inflow=isNaN(e2)?0:round2(e2); }
+    }
   }
 
   // Serve para criar E para editar. Em edição trabalha sempre sobre o PAR: as duas metades
@@ -2549,7 +2697,7 @@
         '<span><button class="btn" data-action="close">Cancelar</button> <button class="btn primary" data-action="save-split">Guardar</button></span></div>');
   }
 
-  // ---------- Actions ----------
+  // ---------- Ações ----------
   // Aceita vírgula OU ponto como separador de cêntimos (sem separador de milhares).
   function parseAmount(s){
     if (typeof s === "number") return s;
@@ -2689,12 +2837,23 @@
     },
     "delete-account": function(id){
       var a = accountById(id); if(!a) return;
-      if (!confirm("Eliminar a conta «"+a.name+"» e todas as suas transações?")) return;
+      // Uma transferência tem uma metade em cada conta. Apagar só a metade desta conta
+      // deixaria a outra órfã; apagar as duas mudaria o saldo de uma conta que fica.
+      // A saída certa é a outra metade sobreviver como movimento normal.
+      var paresTocados = {}, nOutras = 0, i, t;
+      for (i=0;i<state.transactions.length;i++){ t=state.transactions[i]; if(t.transfer && t.accountId===id) paresTocados[t.transfer]=true; }
+      for (i=0;i<state.transactions.length;i++){ t=state.transactions[i]; if(t.transfer && paresTocados[t.transfer] && t.accountId!==id) nOutras++; }
+      var aviso = "Eliminar a conta «"+a.name+"» e todas as suas transações?";
+      if (nOutras) aviso += "\n\n"+nOutras+" transferência"+(nOutras===1?"":"s")+" ligava"+(nOutras===1?"":"m")+
+        " esta conta a outras. A outra metade fica onde está, como movimento normal — o saldo dessas contas não muda, mas pode precisar de lhe dar categoria.";
+      if (!confirm(aviso)) return;
       pushUndo("Conta «"+a.name+"» eliminada.");
       if (a.paymentCatId) removePaymentCategory(a);
       state.accounts = state.accounts.filter(function(x){return x.id!==id;});
-      state.transactions = state.transactions.filter(function(t){return t.accountId!==id;});
-      state.recurring = (state.recurring||[]).filter(function(r){return r.accountId!==id;});
+      state.transactions = state.transactions.filter(function(x){return x.accountId!==id;});
+      for (i=0;i<state.transactions.length;i++){ t=state.transactions[i]; if(t.transfer && paresTocados[t.transfer]) delete t.transfer; }
+      // regras recorrentes que usavam esta conta como origem OU como destino
+      state.recurring = (state.recurring||[]).filter(function(r){ return r.accountId!==id && r.toAccountId!==id; });
       if (state.ui.openAccount===id) state.ui.openAccount=null;
       closeModal(); save(); render(); showUndo();
     },
@@ -2792,9 +2951,9 @@
         toast(pair ? ("Transação dividida em "+lines.length+" categorias.") : "Transação registada.");
       }
     },
-    "cat-activity": function(id){ state.ui.view="transactions"; state.ui.txFilter={category:id}; state.ui.openAccount=null; state.ui.txLimit=300; render(); },
-    "tx-filter-clear": function(){ state.ui.txFilter=null; state.ui.txLimit=300; save(); render(); },
-    "show-more-tx": function(){ state.ui.txLimit=(state.ui.txLimit||300)+300; save(); render(); },
+    "cat-activity": function(id){ state.ui.view="transactions"; state.ui.txFilter={category:id}; state.ui.openAccount=null; state.ui.txLimit=PAGINA; render(); },
+    "tx-filter-clear": function(){ state.ui.txFilter=null; state.ui.txLimit=PAGINA; save(); render(); },
+    "show-more-tx": function(){ state.ui.txLimit=(state.ui.txLimit||PAGINA)+PAGINA; save(); render(); },
     "report-toggle-cat": function(id){ var arr=(state.ui.reportCats||[]).slice(); var i=arr.indexOf(id); if(i>=0) arr.splice(i,1); else arr.push(id); state.ui.reportCats=arr; save(); render(); },
     "report-months": function(id){ state.ui.reportMonths=parseInt(id,10)||6; state.ui.reportFrom=null; state.ui.reportTo=null; save(); render(); },
     "report-clear-range": function(){ state.ui.reportFrom=null; state.ui.reportTo=null; save(); render(); },
@@ -2926,17 +3085,37 @@
     "move-group-up": function(id){ moveGroup(id,-1); save(); render(); },
     "move-group-down": function(id){ moveGroup(id, 1); save(); render(); },
 
-    "add-recurring": function(){ recurringModal(); },
+    "add-recurring": function(){ recurringModal(null); },
     "edit-recurring": function(id){ recurringModal(recById(id)); },
+    "rec-tipo": function(id){ readRec(); _rec.tipo = (id==="transf"?"transf":"normal"); recurringModal(); },
     "save-recurring": function(id){
-      var accId=el("rcAcc").value; if(!accId){ toast("Selecione uma conta."); return; }
-      var data={ nextDate: val("rcDate")||todayISO(), freq: el("rcFreq").value, accountId:accId, payee:valLim("rcPayee", LIM_PAYEE),
-        categoryId: el("rcCat").value||null, memo:valLim("rcMemo", LIM_NOTA), outflow:num("rcOut"), inflow:num("rcIn"), active: el("rcActive").checked };
-      if(data.outflow===0 && data.inflow===0){ toast("Indique um valor de saída ou entrada."); return; }
-      if(data.outflow>0 && data.inflow>0){ toast("Preencha só a Saída OU a Entrada, não as duas."); return; }
-      if(id){ var r=recById(id); for(var k in data) r[k]=data[k]; }
-      else { data.id=uid(); state.recurring.push(data); }
-      closeModal(); save(); var posted=processRecurring(); render(); toast(posted>0?("Regra guardada — lançadas "+posted+" já em atraso."):"Regra recorrente guardada.");
+      readRec();
+      var d = _rec;
+      if(!d.accountId){ toast("Selecione uma conta."); return; }
+      var dados;
+      if (d.tipo==="transf") {
+        if(!d.toAccountId){ toast("Selecione a conta de destino."); return; }
+        if(d.toAccountId===d.accountId){ toast("Escolha contas diferentes."); return; }
+        var valor = round2((d.outflow||0) || (d.inflow||0));
+        if(valor<=0){ toast("Indique um valor."); return; }
+        var fa=accountById(d.accountId), ta=accountById(d.toAccountId);
+        var cruza = !!(fa && ta && crossesBudget(fa,ta));
+        if(cruza && !d.categoryId){ toast("Escolha a categoria — este movimento entra ou sai do orçamento."); return; }
+        dados = { nextDate:d.nextDate||todayISO(), freq:d.freq, accountId:d.accountId, toAccountId:d.toAccountId,
+                  payee:"", categoryId: cruza ? d.categoryId : null, memo:d.memo||"",
+                  outflow:valor, inflow:0, active:!!d.active };
+      } else {
+        if((d.outflow||0)===0 && (d.inflow||0)===0){ toast("Indique um valor de saída ou entrada."); return; }
+        if((d.outflow||0)>0 && (d.inflow||0)>0){ toast("Preencha só a Saída OU a Entrada, não as duas."); return; }
+        dados = { nextDate:d.nextDate||todayISO(), freq:d.freq, accountId:d.accountId, toAccountId:null,
+                  payee:d.payee||"", categoryId:d.categoryId||null, memo:d.memo||"",
+                  outflow:d.outflow||0, inflow:d.inflow||0, active:!!d.active };
+      }
+      if(d._id){ var r=recById(d._id); for(var k in dados) r[k]=dados[k]; }
+      else { dados.id=uid(); state.recurring.push(dados); }
+      _rec=null; closeModal(); save();
+      var posted=processRecurring(); render();
+      toast(posted>0?("Regra guardada — lançadas "+posted+" já em atraso."):"Regra recorrente guardada.");
     },
     "delete-recurring": function(id){
       if(!confirm("Eliminar esta regra recorrente? As transações já lançadas mantêm-se.")) return;
@@ -2947,10 +3126,10 @@
     "toggle-recurring": function(id){ var r=recById(id); if(r){ r.active=!r.active; save(); render(); } },
     "post-recurring-now": function(id){
       var r=recById(id); if(!r) return;
-      if(!accountById(r.accountId)){ toast("A conta desta regra já não existe."); return; }
-      state.transactions.push({id:uid(), date:r.nextDate, accountId:r.accountId, payee:r.payee||"", categoryId:r.categoryId||null, memo:r.memo||"", outflow:r.outflow||0, inflow:r.inflow||0, cleared:false});
+      if(!recValida(r)){ toast("As contas desta regra já não existem."); return; }
+      lancarRecorrente(r, r.nextDate);
       r.nextDate=advanceDate(r.nextDate, r.freq);
-      closeModal(); save(); render(); toast("Transação lançada. Próxima: "+fmtDate(r.nextDate));
+      closeModal(); save(); render(); toast("Lançado. Próxima: "+fmtDate(r.nextDate));
     },
 
     "transfer": function(){ transferModal(); },
@@ -3053,7 +3232,7 @@
 
   function txById(id){ for(var i=0;i<state.transactions.length;i++) if(state.transactions[i].id===id) return state.transactions[i]; return null; }
 
-  // ---------- Import / Export ----------
+  // ---------- Importar / Exportar ----------
   // ---------- Estado da cópia de segurança em ficheiro ----------
   // Assinatura barata dos dados: contagens + somas. Deteta acrescentos, remoções e alterações de valores.
   function backupSig(){
@@ -3094,7 +3273,7 @@
   }
   function hideBackupBar(){ var b=el("backupBar"); if(b) b.classList.remove("show"); }
 
-  // ---------- Instantâneos diários (dentro da app, últimos 5 dias) ----------
+  // ---------- Instantâneos diários (dentro da aplicação, últimos 5 dias) ----------
   // Guardados numa chave separada do localStorage — não sincronizam nem incham o gist.
   // Servem de "máquina do tempo" para reverter enganos. Funciona igual no iPhone e no PC,
   // porque NÃO transfere ficheiros (evita o download que o iOS bloqueia em silêncio).
@@ -3166,7 +3345,7 @@
   function syncReady(){ return !!(_sync.token && _sync.pass); }
   function setSyncStatus(s){ _syncStatus = s; var e = el("syncStatus"); if (e) e.textContent = s; }
 
-  // ---- Cifra (Web Crypto): AES-GCM com chave derivada da palavra-passe (PBKDF2) ----
+  // ---- Cifra: AES-GCM com chave derivada da palavra-passe (PBKDF2) ----
   function b64(buf){ var b = new Uint8Array(buf), s = ""; for (var i=0;i<b.length;i++) s += String.fromCharCode(b[i]); return btoa(s); }
   function unb64(s){ var bin = atob(s), a = new Uint8Array(bin.length); for (var i=0;i<bin.length;i++) a[i] = bin.charCodeAt(i); return a; }
   async function gzip(u8, dir){
@@ -3201,7 +3380,7 @@
     return JSON.parse(new TextDecoder().decode(bytes));
   }
 
-  // ---- API do GitHub (gists) ----
+  // ---- Ligação ao GitHub (gists) ----
   function ghHeaders(){ return { "Authorization":"Bearer "+_sync.token, "Accept":"application/vnd.github+json", "Content-Type":"application/json" }; }
   async function gistRead(){
     var res = await fetch("https://api.github.com/gists/"+_sync.gistId, { headers: ghHeaders() });
@@ -3504,7 +3683,7 @@
     reader.readAsText(file);
   }
 
-  // ---------- Sample data ----------
+  // ---------- Dados de exemplo ----------
   function loadSample() {
     var s = JSON.parse(JSON.stringify(DEFAULT_STATE));
     s.ui.month = nowMonthKey();
@@ -3560,7 +3739,7 @@
     state = s; save(); render(); toast("Dados de exemplo carregados.");
   }
 
-  // ---------- Toast ----------
+  // ---------- Avisos ----------
   var toastTimer;
   function toast(msg){ var t=el("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.classList.remove("show");},2200); }
   function pushUndo(desc){ _undo.push({ desc:desc, json:JSON.stringify(state) }); if(_undo.length>UNDO_MAX) _undo.shift(); }
@@ -3583,12 +3762,12 @@
     if (!actions[action]) return;
     var id = a.getAttribute("data-id");
     var ds = { account: a.getAttribute("data-account") };
-    // Prevent row click firing when clicking an inner action button
+    // Evita que o clique na linha dispare quando se carrega num botão lá dentro
     if (a.hasAttribute("data-id") || action==="toggle-clear" || action==="delete-tx") e.stopPropagation();
     actions[action](id, ds);
   });
 
-  // Overlay click closes modal
+  // Clicar no fundo escurecido fecha a janela
   el("modalOverlay").addEventListener("click", function(e){ if(e.target===el("modalOverlay")) closeModal(); });
   document.addEventListener("keydown", function(e){ if(e.key==="Escape") closeModal(); });
   // Prende o Tab dentro do modal aberto, para não se andar às cegas por trás do fundo escurecido.
@@ -3601,7 +3780,7 @@
     else if (!e.shiftKey && document.activeElement===ultimo) { e.preventDefault(); primeiro.focus(); }
   });
 
-  // Assigned inline edit (change / enter)
+  // Edição do valor atribuído na própria linha
   document.addEventListener("change", function(e){
     var inp = e.target.closest("[data-assign]");
     if (inp) {
@@ -3704,7 +3883,7 @@
   document.addEventListener("click", function(e){ var pt=e.target.closest && e.target.closest(".evo-pt"); if(pt) toast(pt.getAttribute("data-tip")); });
   var _rzT; window.addEventListener("resize", function(){ clearTimeout(_rzT); _rzT=setTimeout(function(){ if(state.ui.view==="reports") render(); }, 200); });
 
-  // ---------- Boot ----------
+  // ---------- Arranque ----------
   if (!state.ui.month) state.ui.month = nowMonthKey();
   state.recurring = state.recurring || [];
   state.backup = state.backup || { at:null, sig:null, autoDay:null };
@@ -3712,7 +3891,7 @@
   render();
   if (_posted > 0) toast("Foram lançadas " + _posted + " transações recorrentes.");
 
-  // Instantâneo diário DENTRO da app (últimos 5 dias) — sem transferir ficheiros,
+  // Instantâneo diário DENTRO da aplicação (últimos 5 dias) — sem transferir ficheiros,
   // por isso funciona igual no iPhone e no PC. A exportação para ficheiro é manual.
   (function(){
     if (state.settings.autoBackup !== false) { try { takeDailySnapshot(); } catch(e){} }
