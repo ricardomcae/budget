@@ -2,7 +2,9 @@
 <html lang="pt-PT" dir="ltr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- maximum-scale=1 impede o zoom automático do Safari ao focar um campo. Desde o iOS 10
+     o Safari continua a permitir o zoom com os dedos, por isso não se perde acessibilidade. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <title>O Meu Orçamento — Base-Zero (com sincronização)</title>
 <meta name="theme-color" content="#0d9488">
@@ -207,7 +209,8 @@
   tr.cat-row:hover .cat-actions { opacity: 1; }
   .cat-actions button { background: transparent; border: 0; color: var(--text-muted); font-size: 13px; padding: 2px 5px; border-radius: 5px; }
   .cat-actions button:hover { background: var(--neutral-soft); color: var(--text); }
-  .target-bar { height: 5px; border-radius: 4px; background: var(--neutral-soft); margin-top: 5px; overflow: hidden; max-width: 220px; }
+  /* Ocupa toda a largura da coluna da categoria, em qualquer ecrã. */
+  .target-bar { height: 5px; border-radius: 4px; background: var(--neutral-soft); margin-top: 5px; overflow: hidden; width: 100%; }
   .target-bar > span { display: block; height: 100%; background: var(--primary); border-radius: 4px; transition: width .18s, background .18s; }
   .target-bar > span.full { background: var(--positive); }   /* alvo cumprido */
   .target-bar > span.warn { background: var(--warning); }    /* abaixo do alvo */
@@ -223,6 +226,10 @@
   .btn.f-baixa.active  { background: var(--negative-soft); border-color: var(--negative); color: var(--negative); }
   .toolbar .sep { width: 1px; align-self: stretch; background: var(--border); margin: 2px 4px; }
   .target-note { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+  /* Os montantes nunca partem de linha — era o que atirava o «€» para baixo. */
+  .num, .grp-total, .activity-cell, .avail-pill { white-space: nowrap; }
+  table.budget td.num, table.budget th:not(.first) { width: 1%; }   /* colunas de valores: só o necessário */
+  table.budget td:first-child, table.budget th.first { width: auto; }
   .num { text-align: end; font-variant-numeric: tabular-nums; }
   .assign-input { width: 108px; text-align: end; padding: 7px 9px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
   .assign-input:hover { border-color: var(--border); }
@@ -355,16 +362,24 @@
     .integrity-bar, .upcoming-bar { margin: 10px 13px 0; }
     .rta-amount { font-size: 22px; }
 
-    /* Safari faz zoom ao focar campos < 16px — forçar 16px no telemóvel */
-    .assign-input, .search, select.filter, .field input, .field select, .field textarea, .split-line select, .split-line input { font-size: 16px; }
+    /* Safari faz zoom ao focar qualquer campo com menos de 16px.
+       A regra é deliberadamente abrangente para não escapar nenhum campo novo. */
+    input, select, textarea, .assign-input { font-size: 16px; }
 
     /* Orçamento compacto; ações sempre visíveis (não há hover no toque) */
     .budget-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table.budget thead th, .grp-row td, tr.cat-row td { padding: 9px 8px; }
+    table.budget thead th, .grp-row td, tr.cat-row td { padding: 8px 6px; }
     .cat-actions, .grp-add { opacity: 1 !important; }
     .cat-name-cell { flex-wrap: wrap; gap: 6px; }
-    .assign-input { width: 84px; }
-    .target-bar { max-width: 150px; }
+    .assign-input { width: 82px; padding: 6px; }
+    .activity-cell, .grp-total { font-size: 12.5px; }
+    .avail-pill { padding: 4px 8px; }
+
+    /* Barra de ações do orçamento: o «Nova transação» já está no cabeçalho,
+       e os filtros ficam só com o símbolo para caberem todos numa linha. */
+    .toolbar .hide-phone { display: none !important; }
+    .btn.f-filtro { padding: 6px 9px; font-size: 13px; }
+    .btn.f-filtro .rot { display: none; }
 
     /* Tabelas largas (transações/contas/recorrentes) com deslize horizontal suave */
     .data-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -1216,9 +1231,7 @@
         '<span class="caret" style="transform:rotate('+(collapsed?"-90":"0")+'deg)">▾</span>' + esc(grp.name) + '</button>' +
         (grp.system ? '' :
           '<button class="grp-add" data-action="add-category" data-id="'+grp.id+'">+ categoria</button>' +
-          '<button class="grp-add" data-action="edit-group" data-id="'+grp.id+'">✎</button>' +
-          '<button class="grp-add" data-action="move-group-up" data-id="'+grp.id+'" title="Subir grupo">▲</button>' +
-          '<button class="grp-add" data-action="move-group-down" data-id="'+grp.id+'" title="Descer grupo">▼</button>') + '</div></td>' +
+          '<button class="grp-add" data-action="edit-group" data-id="'+grp.id+'">✎</button>') + '</div></td>' +
         '<td class="grp-total">'+fmt(gAssigned)+'</td>' +
         '<td class="grp-total">'+fmt(gActivity)+'</td>' +
         '<td class="grp-total">'+fmt(gAvail)+'</td></tr>';
@@ -1270,8 +1283,6 @@
         rows += '<tr class="cat-row" data-id="'+cat.id+'" draggable="true" data-drag="cat" data-drag-id="'+cat.id+'"><td>' +
           '<div class="cat-name-cell">' + prioBtn + '<span class="cat-name">'+esc(cat.name)+'</span>' +
           '<span class="cat-actions">' +
-            '<button data-action="move-cat-up" data-id="'+cat.id+'" title="Subir">▲</button>' +
-            '<button data-action="move-cat-down" data-id="'+cat.id+'" title="Descer">▼</button>' +
             '<button data-action="move-money" data-id="'+cat.id+'" title="Mover dinheiro">↔</button>' +
             '<button data-action="edit-category" data-id="'+cat.id+'" title="Editar / alvo">✎</button>' +
             (ti && ti.need>0 ? '<button data-action="fund-one" data-id="'+cat.id+'" title="Financiar alvo">🎯</button>' : '') +
@@ -1292,21 +1303,29 @@
         '<p style="max-width:360px;margin:0 auto;">Está a pedir categorias que sejam ao mesmo tempo de um dos estados <b>e</b> de uma das prioridades escolhidas. Desligue algum filtro, ou use <b>Limpar</b>.</p>'+
       '</td></tr>';
 
+    // No telemóvel o rótulo esconde-se e fica só o símbolo, para os seis filtros
+    // caberem numa linha só em vez de partirem a meio do grupo.
+    function fBtn(cls, accao, id, ativo, icone, rotulo, dica){
+      return '<button class="btn sm f-filtro '+cls+(ativo?' active':'')+'" data-action="'+accao+'" data-id="'+id+
+        '" title="'+dica+'" aria-label="'+dica+'" aria-pressed="'+(ativo?'true':'false')+'">'+
+        icone+'<span class="rot"> '+rotulo+'</span></button>';
+    }
     el("content").innerHTML =
       '<div class="toolbar">' +
-        '<button class="btn primary" data-action="add-tx">➕ Nova transação</button>' +
+        '<button class="btn primary hide-phone" data-action="add-tx">➕ Nova transação</button>' +
         '<button class="btn" data-action="add-group">+ Grupo</button>' +
-        '<span class="muted" style="font-size:12.5px;margin-inline-start:6px;">Mostrar:</span>' +
-        '<button class="btn sm f-ok'+(bf.ok?' active':'')+'" data-action="budget-filter" data-id="ok" title="Categorias com alvo cumprido">🟢 Alvo cumprido</button>' +
-        '<button class="btn sm f-warn'+(bf.warn?' active':'')+'" data-action="budget-filter" data-id="warn" title="Categorias com alvo por cumprir">🟡 Abaixo do alvo</button>' +
-        '<button class="btn sm f-neg'+(bf.neg?' active':'')+'" data-action="budget-filter" data-id="neg" title="Categorias que gastaram mais do que o disponível">🔴 Excedido</button>' +
+        '<span class="muted hide-phone" style="font-size:12.5px;margin-inline-start:6px;">Mostrar:</span>' +
+        fBtn('f-ok','budget-filter','ok',bf.ok,'🟢','Alvo cumprido','Só as categorias com o alvo cumprido') +
+        fBtn('f-warn','budget-filter','warn',bf.warn,'🟡','Abaixo do alvo','Só as categorias com o alvo por cumprir') +
+        fBtn('f-neg','budget-filter','neg',bf.neg,'🔴','Excedido','Só as categorias que gastaram mais do que tinham') +
         '<span class="sep"></span>' +
-        '<button class="btn sm f-alta'+(bp.alta?' active':'')+'" data-action="prio-filter" data-id="alta" title="Só as de prioridade alta">▲ Alta</button>' +
-        '<button class="btn sm f-normal'+(bp.normal?' active':'')+'" data-action="prio-filter" data-id="normal" title="Só as de prioridade normal">● Normal</button>' +
-        '<button class="btn sm f-baixa'+(bp.baixa?' active':'')+'" data-action="prio-filter" data-id="baixa" title="Só as de prioridade baixa">▼ Baixa</button>' +
+        fBtn('f-alta','prio-filter','alta',bp.alta,'▲','Alta','Só as de prioridade alta') +
+        fBtn('f-normal','prio-filter','normal',bp.normal,'●','Normal','Só as de prioridade normal') +
+        fBtn('f-baixa','prio-filter','baixa',bp.baixa,'▼','Baixa','Só as de prioridade baixa') +
         (filtering ? '<button class="btn sm" data-action="budget-filter-clear">Limpar</button>' : '') +
         '<div class="spacer"></div>' +
-        '<span class="muted" style="font-size:12.5px;">' + (filtering ? ('A mostrar '+nShown+' de '+nTotal+' categorias') : 'Clique num valor em <b>Atribuído</b> para editar') + '</span>' +
+        '<span class="muted'+(filtering?'':' hide-phone')+'" style="font-size:12.5px;">' +
+          (filtering ? ('A mostrar '+nShown+' de '+nTotal+' categorias') : 'Clique num valor em <b>Atribuído</b> para editar') + '</span>' +
       '</div>' +
       '<div class="budget-card"><table class="budget"><thead><tr>' +
         '<th class="first">Categoria</th><th>Atribuído</th><th>Atividade</th><th>Disponível</th>' +
@@ -1762,7 +1781,14 @@
     var editing = !!grp; grp = grp || { name:"" };
     openModal(
       '<div class="modal-head"><h2>'+(editing?"Editar grupo":"Novo grupo de categorias")+'</h2><button class="x" data-action="close">×</button></div>'+
-      '<div class="modal-body"><div class="field"><label>Nome do grupo</label><input id="grpName" maxlength="60" value="'+esc(grp.name)+'" placeholder="Ex.: Despesas fixas"></div></div>'+
+      '<div class="modal-body"><div class="field"><label>Nome do grupo</label><input id="grpName" maxlength="60" value="'+esc(grp.name)+'" placeholder="Ex.: Despesas fixas"></div>'+
+        (editing && !grp.system ? '<div class="field"><label>Ordem no orçamento</label>'+
+          '<div style="display:flex;gap:8px;">'+
+            '<button class="btn" data-action="move-group-up" data-id="'+grp.id+'" style="flex:1;justify-content:center;">▲ Subir</button>'+
+            '<button class="btn" data-action="move-group-down" data-id="'+grp.id+'" style="flex:1;justify-content:center;">▼ Descer</button>'+
+          '</div>'+
+          '<div class="hint">A lista por trás vai mudando a cada toque. No computador também pode arrastar a linha do grupo.</div></div>' : '')+
+      '</div>'+
       '<div class="modal-foot"><span>'+(editing?'<button class="btn danger" data-action="delete-group" data-id="'+grp.id+'">Eliminar</button>':'')+'</span>'+
         '<span><button class="btn" data-action="close">Cancelar</button> <button class="btn primary" data-action="save-group" data-id="'+(grp.id||"")+'">Guardar</button></span></div>');
   }
@@ -1785,6 +1811,12 @@
       '<div class="modal-body">'+
         '<div class="field"><label>Nome</label><input id="catName" maxlength="60" value="'+esc(cat.name)+'" placeholder="Ex.: Supermercado"></div>'+
         '<div class="field"><label>Grupo</label><select id="catGroup">'+grpOpts+'</select></div>'+
+        (editing ? '<div class="field"><label>Ordem no orçamento</label>'+
+          '<div style="display:flex;gap:8px;">'+
+            '<button class="btn" data-action="move-cat-up" data-id="'+cat.id+'" style="flex:1;justify-content:center;">▲ Subir</button>'+
+            '<button class="btn" data-action="move-cat-down" data-id="'+cat.id+'" style="flex:1;justify-content:center;">▼ Descer</button>'+
+          '</div>'+
+          '<div class="hint">A lista por trás vai mudando a cada toque. No computador também pode arrastar a linha da categoria.</div></div>' : '')+
         '<div class="field"><label>Nota (opcional)</label><input id="catNote" maxlength="300" value="'+esc(cat.note||"")+'" placeholder="Ex.: rever no fim do mês"></div>'+
         '<div class="field"><label>Prioridade</label><select id="catPrio">'+
           ['alta','normal','baixa'].map(function(p){ return '<option value="'+p+'"'+((cat.priority||"normal")===p?" selected":"")+'>'+PRIO_LABEL[p]+'</option>'; }).join("")+
@@ -2132,7 +2164,7 @@
         '<li><b>Método do alvo mensal:</b> «<b>Encher até X</b>» mete só o que falta para ter X disponível; «<b>Reservar X</b>» põe sempre X, todos os meses.</li>'+
         '<li><b>Financiar alvos</b> mostra primeiro o impacto (quanto <b>sobra</b> ou fica <b>negativo</b>) e só aplica ao <b>Confirmar</b>. Pode <b>Anular</b> a seguir. A opção <b>«Até ao disponível»</b> financia por ordem, sem ficar negativo. O 🎯 de cada linha financia uma só categoria.</li>'+
         '<li><b>Mover dinheiro:</b> o <b>↔</b> numa categoria transfere saldo disponível para outra categoria (ou de/para o «Pronto a atribuir») sem tocar no rendimento.</li>'+
-        '<li><b>Reordenar:</b> as setas <b>▲▼</b> mudam a ordem, ou <b>arraste</b> a linha da categoria/grupo para a posição pretendida (arrastar uma categoria para outro grupo também a muda de grupo).</li>'+
+        '<li><b>Reordenar:</b> no computador, <b>arraste</b> a linha da categoria ou do grupo para a posição pretendida (arrastar uma categoria para outro grupo também a muda de grupo). No telemóvel, abra o <b>✎</b> da categoria ou do grupo e use <b>▲ Subir</b> / <b>▼ Descer</b> — a lista por trás vai mudando a cada toque. A ordem conta: quando várias categorias têm a mesma prioridade, é ela que decide quem é financiado primeiro.</li>'+
         '<li><b>Prioridade:</b> cada categoria pode ser <b>Alta ▲</b>, <b>Normal ●</b> ou <b>Baixa ▼</b>. O ícone aparece à frente do nome no orçamento e <b>muda com um clique</b> — cada clique desce um nível e, do fundo, volta ao topo. Também se pode mudar no ✎ da categoria. Serve para financiar alvos «Até ao disponível» com a estratégia <b>por prioridade</b>, que enche primeiro as Altas, depois as Normais, depois as Baixas — e dentro do mesmo nível segue a <b>ordem em que as categorias aparecem</b> no orçamento. Na barra de cima pode ainda <b>filtrar</b> por prioridade; combinada com os filtros de estado, mostra só as que cumprem as duas condições (por exemplo, «Abaixo do alvo» <b>e</b> «Alta»).</li>'+
         '<li><b>Beneficiários:</b> à medida que vai registando, a app aprende. Ao escrever no campo <b>Beneficiário</b> aparecem os que já usou, e ao escolher um a <b>categoria</b> é preenchida com a que lhe deu da última vez — se ainda não tiver escolhido nenhuma. Pode sempre trocar.</li>'+
         '<li><b>Importar do banco:</b> em <b>Dados e cópias</b> pode importar um <b>.csv</b> com as transações; a estrutura esperada está explicada nesse ecrã. Na pré-visualização, as linhas que já existem (mesma conta, data e valor) aparecem marcadas como <b>«já existe»</b> e são <b>saltadas por predefinição</b> — assim pode importar extratos que se sobrepõem sem duplicar nada.</li>'+
