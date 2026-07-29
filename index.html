@@ -125,7 +125,8 @@
   .side-footer { margin-top: auto; padding: 12px 16px 4px; display: flex; flex-direction: column; gap: 4px; }
   /* Uma linha só, sempre — o ponto de aviso não pode empurrar o texto para baixo. */
   .side-footer button { background: transparent; border: 0; color: var(--sidebar-text); text-align: start; padding: 7px 12px; border-radius: 7px; font-size: 12.5px; font-weight: 600; display:flex; align-items:center; gap:9px; white-space: nowrap; overflow: hidden; }
-  .side-footer button > span:first-child { flex: 0 0 auto; }
+  /* Largura fixa para o ícone: os emojis têm larguras diferentes e desalinhavam os rótulos. */
+  .side-footer button > span:first-child { flex: 0 0 20px; text-align: center; }
   .side-footer button:hover { background: rgba(255,255,255,.06); color: var(--sidebar-text-strong); }
 
   /* Main */
@@ -422,6 +423,7 @@
 
     <div class="side-footer">
       <button data-action="add-tx"><span>➕</span> Nova transação</button>
+      <button data-action="payees"><span>🏷️</span> Beneficiários</button>
       <button data-action="data-menu" id="btnData"><span>💾</span> Dados e cópias</button>
       <button data-action="help"><span>❓</span> Como funciona</button>
     </div>
@@ -439,6 +441,7 @@
       </div>
       <div class="topbar-actions mobile-only">
         <button class="btn sm" data-action="add-tx" aria-label="Nova transação">➕</button>
+        <button class="btn sm" data-action="payees" aria-label="Beneficiários">🏷️</button>
         <button class="btn sm" data-action="data-menu" aria-label="Dados e cópias de segurança">💾</button>
         <button class="btn sm" data-action="help" aria-label="Como funciona">❓</button>
       </div>
@@ -1258,7 +1261,7 @@
             '</div>' +
             '<div class="target-bar"><span class="'+barClsP+'" style="width:'+barP+'%"></span></div>' +
             '<div class="target-note">'+pnote+'</div></td>' +
-            '<td class="num"><input class="assign-input" type="text" inputmode="decimal" data-assign="'+cat.id+'" value="'+amtStr(assigned)+'" placeholder="0,00"></td>' +
+            '<td class="num"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="decimal" data-assign="'+cat.id+'" value="'+amtStr(assigned)+'" placeholder="0,00"></td>' +
             '<td class="num activity-cell">'+fmt(activity)+'</td>' +
             '<td class="num"><span class="avail-pill '+pillCls+'">'+fmt(avail)+'</span></td></tr>';
           continue;
@@ -1290,7 +1293,7 @@
           '</span></div>' + (cat.note?'<div class="tag" style="margin-top:3px;">📝 '+esc(cat.note)+'</div>':'') + targetHtml +
           (upc[cat.id] ? '<div class="target-note">📅 Ainda por sair este mês: '+fmt(upc[cat.id])+
             (avail < upc[cat.id]-0.005 ? ' <b style="color:var(--warning)">— faltam '+fmt(round2(upc[cat.id]-avail))+'</b>' : '')+'</div>' : '') + '</td>' +
-          '<td class="num"><input class="assign-input" type="text" inputmode="decimal" data-assign="'+cat.id+'" value="'+amtStr(assigned)+'" placeholder="0,00"></td>' +
+          '<td class="num"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="decimal" data-assign="'+cat.id+'" value="'+amtStr(assigned)+'" placeholder="0,00"></td>' +
           '<td class="num activity-cell"><button class="btn ghost sm" data-action="cat-activity" data-id="'+cat.id+'" style="font-variant-numeric:tabular-nums;">'+fmt(activity)+'</button></td>' +
           '<td class="num"><span class="avail-pill '+pillCls+'">'+fmt(avail)+'</span></td></tr>';
       }
@@ -1437,6 +1440,8 @@
     var head = '<div class="toolbar">'+
       '<button class="btn primary" data-action="add-tx">➕ Nova transação</button>'+
       '<button class="btn" data-action="add-split">➗ Dividir</button>'+
+      // Só no computador: no telemóvel está no 🏷️ da barra de cima, para não densificar esta.
+      '<button class="btn hide-phone" data-action="payees">🏷️ Beneficiários</button>'+
       '<input class="search" id="txSearch" placeholder="Procurar beneficiário ou nota…" value="'+esc(f.q||"")+'">'+
       '<select class="filter" id="txFilterAcc">'+accOpts+'</select>'+
       '<select class="filter" id="txFilterCat">'+catOpts+'</select>'+
@@ -1697,7 +1702,7 @@
           '<button data-t="credit" class="'+(acc.type==="credit"?"active":"")+'">💳 Cartão</button>'+
           '<button data-t="tracking" class="'+(acc.type==="tracking"?"active":"")+'">📉 Acompanhamento</button></div>'+
           '<div class="hint">Orçamento = à ordem, poupança, dinheiro. Cartão = cartão de crédito (com categoria de pagamento automática). Acompanhamento = empréstimos, investimentos.</div></div>'+
-        (editing?'':'<div class="field"><label>Saldo inicial</label><input id="acStart" type="text" inputmode="decimal" value="'+amtStr(acc.start)+'" placeholder="0,00"><div class="hint">Use valor negativo para dívidas (ex.: saldo de cartão de crédito).</div></div>')+
+        (editing?'':'<div class="field"><label>Saldo inicial</label><input id="acStart" class="money" data-neg="1" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(acc.start)+'" placeholder="0,00"><div class="hint">Use valor negativo para dívidas (ex.: saldo de cartão de crédito).</div></div>')+
         '<div class="field"><label>Nota (opcional)</label><input id="acNote" maxlength="300" value="'+esc(acc.note||"")+'"></div>'+
         '<div class="field'+((acc.type==="credit"||acc.type==="tracking")?"":" hidden")+'" id="acPayFromField"><label>Conta de pagamento predefinida</label><select id="acPayFrom">'+payFromOpts+'</select><div class="hint">Ao pagar este cartão/dívida, o dinheiro sai por predefinição desta conta.</div></div>'+
       '</div>'+
@@ -1708,6 +1713,16 @@
   }
 
   // Opções de categoria com o saldo disponível entre parênteses (referente ao mês em vista no orçamento).
+  // Os <option> não aceitam HTML, por isso o estado do alvo vai num símbolo antes do nome
+  // (funciona em todo o lado, incluindo no seletor nativo do iPhone). A cor é um extra
+  // que só alguns navegadores de computador respeitam.
+  var STATUS_MARCA = { ok:"🟢", warn:"🟡", neg:"🔴", none:"⚪" };
+  var STATUS_COR   = { ok:"var(--positive)", warn:"var(--warning)", neg:"var(--negative)", none:"var(--text-muted)" };
+  function optCat(cat, m, selId){
+    var st = catStatus(cat, m);
+    return '<option value="'+cat.id+'"'+(selId===cat.id?" selected":"")+' style="color:'+STATUS_COR[st]+'">'+
+      STATUS_MARCA[st]+' '+esc(cat.name)+' ('+fmt(availableFor(cat.id, m))+')</option>';
+  }
   function catOptionsHTML(selId){
     var m = state.ui.month;
     var o = '<option value="">— Sem categoria —</option>' +
@@ -1716,7 +1731,7 @@
       var cs = categoriesOfGroup(state.groups[g].id).filter(function(c){ return !c.cardId; });
       if (!cs.length) continue;
       o += '<optgroup label="'+esc(state.groups[g].name)+'">';
-      for (var c=0; c<cs.length; c++) o += '<option value="'+cs[c].id+'"'+(selId===cs[c].id?" selected":"")+'>'+esc(cs[c].name)+' ('+fmt(availableFor(cs[c].id,m))+')</option>';
+      for (var c=0; c<cs.length; c++) o += optCat(cs[c], m, selId);
       o += '</optgroup>';
     }
     return o;
@@ -1741,8 +1756,8 @@
           '<div class="hint hidden" id="txCatSug">💡 Categoria preenchida a partir da última vez que usou este beneficiário.</div>'+
           '<div class="hint hidden" id="txCatWarn">⚠️ Sem categoria, este movimento muda o saldo da conta mas fica de fora do orçamento — as contas deixam de bater certo.</div></div>'+
         '<div class="grid-2">'+
-          '<div class="field"><label>Saída (despesa)</label><input id="txOut" type="text" inputmode="decimal" value="'+amtStr(tx.outflow)+'" placeholder="0,00"></div>'+
-          '<div class="field"><label>Entrada (receita)</label><input id="txIn" type="text" inputmode="decimal" value="'+amtStr(tx.inflow)+'" placeholder="0,00"></div>'+
+          '<div class="field"><label>Saída (despesa)</label><input id="txOut" class="money" data-par="txIn" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(tx.outflow)+'" placeholder="0,00"></div>'+
+          '<div class="field"><label>Entrada (receita)</label><input id="txIn" class="money" data-par="txOut" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(tx.inflow)+'" placeholder="0,00"></div>'+
         '</div>'+
         '<div class="field"><label>Nota (opcional)</label><input id="txMemo" maxlength="300" value="'+esc(tx.memo||"")+'"></div>'+
         '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;"><input type="checkbox" id="txClear" '+(tx.cleared?"checked":"")+' style="width:auto;"> Confirmada (reconciliada com o banco)</label>'+
@@ -1830,7 +1845,7 @@
           opt("byDate","Até uma data — juntar um total")+
         '</select></div>'+
         '<div class="grid-2">'+
-          '<div class="field" id="catAmtField"><label id="catAmtLabel">Valor do alvo</label><input id="catTarget" type="text" inputmode="decimal" value="'+amtStr(tAmt)+'" placeholder="0,00"></div>'+
+          '<div class="field" id="catAmtField"><label id="catAmtLabel">Valor do alvo</label><input id="catTarget" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(tAmt)+'" placeholder="0,00"></div>'+
           '<div class="field hidden" id="catDateField"><label>Até ao mês</label><input id="catTargetDate" type="month" value="'+tDate+'"></div>'+
         '</div>'+
         '<div class="field hidden" id="catDueField"><label>Mês da despesa <span class="muted" style="text-transform:none;letter-spacing:0;">(opcional)</span></label>'+
@@ -1874,7 +1889,7 @@
     openModal(
       '<div class="modal-head"><h2>💾 Dados e cópias de segurança</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
-        '<p class="muted" style="margin-top:0;">Os seus dados vivem <b>só neste aparelho</b>, dentro do navegador. Há aqui três coisas diferentes — e só a <b>2</b> e a <b>3</b> os põem a salvo se perder o aparelho.</p>'+
+        '<p class="muted" style="margin-top:0;">Os seus dados vivem <b>só neste aparelho</b>. Destas três, só a <b>2</b> e a <b>3</b> os salvam se o perder.</p>'+
         '<div class="field"><label>Moeda</label><select id="curSel">'+
           CURRENCIES.map(function(c){ return '<option value="'+c[0]+'"'+(((state.settings.currency||"EUR")===c[0])?" selected":"")+'>'+c[0]+' ('+c[1]+')</option>'; }).join("")+
         '</select></div>'+
@@ -1883,9 +1898,7 @@
           '<div style="font-weight:700;font-size:13px;">1 · Histórico — voltar a um dia anterior</div>'+
           '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;margin-top:8px;">'+
             '<input type="checkbox" data-action="toggle-autobackup" '+(state.settings.autoBackup!==false?"checked":"")+' style="width:auto;"> Guardar o estado do orçamento uma vez por dia</label>'+
-          '<div class="hint" style="margin-top:4px;">Guarda uma cópia <b>dentro da própria aplicação</b>. Não descarrega ficheiro nenhum, por isso funciona igual no iPhone e no PC. Serve para <b>voltar atrás</b> quando se engana — não é uma cópia de segurança.<br>'+
-          'É guardada quando <b>abre</b> e quando <b>sai</b> da aplicação, e ficam os <b>5 dias</b> mais recentes. Cada dia tem um ponto só, com o estado mais recente desse dia — para desfazer enganos do próprio dia use o <b>↩ Anular</b>.<br>'+
-          '<b>⚠️ Fica no mesmo sítio que os seus dados</b> — se o navegador limpar o armazenamento, desaparece tudo junto. Para isso é que serve o ponto 2.</div>'+
+          '<div class="hint" style="margin-top:4px;">Os <b>5 dias</b> mais recentes, guardados dentro da aplicação. Servem para voltar atrás — <b>não</b> o salvam se perder o aparelho.</div>'+
           snapshotsHtml()+
         '</div>'+
 
@@ -1897,22 +1910,22 @@
               : 'Ainda não guardou nenhuma cópia de segurança em ficheiro.')+
           '</div>'+
           '<div class="hint" style="margin-top:4px;">'+(backupPending()?'⚠️ Há alterações por guardar em ficheiro.':'✅ A última cópia está atualizada.')+'</div>'+
-          '<div class="hint" style="margin-top:6px;">É <b>sempre manual</b> — só acontece quando carrega no botão aqui em baixo. É a única cópia que sobrevive a perder o aparelho ou a uma limpeza do navegador, por isso guarde o ficheiro <b>fora daqui</b> (OneDrive, e-mail, pen). A aplicação não gere estes ficheiros: cada exportação cria um novo e a limpeza é sua.'+
-          (usaPartilha()?'<br>Neste aparelho abre a <b>partilha do iPhone</b>, para poder guardar em «Ficheiros» ou enviar para onde quiser.':'')+'</div>'+
+          '<div class="hint" style="margin-top:6px;">Manual. Guarde o ficheiro <b>fora daqui</b> — OneDrive, e-mail, pen.'+
+          (usaPartilha()?' Neste aparelho abre a partilha do iPhone.':'')+'</div>'+
         '</div>'+
         '<div class="field"><button class="btn primary" data-action="export-json" style="width:100%;justify-content:center;">⬇ Guardar cópia de segurança (.json)</button></div>'+
         '<div class="field"><button class="btn" data-action="export-csv" style="width:100%;justify-content:center;">⬇ Exportar transações (.csv)</button></div>'+
         '<div class="field"><label>Importar cópia de segurança (.json)</label><input id="importFile" type="file" accept="application/json,.json"><div class="hint">Substitui todos os dados atuais por este ficheiro.</div></div>'+
         '<div class="field"><button class="btn" data-action="import-csv" style="width:100%;justify-content:center;">📥 Importar transações do banco (.csv)</button><div class="hint">Acrescenta transações às existentes, sem substituir nada.</div></div>'+
         '<hr style="border:0;border-top:1px solid var(--border);margin:18px 0;">'+
-        '<div class="field"><label>3 · Sincronização entre dispositivos</label><button class="btn" data-action="open-sync" style="width:100%;justify-content:center;">☁️ Sincronização entre dispositivos</button>'+
-          '<div class="hint">'+(syncReady()?('Ligada — '+esc(_syncStatus||"pronta")):'Guarde uma cópia cifrada num gist privado do GitHub para partilhar entre o telemóvel e o PC.')+'</div></div>'+
+        '<div class="field"><label>3 · Sincronização entre dispositivos</label><button class="btn" data-action="open-sync" style="width:100%;justify-content:center;">☁️ Sincronizar telemóvel e PC</button>'+
+          '<div class="hint">'+(syncReady()?('Ligada — '+esc(_syncStatus||"pronta")):'Cópia cifrada num gist privado do GitHub.')+'</div></div>'+
         '<div class="field"><button class="btn" data-action="archived-menu" style="width:100%;justify-content:center;">🗄 Ver arquivados</button></div>'+
         '<div class="field"><button class="btn" data-action="load-sample" style="width:100%;justify-content:center;">🧪 Carregar dados de exemplo</button></div>'+
         '<div class="field"><button class="btn danger" data-action="reset-data" style="width:100%;justify-content:center;">🗑 Apagar todos os dados</button></div>'+
         (function(){ var e=espacoApp(); if(!e) return "";
-          return '<div class="hint" style="border-top:1px solid var(--border);padding-top:10px;">Espaço usado neste navegador: <b>'+mb(e.total)+
-            '</b> (orçamento '+mb(e.dados)+' · histórico '+mb(e.hist)+'). Costumam estar disponíveis cerca de 5 MB por site.</div>'; })()+
+          return '<div class="hint" style="border-top:1px solid var(--border);padding-top:10px;">Espaço usado: <b>'+mb(e.total)+
+            '</b> de cerca de 5 MB (orçamento '+mb(e.dados)+' · histórico '+mb(e.hist)+').</div>'; })()+
       '</div>'+
       '<div class="modal-foot"><span class="muted" style="font-size:12px;">Versão 1.0 · Orçamento base-zero</span><button class="btn" data-action="close">Fechar</button></div>');
     el("importFile").addEventListener("change", function(e){ importJSON(e.target.files[0]); });
@@ -2025,6 +2038,47 @@
         '<div class="hint">Se mesmo assim não chegar, exporte tudo, apague transações de anos antigos e volte a importar. Ativar a <b>sincronização</b> não ajuda aqui: a cópia na nuvem não substitui o armazenamento local.</div>'+
       '</div>'+
       '<div class="modal-foot"><span></span><button class="btn" data-action="close">Continuar sem guardar</button></div>');
+  }
+
+  function payeesModal(){
+    var idx = payeeIndex(), arr = [];
+    for (var k in idx) if (idx.hasOwnProperty(k)) arr.push({ k:k, e:idx[k] });
+    arr.sort(function(a,b){ return b.e.count-a.e.count || (a.e.name<b.e.name?-1:1); });
+
+    var corpo;
+    if (!arr.length) {
+      corpo = '<div class="muted" style="text-align:center;padding:20px 0;">Ainda não há beneficiários — aparecem aqui à medida que for registando transações.</div>';
+    } else {
+      corpo = '<div style="max-height:340px;overflow:auto;">' + arr.map(function(x){
+        var c = x.e.cat===INCOME ? "Rendimento" : (x.e.cat ? ((lkCat(x.e.cat)||{name:"(apagada)"}).name) : "sem categoria");
+        return '<div class="int-row"><span class="who"><b>'+esc(x.e.name)+'</b>'+
+          '<span class="tag">'+x.e.count+' transaç'+(x.e.count===1?'ão':'ões')+' · última em '+fmtDate(x.e.lastDate)+' · '+esc(c)+'</span></span>'+
+          '<span></span>'+
+          '<button class="btn sm" data-action="rename-payee" data-id="'+x.k+'">✎ Mudar nome</button></div>';
+      }).join("") + '</div>';
+    }
+    openModal(
+      '<div class="modal-head"><h2>🏷 Beneficiários</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body">'+
+        '<p class="muted" style="margin-top:0;">Os nomes que já usou, do mais frequente para o menos. São eles que alimentam as sugestões ao escrever uma transação.<br>'+
+        'Mudar um nome altera <b>todas</b> as transações e regras onde aparece. Se lhe der um nome que já existe, os dois <b>juntam-se</b> num só — é assim que se corrige um «Continemte» ou se unificam variantes.</p>'+
+        corpo+
+      '</div>'+
+      '<div class="modal-foot"><span class="muted" style="font-size:12px;">'+arr.length+' beneficiário'+(arr.length===1?'':'s')+'</span><button class="btn" data-action="close">Fechar</button></div>');
+  }
+
+  function renamePayeeModal(k){
+    var e = payeeIndex()[k];
+    if (!e) { toast("Beneficiário não encontrado."); return; }
+    openModal(
+      '<div class="modal-head"><h2>Mudar nome do beneficiário</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body">'+
+        '<p class="muted" style="margin-top:0;">«'+esc(e.name)+'» aparece em <b>'+e.count+'</b> transaç'+(e.count===1?'ão':'ões')+'.</p>'+
+        '<div class="field"><label>Novo nome</label><input id="pyNome" maxlength="100" value="'+esc(e.name)+'">'+
+          '<div class="hint">Se escrever um nome que já exista, os dois passam a ser o mesmo beneficiário.</div></div>'+
+      '</div>'+
+      '<div class="modal-foot"><span></span><span><button class="btn" data-action="payees">Cancelar</button> '+
+        '<button class="btn primary" data-action="save-payee" data-id="'+k+'">Guardar</button></span></div>');
   }
 
   function integrityModal(){
@@ -2154,35 +2208,64 @@
   }
 
   function helpModal() {
+    function sec(t){ return '<div style="font-weight:700;color:var(--text);margin:16px 0 6px;font-size:13px;">'+t+'</div>'; }
     openModal(
       '<div class="modal-head"><h2>❓ Como funciona</h2><button class="x" data-action="close">×</button></div>'+
-      '<div class="modal-body"><ul class="help-list">'+
-        '<li><b>Dê uma função a cada euro.</b> O valor <b>Pronto a atribuir</b> mostra o dinheiro por distribuir. O objetivo é chegar a 0 €, atribuindo tudo às categorias.</li>'+
-        '<li><b>Registe rendimentos</b> como transações de <b>Entrada</b> com a categoria «Rendimento». Isso alimenta o «Pronto a atribuir».</li>'+
-        '<li><b>Atribua</b> valores às categorias na coluna <b>Atribuído</b>. A coluna <b>Disponível</b> mostra o que resta em cada categoria (transita de mês para mês).</li>'+
-        '<li><b>Alvos:</b> em cada categoria (lápis ✎) escolha o tipo — <b>mensal</b>, <b>semanal</b> (valor × nº de semanas do mês), <b>trimestral</b>, <b>anual</b> ou <b>até uma data</b>.</li>'+
-        '<li><b>Método do alvo mensal:</b> «<b>Encher até X</b>» mete só o que falta para ter X disponível; «<b>Reservar X</b>» põe sempre X, todos os meses.</li>'+
-        '<li><b>Financiar alvos</b> mostra primeiro o impacto (quanto <b>sobra</b> ou fica <b>negativo</b>) e só aplica ao <b>Confirmar</b>. Pode <b>Anular</b> a seguir. A opção <b>«Até ao disponível»</b> financia por ordem, sem ficar negativo. O 🎯 de cada linha financia uma só categoria.</li>'+
-        '<li><b>Mover dinheiro:</b> o <b>↔</b> numa categoria transfere saldo disponível para outra categoria (ou de/para o «Pronto a atribuir») sem tocar no rendimento.</li>'+
-        '<li><b>Reordenar:</b> no computador, <b>arraste</b> a linha da categoria ou do grupo para a posição pretendida (arrastar uma categoria para outro grupo também a muda de grupo). No telemóvel, abra o <b>✎</b> da categoria ou do grupo e use <b>▲ Subir</b> / <b>▼ Descer</b> — a lista por trás vai mudando a cada toque. A ordem conta: quando várias categorias têm a mesma prioridade, é ela que decide quem é financiado primeiro.</li>'+
-        '<li><b>Prioridade:</b> cada categoria pode ser <b>Alta ▲</b>, <b>Normal ●</b> ou <b>Baixa ▼</b>. O ícone aparece à frente do nome no orçamento e <b>muda com um clique</b> — cada clique desce um nível e, do fundo, volta ao topo. Também se pode mudar no ✎ da categoria. Serve para financiar alvos «Até ao disponível» com a estratégia <b>por prioridade</b>, que enche primeiro as Altas, depois as Normais, depois as Baixas — e dentro do mesmo nível segue a <b>ordem em que as categorias aparecem</b> no orçamento. Na barra de cima pode ainda <b>filtrar</b> por prioridade; combinada com os filtros de estado, mostra só as que cumprem as duas condições (por exemplo, «Abaixo do alvo» <b>e</b> «Alta»).</li>'+
-        '<li><b>Beneficiários:</b> à medida que vai registando, a app aprende. Ao escrever no campo <b>Beneficiário</b> aparecem os que já usou, e ao escolher um a <b>categoria</b> é preenchida com a que lhe deu da última vez — se ainda não tiver escolhido nenhuma. Pode sempre trocar.</li>'+
-        '<li><b>Importar do banco:</b> em <b>Dados e cópias</b> pode importar um <b>.csv</b> com as transações; a estrutura esperada está explicada nesse ecrã. Na pré-visualização, as linhas que já existem (mesma conta, data e valor) aparecem marcadas como <b>«já existe»</b> e são <b>saltadas por predefinição</b> — assim pode importar extratos que se sobrepõem sem duplicar nada.</li>'+
-        '<li><b>Anular:</b> o botão <b>↩ Anular</b> repõe as últimas <b>5</b> ações (eliminações, importações, duplicações).</li>'+
-        '<li><b>Recorrentes</b> (separador 📅): crie regras (renda, salário, subscrições) que são lançadas automaticamente na data. O <b>▶</b> lança já a próxima; o <b>✓</b> ativa/desativa.</li>'+
-        '<li><b>Transferir / Pagar cartão:</b> em <b>Contas</b>, o «↔ Transferir» move dinheiro entre contas. Numa conta de cartão/dívida com saldo negativo, o <b>💳 Pagar</b> abate o valor a partir da sua conta à ordem (pode definir uma conta de pagamento predefinida ao editar o cartão).</li>'+
-        '<li><b>Editar uma transferência:</b> clique na linha, como em qualquer transação. Uma transferência são <b>dois</b> movimentos ligados — um em cada conta — e a app edita-os sempre <b>em conjunto</b>, para o valor, a data e as contas nunca ficarem a divergir. Na lista, o <b>✓</b> continua a confirmar cada lado de sua vez, porque cada banco tem o seu ritmo.</li>'+
-        '<li><b>Cartões de crédito:</b> ao criar a conta escolha o tipo <b>💳 Cartão</b>. Sempre que gasta no cartão numa categoria, a app <b>reserva</b> automaticamente esse valor na categoria «Pagamento» do cartão (no fim do orçamento), garantindo que tem dinheiro para a fatura. O <b>💳 Pagar</b> usa essa reserva.</li>'+
-        '<li><b>Transação dividida</b> (<b>➗ Dividir</b>): reparte uma única compra por várias categorias (ex.: no hipermercado, parte em «Supermercado», parte em «Casa»). Cada parte fica na sua categoria e aparece com 🔗 na lista. Clique em qualquer uma para <b>editar a repartição toda</b> — pode mudar valores, acrescentar ou tirar categorias, e é guardada em bloco, para o total nunca ficar a meio. Eliminar uma parte remove a transação inteira.</li>'+
-        '<li><b>Contas de orçamento</b> (à ordem, poupança, dinheiro) entram no orçamento. <b>Contas de acompanhamento</b> (cartões, empréstimos, investimentos) não afetam o «Pronto a atribuir».</li>'+
-        '<li><b>Excesso</b> (Disponível a vermelho) significa que gastou mais do que atribuiu — atribua mais a essa categoria para o cobrir.</li>'+
-        '<li><b>Orçamento vs. contas:</b> o dinheiro nas contas de orçamento tem de ser sempre igual ao «Pronto a atribuir» mais o «Disponível» de todas as categorias. Se algum movimento ficar <b>sem categoria</b>, ou se transferir dinheiro para uma <b>conta de acompanhamento</b> sem lhe dar categoria, aparece um aviso ⚠️ por baixo do «Pronto a atribuir» — carregue em <b>Ver porquê</b> para ver e corrigir os movimentos em causa.</li>'+
-        '<li><b>Limites:</b> os nomes ficam por 60 caracteres, os beneficiários por 100 e as notas por 300; cada importação de <b>.csv</b> lê no máximo 20 000 linhas. Isto existe porque tudo o que escreve ocupa espaço no navegador, que dá cerca de <b>5 MB</b> por site — e esse espaço é partilhado com o histórico. Pode ver quanto está a usar no fim do ecrã <b>Dados e cópias</b>. Se alguma vez encher, a aplicação avisa-o de forma bem visível: nessa altura <b>as alterações deixam de ser gravadas</b>, e a primeira coisa a fazer é guardar uma cópia em ficheiro.</li>'+
-        '<li><b>Onde vivem os dados:</b> só <b>neste aparelho</b>, dentro do navegador — que os pode limpar ao fim de algum tempo sem uso, sobretudo no iPhone. Em <b>Dados e cópias</b> há três níveis de proteção, e convém não os confundir:<br>'+
-          '<b>1 · Histórico</b> — a app guarda sozinha o estado do orçamento uma vez por dia, <b>dentro dela própria</b> (nunca descarrega ficheiros, funciona igual no iPhone e no PC), ao abrir e ao sair. Ficam os <b>5 dias</b> mais recentes e servem para <b>voltar a um dia anterior</b>. Como ficam no mesmo sítio que os dados, <b>não</b> o salvam se perder o aparelho.<br>'+
-          '<b>2 · Cópia de segurança em ficheiro (.json)</b> — <b>sempre manual</b>, só quando carrega no botão. É a única que sobrevive a perder o aparelho; guarde-a fora daqui. A app avisa quando já vai com uns dias.<br>'+
-          '<b>3 · Sincronização</b> — mantém o telemóvel e o PC com os mesmos dados, através de uma cópia cifrada no GitHub.</li>'+
-      '</ul></div>'+
+      '<div class="modal-body"><div class="help-list">'+
+
+      sec("O essencial")+
+      '<ul style="margin:0;padding-inline-start:18px;">'+
+        '<li><b>Dê uma função a cada euro.</b> O <b>Pronto a atribuir</b> é o dinheiro por distribuir — o objetivo é chegar a 0 €.</li>'+
+        '<li>Os <b>rendimentos</b> entram como transações de <b>Entrada</b> com a categoria «Rendimento».</li>'+
+        '<li>O que atribui fica em <b>Disponível</b> e transita de mês para mês.</li>'+
+        '<li><b>Excesso</b> (a vermelho): gastou mais do que tinha atribuído. Atribua mais para o cobrir.</li>'+
+      '</ul>'+
+
+      sec("Alvos")+
+      '<ul style="margin:0;padding-inline-start:18px;">'+
+        '<li>Definem-se no <b>✎</b> de cada categoria: mensal, semanal, trimestral, anual, ou até uma data.</li>'+
+        '<li>No mensal, «<b>Encher até X</b>» mete só o que falta; «<b>Reservar X</b>» põe sempre X.</li>'+
+        '<li>Trimestral e anual <b>param de pedir</b> quando já tiver o total. Indicando o mês da despesa, repartem o que falta até lá.</li>'+
+      '</ul>'+
+
+      sec("Distribuir o dinheiro")+
+      '<ul style="margin:0;padding-inline-start:18px;">'+
+        '<li><b>🎯 Financiar alvos</b> mostra o impacto antes de aplicar, e pode <b>Anular</b> a seguir. «Até ao disponível» nunca o deixa negativo.</li>'+
+        '<li><b>Prioridade</b> ▲ ● ▼ à frente de cada categoria, muda com um clique. Ao financiar por prioridade enche as <b>Altas</b> primeiro; entre iguais, manda a <b>ordem da lista</b>.</li>'+
+        '<li><b>↔</b> move dinheiro entre categorias (ou de/para o «Pronto a atribuir») sem mexer no rendimento.</li>'+
+      '</ul>'+
+
+      sec("Organizar")+
+      '<ul style="margin:0;padding-inline-start:18px;">'+
+        '<li><b>Filtros</b> no topo: estado (🟢🟡🔴) e prioridade (▲●▼) <b>cruzam-se</b> entre si.</li>'+
+        '<li><b>Reordenar:</b> arraste a linha no computador; no telemóvel use <b>▲▼</b> dentro do ✎.</li>'+
+        '<li><b>🗄 Arquivar</b> esconde uma conta ou categoria sem perder o histórico.</li>'+
+      '</ul>'+
+
+      sec("Contas e transações")+
+      '<ul style="margin:0;padding-inline-start:18px;">'+
+        '<li>Contas de <b>orçamento</b> (à ordem, poupança) entram no orçamento. De <b>acompanhamento</b> (investimentos, empréstimos) não.</li>'+
+        '<li><b>Cartão de crédito:</b> ao gastar, a app reserva logo o valor para a fatura. O <b>💳 Pagar</b> usa essa reserva.</li>'+
+        '<li><b>↔ Transferir</b> move entre contas. Se o dinheiro sair do orçamento para uma conta de acompanhamento, leva categoria.</li>'+
+        '<li><b>➗ Dividir</b> reparte uma compra por várias categorias. <b>📅 Recorrentes</b> lançam-se sozinhas na data.</li>'+
+        '<li>Clique numa transação para a editar. Transferências e divididas editam-se <b>por inteiro</b>, nunca metade.</li>'+
+        '<li><b>Campos de valor:</b> algarismos e um separador decimal. Em <b>Saída/Entrada</b>, o «-» troca de lado.</li>'+
+        '<li><b>🏷️ Beneficiários:</b> mudar um nome altera todas as transações; dar-lhe um nome que já existe <b>junta</b> os dois.</li>'+
+        '<li><b>Importar .csv</b> do banco: as linhas que já existem são detetadas e saltadas.</li>'+
+      '</ul>'+
+
+      sec("Se algo não bater certo")+
+      '<ul style="margin:0;padding-inline-start:18px;">'+
+        '<li>Um <b>⚠️</b> por baixo do «Pronto a atribuir» quer dizer que o dinheiro nas contas não bate com o orçamento. Carregue em <b>Ver porquê</b> — mostra os movimentos em causa e corrige-os.</li>'+
+        '<li><b>↩ Anular</b> repõe as últimas <b>5</b> ações.</li>'+
+      '</ul>'+
+
+      sec("Os seus dados")+
+      '<ul style="margin:0;padding-inline-start:18px;">'+
+        '<li>Vivem <b>só neste aparelho</b>. Em <b>Dados e cópias</b> há três níveis: <b>1</b> histórico dos 5 últimos dias, para voltar atrás; <b>2</b> cópia em ficheiro, a única que sobrevive a perder o aparelho; <b>3</b> sincronização cifrada entre telemóvel e PC.</li>'+
+      '</ul>'+
+
+      '</div></div>'+
       '<div class="modal-foot"><span></span><button class="btn primary" data-action="close">Entendido</button></div>');
   }
 
@@ -2242,7 +2325,7 @@
     var m=state.ui.month;
     function optsFor(sel){
       var o='<option value="'+RTA_ID+'"'+(sel===RTA_ID?" selected":"")+'>💵 Pronto a atribuir</option>';
-      for(var g=0;g<state.groups.length;g++){ var cs=categoriesOfGroup(state.groups[g].id).filter(function(c){return !c.cardId;}); if(!cs.length)continue; o+='<optgroup label="'+esc(state.groups[g].name)+'">'; for(var c=0;c<cs.length;c++) o+='<option value="'+cs[c].id+'"'+(sel===cs[c].id?" selected":"")+'>'+esc(cs[c].name)+' ('+fmt(availableFor(cs[c].id,m))+')</option>'; o+='</optgroup>'; }
+      for(var g=0;g<state.groups.length;g++){ var cs=categoriesOfGroup(state.groups[g].id).filter(function(c){return !c.cardId;}); if(!cs.length)continue; o+='<optgroup label="'+esc(state.groups[g].name)+'">'; for(var c=0;c<cs.length;c++) o+=optCat(cs[c], m, sel); o+='</optgroup>'; }
       return o;
     }
     var fromDefault=fromId||RTA_ID;
@@ -2253,7 +2336,7 @@
       '<div class="modal-body">'+
         '<div class="field"><label>De</label><select id="mvFrom">'+optsFor(fromDefault)+'</select></div>'+
         '<div class="field"><label>Para</label><select id="mvTo">'+optsFor(toDefault)+'</select></div>'+
-        '<div class="field"><label>Valor</label><input id="mvAmt" type="text" inputmode="decimal" value="'+amtStr(fromAvail>0?round2(fromAvail):"")+'" placeholder="0,00"><div class="hint" id="mvHint"></div></div>'+
+        '<div class="field"><label>Valor</label><input id="mvAmt" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(fromAvail>0?round2(fromAvail):"")+'" placeholder="0,00"><div class="hint" id="mvHint"></div></div>'+
       '</div>'+
       '<div class="modal-foot"><span></span><span><button class="btn" data-action="close">Cancelar</button> <button class="btn primary" data-action="do-move">Mover</button></span></div>');
     function upd(){ var f=el("mvFrom").value; var fa=f===RTA_ID?readyToAssign(m):availableFor(f,m); el("mvHint").textContent="Disponível na origem: "+fmt(fa); }
@@ -2279,8 +2362,8 @@
           '<datalist id="payeeList">'+payeeListHTML()+'</datalist></div>'+
         '<div class="field"><label>Categoria</label><select id="rcCat">'+catOpts+'</select></div>'+
         '<div class="grid-2">'+
-          '<div class="field"><label>Saída (despesa)</label><input id="rcOut" type="text" inputmode="decimal" value="'+amtStr(r.outflow)+'" placeholder="0,00"></div>'+
-          '<div class="field"><label>Entrada (receita)</label><input id="rcIn" type="text" inputmode="decimal" value="'+amtStr(r.inflow)+'" placeholder="0,00"></div>'+
+          '<div class="field"><label>Saída (despesa)</label><input id="rcOut" class="money" data-par="rcIn" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(r.outflow)+'" placeholder="0,00"></div>'+
+          '<div class="field"><label>Entrada (receita)</label><input id="rcIn" class="money" data-par="rcOut" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(r.inflow)+'" placeholder="0,00"></div>'+
         '</div>'+
         '<div class="field"><label>Nota (opcional)</label><input id="rcMemo" maxlength="300" value="'+esc(r.memo||"")+'"></div>'+
         '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;"><input type="checkbox" id="rcActive" '+(r.active?"checked":"")+' style="width:auto;"> Ativa (lança automaticamente na data)</label>'+
@@ -2329,7 +2412,7 @@
         '<div class="field hidden" id="tfCatField"><label id="tfCatLabel">Categoria</label><select id="tfCat">'+catOptionsHTML(catDefault)+'</select>'+
           '<div class="hint" id="tfCatHint"></div></div>'+
         '<div class="grid-2">'+
-          '<div class="field"><label>Valor</label><input id="tfAmt" type="text" inputmode="decimal" value="'+amtStr(amtDefault)+'" placeholder="0,00"></div>'+
+          '<div class="field"><label>Valor</label><input id="tfAmt" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(amtDefault)+'" placeholder="0,00"></div>'+
           '<div class="field"><label>Data</label><input id="tfDate" type="date" value="'+esc(dateDefault)+'"></div>'+
         '</div>'+
         '<div class="field"><label>Nota (opcional)</label><input id="tfMemo" maxlength="300" value="'+esc(memoDefault)+'"></div>'+
@@ -2403,7 +2486,7 @@
     var lineRows=s.lines.map(function(l,i){
       return '<div class="split-line" style="display:grid;grid-template-columns:1fr 108px 36px;gap:8px;margin-bottom:8px;align-items:center;">'+
         '<select id="spCat'+i+'">'+catOptsFor(l.categoryId)+'</select>'+
-        '<input id="spAmt'+i+'" type="text" inputmode="decimal" value="'+amtStr(l.amount)+'" placeholder="0,00" style="text-align:end;">'+
+        '<input id="spAmt'+i+'" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(l.amount)+'" placeholder="0,00" style="text-align:end;">'+
         '<button class="btn ghost sm" data-action="split-del-line" data-id="'+i+'" title="Remover">🗑</button></div>';
     }).join("");
     openModal(
@@ -2462,6 +2545,24 @@
   var MAX_FICH_CSV  = 10*1024*1024;        // 10 MB
   var MAX_LINHAS_CSV = 20000;
   function corta(s, n){ s=String(s==null?"":s).trim(); return s.length>n ? s.slice(0,n) : s; }
+
+  // ---------- Campos de valor ----------
+  // Deixa passar apenas dígitos e UM separador decimal, com 9 inteiros e 2 decimais no máximo.
+  // Havendo vários separadores, o último é o decimal e os anteriores eram de milhares — assim
+  // colar «1.234,56» do banco dá 1234,56 em vez de estragar o número.
+  var LIM_INT = 9, LIM_DEC = 2;
+  function limpaValor(txt, permiteNegativo){
+    var s = String(txt==null?"":txt);
+    var neg = permiteNegativo && s.indexOf("-") >= 0;
+    s = s.replace(/[^0-9.,]/g, "");
+    var ult = Math.max(s.lastIndexOf(","), s.lastIndexOf("."));
+    var intp, frac = null, sep = ",";
+    if (ult < 0) { intp = s; }
+    else { sep = s.charAt(ult); intp = s.slice(0, ult).replace(/[.,]/g, ""); frac = s.slice(ult+1).replace(/[.,]/g, ""); }
+    intp = intp.slice(0, LIM_INT);
+    if (frac !== null) frac = frac.slice(0, LIM_DEC);
+    return (neg?"-":"") + intp + (frac===null ? "" : sep+frac);
+  }
   function mb(bytes){ return (bytes/1048576).toFixed(1).replace(".", ",")+" MB"; }
 
   function num(id) {
@@ -2484,6 +2585,29 @@
     "help": helpModal,
     "data-menu": dataModal,
     "integrity": function(){ integrityModal(); },
+    "payees": function(){ payeesModal(); },
+    "rename-payee": function(k){ renamePayeeModal(k); },
+    "save-payee": function(k){
+      var idx=payeeIndex(), e=idx[k]; if(!e) return;
+      var novo=valLim("pyNome", LIM_PAYEE);
+      if(!novo){ toast("Indique um nome."); return; }
+      if(novo===e.name){ payeesModal(); return; }
+      var destino=payeeKey(novo), junta = destino!==k && !!idx[destino];
+      pushUndo("Beneficiário «"+e.name+"» renomeado.");
+      var n=0;
+      for(var i=0;i<state.transactions.length;i++){
+        var t=state.transactions[i];
+        if(t.transfer) continue;                                  // "↔ Conta" é gerado pela app
+        if(payeeKey(t.payee||"")===k){ t.payee=novo; n++; }
+      }
+      for(var j=0;j<(state.recurring||[]).length;j++){            // e as regras recorrentes
+        var r=state.recurring[j];
+        if(payeeKey(r.payee||"")===k) r.payee=novo;
+      }
+      save(); render();
+      toast(junta ? ("Juntado a «"+novo+"» — "+n+" transações.") : ("Renomeado em "+n+" transaç"+(n===1?"ão":"ões")+"."));
+      showUndo(); payeesModal();
+    },
     "limpar-historico": function(){
       if(!confirm("Apagar os pontos de histórico guardados?\nOs seus dados atuais não são afetados — perde apenas a possibilidade de voltar a um dia anterior.")) return;
       try { localStorage.removeItem(SNAP_KEY); } catch(e){}
@@ -3461,8 +3585,29 @@
   });
   document.addEventListener("input", function(e){
     var _id=e.target.id;
-    if ((_id==="txOut"||_id==="rcOut") && e.target.value){ var _o=el(_id==="txOut"?"txIn":"rcIn"); if(_o) _o.value=""; }
-    else if ((_id==="txIn"||_id==="rcIn") && e.target.value){ var _o2=el(_id==="txIn"?"txOut":"rcOut"); if(_o2) _o2.value=""; }
+
+    // ---- Campos de valor: só dígitos e um separador decimal ----
+    var alvo = e.target;
+    if (alvo.classList && alvo.classList.contains("money")) {
+      var par = alvo.getAttribute("data-par");
+      var bruto = alvo.value;
+      // Num par Saída/Entrada o "-" não é um sinal: passa o valor para o outro lado.
+      if (par && bruto.indexOf("-") >= 0) {
+        var outro = el(par), limpo = limpaValor(bruto.replace(/-/g, ""), false);
+        alvo.value = "";
+        if (outro) { outro.value = limpo; try { outro.focus(); outro.setSelectionRange(limpo.length, limpo.length); } catch(err){} }
+        toast(/In$/.test(par) ? "Passou para Entrada." : "Passou para Saída.");
+        return;
+      }
+      var limpo2 = limpaValor(bruto, alvo.hasAttribute("data-neg"));
+      if (limpo2 !== bruto) {
+        var pos = alvo.selectionStart, delta = bruto.length - limpo2.length;
+        alvo.value = limpo2;
+        try { var np = Math.max(0, Math.min(limpo2.length, (pos==null?limpo2.length:pos) - delta)); alvo.setSelectionRange(np, np); } catch(err){}
+      }
+      if (par && alvo.value) { var op = el(par); if (op) op.value = ""; }   // só um dos dois lados
+    }
+
     if (_id && _id.indexOf("spAmt")===0){ var _els=document.querySelectorAll("[id^='spAmt']"), _tot=0; for(var _qi=0;_qi<_els.length;_qi++){ var _vv=parseAmount(_els[_qi].value); if(!isNaN(_vv)) _tot+=_vv; } var _h=el("splitTotal"); if(_h) _h.textContent=fmt(_tot); }
     if (e.target.id==="txSearch"){
       state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.q=e.target.value;
