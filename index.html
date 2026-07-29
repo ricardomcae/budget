@@ -38,6 +38,7 @@
     --warning: #b45309;
     --warning-soft: #fef3c7;
     --neutral-soft: #e2e8f0;
+    --group-row: #e8edf4;
     --shadow: 0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.04);
     --shadow-lg: 0 10px 30px rgba(15,23,42,.18);
     --radius: 10px;
@@ -66,6 +67,7 @@
       --warning: #fbbf24;
       --warning-soft: #3a2c07;
       --neutral-soft: #1f2a3c;
+      --group-row: #172232;
       --shadow: 0 1px 3px rgba(0,0,0,.4);
       --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
     }
@@ -185,7 +187,7 @@
   table.budget { width: 100%; border-collapse: collapse; }
   table.budget thead th { text-align: end; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; padding: 12px 18px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
   table.budget thead th.first { text-align: start; }
-  .grp-row td { padding: 11px 18px; background: var(--surface-2); border-bottom: 1px solid var(--border); font-weight: 700; }
+  .grp-row td { padding: 11px 18px; background: var(--group-row); border-bottom: 1px solid var(--border); border-top: 1px solid var(--border); font-weight: 700; }
   .grp-row .grp-name { display: flex; align-items: center; gap: 9px; }
   .grp-row .grp-name .caret { transition: transform .15s; color: var(--text-muted); font-size: 12px; }
   .grp-row .grp-name button.grp-toggle { background: transparent; border: 0; display: flex; align-items: center; gap: 9px; color: var(--text); font-weight: 700; padding: 0; }
@@ -232,8 +234,9 @@
   table.budget td.num, table.budget th:not(.first) { width: 1%; }   /* colunas de valores: só o necessário */
   table.budget td:first-child, table.budget th.first { width: auto; }
   .num { text-align: end; font-variant-numeric: tabular-nums; }
-  .assign-input { width: 108px; text-align: end; padding: 7px 9px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
-  .assign-input:hover { border-color: var(--border); }
+  /* Tem de parecer um campo mesmo sem lhe passar o rato por cima — no telemóvel não há rato. */
+  .assign-input { width: 108px; text-align: end; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .assign-input:hover { border-color: var(--primary); background: var(--surface); }
   .assign-input:focus { border-color: var(--primary); background: var(--surface); outline: none; box-shadow: 0 0 0 3px var(--primary-soft); }
   .activity-cell { color: var(--text-muted); }
   .avail-pill { display: inline-block; padding: 4px 11px; border-radius: 20px; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 12.5px; }
@@ -334,6 +337,7 @@
 
   .hidden { display: none !important; }
   .mobile-only { display: none; }
+  .so-fone { display: none; }
   button { -webkit-tap-highlight-color: transparent; }
 
   @media (max-width: 820px) {
@@ -381,9 +385,25 @@
     .activity-cell, .grp-total { font-size: 12.5px; }
     .avail-pill { padding: 4px 8px; }
 
-    /* Barra de ações do orçamento: o «Nova transação» já está no cabeçalho,
-       e os filtros ficam só com o símbolo para caberem todos numa linha. */
-    .toolbar .hide-phone { display: none !important; }
+    /* Escondido no telemóvel: já existe noutro sítio, ou não cabe. */
+    .hide-phone { display: none !important; }
+    .so-fone { display: inline; }
+
+    /* Campos de data: o iOS dá-lhes largura própria e centra o texto, o que os fazia
+       transbordar da coluna e encavalitar no campo do lado. */
+    input[type="date"], input[type="month"] {
+      -webkit-appearance: none; appearance: none;
+      min-width: 0; max-width: 100%; width: 100%; box-sizing: border-box;
+      text-align: start; line-height: 1.35; height: auto;
+    }
+    .grid-2 > *, .toolbar > * { min-width: 0; }
+
+    /* Lista de transações: a nota vai quase sempre vazia e roubava largura, e o texto
+       a partir em duas linhas deixava as alturas das linhas todas diferentes. */
+    .col-nota { display: none !important; }
+    table.data { min-width: 560px; }
+    table.data td, table.data th { white-space: nowrap; }
+    table.data td:nth-child(2), table.data td:nth-child(3) { max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
     .btn.f-filtro { padding: 6px 9px; font-size: 13px; }
     .btn.f-filtro .rot { display: none; }
 
@@ -1131,6 +1151,7 @@
   //   "priority" – primeiro as de prioridade Alta, depois Normal, depois Baixa
   //   "prop"     – reparte proporcionalmente ao que falta em cada categoria
   function fundingPlan(mode, m, strategy) {
+    strategy = strategy || "priority";        // predefinição num sítio só, não em cada chamada
     var list = orderedCategories();
     var rta = readyToAssign(m);
     var needs = [];
@@ -1398,7 +1419,7 @@
         (filtering ? '<button class="btn sm" data-action="budget-filter-clear">Limpar</button>' : '') +
         '<div class="spacer"></div>' +
         '<span class="muted'+(filtering?'':' hide-phone')+'" style="font-size:12.5px;">' +
-          (filtering ? ('A mostrar '+nShown+' de '+nTotal+' categorias') : 'Clique num valor em <b>Atribuído</b> para editar') + '</span>' +
+          (filtering ? ('A mostrar '+nShown+' de '+nTotal+' categorias') : 'Escreva no campo <b>Atribuído</b> de cada categoria') + '</span>' +
       '</div>' +
       '<div class="budget-card"><table class="budget"><thead><tr>' +
         '<th class="first">Categoria'+
@@ -1471,7 +1492,7 @@
       '</div>'+
       '<h3 style="margin:4px 2px 12px;">'+esc(acc.name)+' <span class="pill '+(acc.type==="budget"?"budget":(acc.type==="credit"?"credit":"tracking"))+'">'+(acc.type==="budget"?"Orçamento":(acc.type==="credit"?"Cartão de crédito":"Acompanhamento"))+'</span></h3>'+
       '<div class="data-card"><table class="data"><thead><tr>'+
-      '<th>Data</th><th>Beneficiário</th><th>Categoria</th><th>Nota</th><th class="num">Saída</th><th class="num">Entrada</th><th class="num">Saldo</th><th style="text-align:center;">✓</th><th></th></tr></thead><tbody>'+body+'</tbody></table></div>';
+      '<th>Data</th><th>Beneficiário</th><th>Categoria</th><th class="col-nota">Nota</th><th class="num">Saída</th><th class="num">Entrada</th><th class="num">Saldo</th><th style="text-align:center;">✓</th><th></th></tr></thead><tbody>'+body+'</tbody></table></div>';
   }
 
   function txRow(t, runBal, withAccount) {
@@ -1487,7 +1508,7 @@
       accCell +
       '<td style="font-weight:600;">'+esc(t.payee||"")+(t.split?' <span class="tag" title="Transação dividida">🔗</span>':'')+'</td>'+
       '<td>'+catName+'</td>'+
-      '<td class="tag">'+esc(t.memo||"")+'</td>'+
+      '<td class="tag col-nota">'+esc(t.memo||"")+'</td>'+
       '<td class="num">'+(t.outflow?'<span class="tx-amt out">'+fmt(t.outflow)+'</span>':'')+'</td>'+
       '<td class="num">'+(t.inflow?'<span class="tx-amt in">'+fmt(t.inflow)+'</span>':'')+'</td>'+
       balCell +
@@ -1528,6 +1549,7 @@
     // Chega-se aqui filtrado a partir da atividade de uma categoria — sem isto não há
     // forma óbvia de voltar a ver tudo.
     var temFiltro = !!(f.account || f.category || f.per || f.from || f.to || (f.q||"").trim());
+    var soConta = !!(f.account && !f.category && !f.per && !f.from && !f.to && !(f.q||"").trim());
     var head = '<div class="toolbar">'+
       // O «Dividir» e o «Beneficiários» saíram daqui: o primeiro está dentro da nova
       // transação, o segundo na barra lateral (e no 🏷️ do topo, no telemóvel).
@@ -1550,14 +1572,25 @@
     }
     var LIM = state.ui.txLimit || PAGINA;
     var visiveis = list.slice(0, LIM);
-    var body = list.length ? visiveis.map(function(t){ return txRow(t, undefined, true); }).join("")
+    // Só faz sentido mostrar saldo acumulado quando se está a ver UMA conta e nada mais:
+    // com outros filtros faltariam movimentos pelo meio e o saldo mentiria.
+    var balOf = null;
+    if (soConta) {
+      var asc = state.transactions.filter(function(t){ return t.accountId===f.account; })
+        .sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:0); });
+      balOf = {}; var run = 0;
+      for (var bi=0; bi<asc.length; bi++){ run = round2(run + (asc[bi].inflow||0) - (asc[bi].outflow||0)); balOf[asc[bi].id] = run; }
+    }
+    var body = list.length ? visiveis.map(function(t){ return txRow(t, balOf?balOf[t.id]:undefined, !soConta); }).join("")
                            : '<tr><td colspan="9" class="empty">Nada corresponde ao filtro.</td></tr>';
     if (list.length > LIM) body += '<tr><td colspan="9" style="text-align:center;padding:14px;">'+
       '<button class="btn" data-action="show-more-tx">Mostrar mais '+PAGINA+' (a ver '+LIM+' de '+list.length+')</button></td></tr>';
 
     el("content").innerHTML = head +
       '<div class="data-card"><table class="data"><thead><tr>'+
-      '<th>Data</th><th>Conta</th><th>Beneficiário</th><th>Categoria</th><th>Nota</th><th class="num">Saída</th><th class="num">Entrada</th><th style="text-align:center;">✓</th><th></th></tr></thead><tbody>'+body+'</tbody></table></div>';
+      '<th>Data</th>'+(soConta?'':'<th>Conta</th>')+'<th>Beneficiário</th><th>Categoria</th><th class="col-nota">Nota</th>'+
+      '<th class="num">Saída</th><th class="num">Entrada</th>'+(soConta?'<th class="num">Saldo</th>':'')+
+      '<th style="text-align:center;">✓</th><th></th></tr></thead><tbody>'+body+'</tbody></table></div>';
   }
 
   function niceMax(v){ if(!(v>0)) return 1; var pow=Math.pow(10,Math.floor(Math.log(v)/Math.LN10)); var f=v/pow; var nf=f<=1?1:(f<=2?2:(f<=2.5?2.5:(f<=5?5:10))); return nf*pow; }
@@ -1652,17 +1685,17 @@
     }
     var net = round2(totalIn - totalOut);
 
-    var repPer = [1,6,12,24].map(function(nn){
-      return '<button data-action="report-months" data-id="'+nn+'" class="'+((!customPer&&nMonths===nn)?'active':'')+'">'+(nn===1?'1 mês':nn+' meses')+'</button>';
+    var repPer = [1,3,6,12,24].map(function(nn){
+      return '<button data-action="report-months" data-id="'+nn+'" class="'+((!customPer&&nMonths===nn)?'active':'')+'">'+nn+'<span class="rot"> '+(nn===1?'mês':'meses')+'</span><span class="so-fone">m</span></button>';
     }).join("");
     var blocoPeriodo = '<div class="report-block" style="padding:14px 18px;margin-bottom:18px;">'+
       '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">'+
         '<span style="font-weight:700;font-size:13px;">Período</span>'+
         '<div class="seg" style="flex:1;min-width:220px;max-width:340px;">'+repPer+'</div>'+
-        '<span class="muted" style="font-size:12.5px;">ou</span>'+
-        '<input class="filter" id="repFrom" type="month" value="'+esc(state.ui.reportFrom||"")+'">'+
-        '<span class="muted" style="font-size:12.5px;">até</span>'+
-        '<input class="filter" id="repTo" type="month" value="'+esc(state.ui.reportTo||"")+'">'+
+        '<span class="muted hide-phone" style="font-size:12.5px;">ou</span>'+
+        '<input class="filter hide-phone" id="repFrom" type="month" value="'+esc(state.ui.reportFrom||"")+'">'+
+        '<span class="muted hide-phone" style="font-size:12.5px;">até</span>'+
+        '<input class="filter hide-phone" id="repTo" type="month" value="'+esc(state.ui.reportTo||"")+'">'+
         (customPer?'<button class="btn sm" data-action="report-clear-range">Limpar</button>':'')+
         '<div class="spacer"></div>'+
         '<b style="font-size:13px;white-space:nowrap;">'+etiqueta+'</b>'+
@@ -1946,7 +1979,7 @@
         '<div class="field"><label>Nota (opcional)</label><input id="catNote" maxlength="300" value="'+esc(cat.note||"")+'" placeholder="Ex.: rever no fim do mês"></div>'+
         '<div class="field"><label>Prioridade</label><select id="catPrio">'+
           ['alta','normal','baixa'].map(function(p){ return '<option value="'+p+'"'+((cat.priority||"normal")===p?" selected":"")+'>'+PRIO_LABEL[p]+'</option>'; }).join("")+
-        '</select><div class="hint">Usada ao financiar alvos «Até ao disponível» com a estratégia por prioridade. No orçamento também pode carregar no ▲ ● ▼ à frente do nome para mudar sem abrir esta janela.</div></div>'+
+        '</select><div class="hint">Usada ao financiar alvos com «Repartir o que está por atribuir» e a estratégia por prioridade. No orçamento também pode carregar no ▲ ● ▼ à frente do nome para mudar sem abrir esta janela.</div></div>'+
         '<div class="field"><label>Tipo de alvo</label><select id="catTType">'+
           opt("none","— Sem alvo —")+
           opt("monthly","Mensal — ter/reservar todos os meses")+
@@ -1963,9 +1996,9 @@
           '<input id="catTargetDue" type="month" value="'+esc(tg.due||"")+'">'+
           '<div class="hint" id="catDueHint"></div></div>'+
         '<div class="field hidden" id="catWeekdayField"><label>Dia da semana</label><select id="catWeekday">'+weekdayOpts+'</select></div>'+
-        '<div class="field hidden" id="catFundField"><label>Método (alvo mensal)</label><select id="catFund">'+
-          '<option value="refill"'+(curFund==="refill"?" selected":"")+'>Encher até este valor — mete só o que falta</option>'+
-          '<option value="setAside"'+(curFund==="setAside"?" selected":"")+'>Reservar este valor — sempre, todos os meses</option>'+
+        '<div class="field hidden" id="catFundField"><label>Método</label><select id="catFund">'+
+          '<option value="refill"'+(curFund==="refill"?" selected":"")+'>Repor até este valor — acrescenta só o que falta</option>'+
+          '<option value="setAside"'+(curFund==="setAside"?" selected":"")+'>Reservar este valor todos os meses — mesmo que já o tenha</option>'+
         '</select></div>'+
         '<div class="hint" id="catTargetHint" style="margin-top:-6px;"></div>'+
         (editing?'<div class="field" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;">'+
@@ -2351,14 +2384,14 @@
       sec("Alvos")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li>Definem-se no <b>✎</b> de cada categoria: mensal, semanal, trimestral, anual, ou até uma data.</li>'+
-        '<li>No mensal, «<b>Encher até X</b>» mete só o que falta; «<b>Reservar X</b>» põe sempre X.</li>'+
+        '<li>No mensal, «<b>Repor até X</b>» acrescenta só o que falta para ter X disponível; «<b>Reservar X</b>» acrescenta sempre X, mesmo que já o tenha.</li>'+
         '<li>Trimestral e anual <b>param de pedir</b> quando já tiver o total. Indicando o mês da despesa, repartem o que falta até lá.</li>'+
       '</ul>'+
 
       sec("Distribuir o dinheiro")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
-        '<li><b>🎯 Financiar alvos</b> mostra o impacto antes de aplicar, e pode <b>Anular</b> a seguir. «Até ao disponível» nunca o deixa negativo.</li>'+
-        '<li><b>Prioridade</b> ▲ ● ▼ à frente de cada categoria, muda com um clique. Ao financiar por prioridade enche as <b>Altas</b> primeiro; entre iguais, manda a <b>ordem da lista</b>.</li>'+
+        '<li><b>🎯 Financiar alvos</b> mostra o impacto antes de aplicar, e pode <b>Anular</b> a seguir. «Repartir o que está por atribuir» nunca o deixa negativo, e reparte de três maneiras: <b>por prioridade</b> (serve as Altas primeiro), <b>proporcional</b> (todas ficam igualmente perto do alvo — quem precisa de mais leva mais) ou <b>pela ordem da lista</b> (completa de cima para baixo até acabar).</li>'+
+        '<li><b>Prioridade</b> ▲ ● ▼ à frente de cada categoria, muda com um clique. Ao financiar por prioridade serve as <b>Altas</b> primeiro; entre iguais, manda a <b>ordem da lista</b>.</li>'+
         '<li><b>↔</b> move dinheiro entre categorias (ou de/para o «Pronto a atribuir») sem mexer no rendimento.</li>'+
       '</ul>'+
 
@@ -2400,7 +2433,7 @@
   function fundModal() {
     var m = state.ui.month;
     var mode = state.ui._fundMode || "full";
-    var strat = state.ui.fundStrategy || "order";
+    var strat = state.ui.fundStrategy || "priority";   // só para marcar a opção escolhida no menu
     var plan = fundingPlan(mode, m, strat);
     var fullPlan = fundingPlan("full", m, strat);
     var anyNeed = fullPlan.entries.length>0;
@@ -2421,14 +2454,14 @@
       '<div class="modal-body">'+
         '<div class="seg" id="fundMode" style="margin-bottom:10px;">'+
           '<button data-m="full" class="'+(mode==="full"?"active":"")+'">Financiar tudo</button>'+
-          '<button data-m="cap" class="'+(mode==="cap"?"active":"")+'">Até ao disponível</button>'+
+          '<button data-m="cap" class="'+(mode==="cap"?"active":"")+'">Repartir o que está por atribuir</button>'+
         '</div>'+
         (mode==="cap" ?
           '<div class="field" style="margin-bottom:12px;"><label>Como repartir o dinheiro disponível</label>'+
           '<select id="fundStrat">'+
-            '<option value="order"'+(strat==="order"?" selected":"")+'>Pela ordem do orçamento — enche cada uma até esgotar</option>'+
-            '<option value="priority"'+(strat==="priority"?" selected":"")+'>Por prioridade — primeiro as Altas, depois Normais, depois Baixas</option>'+
-            '<option value="prop"'+(strat==="prop"?" selected":"")+'>Proporcional — reparte por todas conforme o que falta</option>'+
+            '<option value="priority"'+(strat==="priority"?" selected":"")+'>Por prioridade — serve primeiro as Altas, depois as Normais, depois as Baixas</option>'+
+            '<option value="prop"'+(strat==="prop"?" selected":"")+'>Proporcional — todas ficam igualmente perto do alvo (quem precisa mais, leva mais)</option>'+
+            '<option value="order"'+(strat==="order"?" selected":"")+'>Pela ordem da lista — completa de cima para baixo até acabar o dinheiro</option>'+
           '</select><div class="hint">A prioridade define-se em cada categoria (lápis ✎).</div></div>' : '')+
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;text-align:center;">'+
           '<div class="kpi" style="padding:12px 8px;"><div class="k-label">Disponível</div><div class="k-value" style="font-size:17px;">'+fmt(plan.rtaBefore)+'</div></div>'+
@@ -2580,8 +2613,20 @@
     var fromId=editPair?saida.accountId:(preset.from||"");
     if(!fromId){ for(var i=0;i<state.accounts.length;i++){ if(state.accounts[i].type==="budget"){ fromId=state.accounts[i].id; break; } } if(!fromId) fromId=state.accounts[0].id; }
     var toId=editPair?entrada.accountId:(preset.to||"");
-    if(!toId){ for(var j=0;j<state.accounts.length;j++){ if(state.accounts[j].id!==fromId){ toId=state.accounts[j].id; break; } } }
-    function opts(sel){ return state.accounts.filter(function(a){return !a.hidden || a.id===sel;}).map(function(a){ return '<option value="'+a.id+'"'+(sel===a.id?" selected":"")+'>'+esc(a.name)+' ('+fmt(accountBalance(a.id))+')</option>'; }).join(""); }
+    if(!toId){ for(var j=0;j<state.accounts.length;j++){ var cj=state.accounts[j];
+      if(cj.id===fromId || cj.hidden) continue;
+      if(payCard && cj.type==="budget") continue;         // no pagamento, o destino é sempre uma dívida
+      toId=cj.id; break; } }
+    function opts(sel, filtro){
+      return state.accounts.filter(function(a){
+        if(a.id===sel) return true;                       // a escolhida aparece sempre
+        if(a.hidden) return false;
+        return !filtro || filtro(a);
+      }).map(function(a){ return '<option value="'+a.id+'"'+(sel===a.id?" selected":"")+'>'+esc(a.name)+' ('+fmt(accountBalance(a.id))+')</option>'; }).join("");
+    }
+    // A pagar um cartão só faz sentido pagar A PARTIR de uma conta de orçamento e PARA uma dívida.
+    var soOrcamento = payCard ? function(a){ return a.type==="budget"; } : null;
+    var soDivida    = payCard ? function(a){ return a.type!=="budget"; } : null;
     var amtDefault = editPair ? round2(saida.outflow) : ((preset.amount!=null && preset.amount!=="")?round2(preset.amount):"");
     var dateDefault = editPair ? saida.date : todayISO();
     var clDefault = editPair ? (!!saida.cleared && !!entrada.cleared) : true;
@@ -2591,8 +2636,8 @@
     openModal(
       '<div class="modal-head"><h2>'+titulo+'</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
-        '<div class="field"><label>'+(payCard?"Pagar a partir de":"De (sai desta conta)")+'</label><select id="tfFrom">'+opts(fromId)+'</select></div>'+
-        '<div class="field"><label>'+(payCard?"Cartão / dívida a pagar":"Para (entra nesta conta)")+'</label><select id="tfTo">'+opts(toId)+'</select></div>'+
+        '<div class="field"><label>'+(payCard?"Pagar a partir de":"De (sai desta conta)")+'</label><select id="tfFrom">'+opts(fromId, soOrcamento)+'</select></div>'+
+        '<div class="field"><label>'+(payCard?"Cartão / dívida a pagar":"Para (entra nesta conta)")+'</label><select id="tfTo">'+opts(toId, soDivida)+'</select></div>'+
         '<div class="field hidden" id="tfCatField"><label id="tfCatLabel">Categoria</label><select id="tfCat">'+catOptionsHTML(catDefault)+'</select>'+
           '<div class="hint" id="tfCatHint"></div></div>'+
         '<div class="grid-2">'+
@@ -3032,7 +3077,7 @@
     "fund-preview": function(){ if(!state.categories.length){ toast("Crie categorias com alvos primeiro."); return; } state.ui._fundMode="full"; fundModal(); },
     "apply-funding": function(){
       var m=state.ui.month, mode=state.ui._fundMode||"full";
-      var plan=fundingPlan(mode,m,state.ui.fundStrategy||"order");
+      var plan=fundingPlan(mode,m,state.ui.fundStrategy);
       if(!plan.entries.length){ toast("Nada a financiar."); return; }
       var snap=[];
       for(var i=0;i<plan.entries.length;i++){
