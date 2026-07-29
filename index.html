@@ -423,6 +423,7 @@
 
     <div class="side-footer">
       <button data-action="add-tx"><span>➕</span> Nova transação</button>
+      <button data-action="transfer"><span>↔</span> Transferir</button>
       <button data-action="payees"><span>🏷️</span> Beneficiários</button>
       <button data-action="data-menu" id="btnData"><span>💾</span> Dados e cópias</button>
       <button data-action="help"><span>❓</span> Como funciona</button>
@@ -501,15 +502,14 @@
     var intp = s[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
     return (neg ? "-" : "") + intp + "," + s[1] + " " + currencySym();
   }
-  // Formatador de datas criado UMA vez e resultados em cache — criar um por linha é muito lento.
-  var _dtf = null, _dtCache = {};
+  // Datas sempre em dd/mm/aaaa, sem depender do idioma do aparelho — era isso que fazia
+  // aparecer o formato americano a quem tem o telemóvel ou o navegador em inglês.
+  // (Resultados em cache: formatar linha a linha numa lista grande é caro.)
+  var _dtCache = {};
   function fmtDate(iso) {
     if (_dtCache[iso] !== undefined) return _dtCache[iso];
-    var out;
-    try {
-      if (!_dtf) _dtf = new Intl.DateTimeFormat(state.settings.locale || "pt-PT", { day:"2-digit", month:"short", year:"numeric" });
-      out = _dtf.format(new Date(iso + "T00:00:00"));
-    } catch (e) { out = iso; }
+    var p = String(iso == null ? "" : iso).split("-");
+    var out = (p.length === 3 && p[0].length === 4) ? (p[2].slice(0,2) + "/" + p[1] + "/" + p[0]) : String(iso);
     _dtCache[iso] = out;
     return out;
   }
@@ -1437,19 +1437,23 @@
     var catOpts = '<option value="">Todas as categorias</option><option value="'+INCOME+'"'+(f.category===INCOME?" selected":"")+'>Rendimento</option>' +
       state.categories.filter(function(c){return !c.cardId;}).map(function(c){return '<option value="'+c.id+'"'+(f.category===c.id?" selected":"")+'>'+esc(c.name)+'</option>';}).join("");
 
+    // Chega-se aqui filtrado a partir da atividade de uma categoria — sem isto não há
+    // forma óbvia de voltar a ver tudo.
+    var temFiltro = !!(f.account || f.category || f.from || f.to || (f.q||"").trim());
     var head = '<div class="toolbar">'+
-      '<button class="btn primary" data-action="add-tx">➕ Nova transação</button>'+
+      // No telemóvel estes três já estão na barra de cima (➕ e 🏷️); aqui só ocupavam espaço.
+      '<button class="btn primary hide-phone" data-action="add-tx">➕ Nova transação</button>'+
       '<button class="btn" data-action="add-split">➗ Dividir</button>'+
-      // Só no computador: no telemóvel está no 🏷️ da barra de cima, para não densificar esta.
       '<button class="btn hide-phone" data-action="payees">🏷️ Beneficiários</button>'+
       '<input class="search" id="txSearch" placeholder="Procurar beneficiário ou nota…" value="'+esc(f.q||"")+'">'+
       '<select class="filter" id="txFilterAcc">'+accOpts+'</select>'+
       '<select class="filter" id="txFilterCat">'+catOpts+'</select>'+
       '<input class="filter" id="txFilterFrom" type="date" title="De" value="'+esc(f.from||"")+'">'+
       '<input class="filter" id="txFilterTo" type="date" title="Até" value="'+esc(f.to||"")+'">'+
+      (temFiltro ? '<button class="btn sm" data-action="tx-filter-clear" title="Ver todas as transações">✕ Limpar filtros</button>' : '')+
       '<div class="spacer"></div>'+
       '<button class="btn sm" data-action="export-csv">⬇ CSV</button>'+
-      '<span class="muted" style="font-size:12.5px;">'+list.length+' transações</span></div>';
+      '<span class="muted" style="font-size:12.5px;">'+list.length+(temFiltro?' de '+state.transactions.length:'')+' transações</span></div>';
 
     if (!state.transactions.length) {
       el("content").innerHTML = head + emptyState("🧾","Sem transações","Registe as suas entradas e saídas para ver a atividade no orçamento.",
@@ -1762,7 +1766,9 @@
         '<div class="field"><label>Nota (opcional)</label><input id="txMemo" maxlength="300" value="'+esc(tx.memo||"")+'"></div>'+
         '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;"><input type="checkbox" id="txClear" '+(tx.cleared?"checked":"")+' style="width:auto;"> Confirmada (reconciliada com o banco)</label>'+
       '</div>'+
-      '<div class="modal-foot"><span>'+(editing?'<button class="btn danger" data-action="delete-tx" data-id="'+tx.id+'">Eliminar</button>':'<button class="btn sm" data-action="to-split">➗ Dividir</button>')+'</span>'+
+      '<div class="modal-foot"><span>'+(editing
+          ? '<button class="btn danger" data-action="delete-tx" data-id="'+tx.id+'">Eliminar</button>'
+          : '<button class="btn sm" data-action="to-split">➗ Dividir</button> <button class="btn sm" data-action="transfer">↔ Transferir</button>')+'</span>'+
         '<span><button class="btn" data-action="close">Cancelar</button> <button class="btn primary" data-action="save-tx" data-id="'+(tx.id||"")+'">Guardar</button></span></div>');
     // Aviso discreto (não bloqueia): movimento numa conta de orçamento sem categoria.
     function txWarn(){
@@ -2246,7 +2252,7 @@
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li>Contas de <b>orçamento</b> (à ordem, poupança) entram no orçamento. De <b>acompanhamento</b> (investimentos, empréstimos) não.</li>'+
         '<li><b>Cartão de crédito:</b> ao gastar, a app reserva logo o valor para a fatura. O <b>💳 Pagar</b> usa essa reserva.</li>'+
-        '<li><b>↔ Transferir</b> move entre contas. Se o dinheiro sair do orçamento para uma conta de acompanhamento, leva categoria.</li>'+
+        '<li><b>↔ Transferir</b> move entre contas — está no ecrã <b>Contas</b>, na barra lateral e dentro da janela de nova transação. Se o dinheiro sair do orçamento para uma conta de acompanhamento, leva categoria.</li>'+
         '<li><b>➗ Dividir</b> reparte uma compra por várias categorias. <b>📅 Recorrentes</b> lançam-se sozinhas na data.</li>'+
         '<li>Clique numa transação para a editar. Transferências e divididas editam-se <b>por inteiro</b>, nunca metade.</li>'+
         '<li><b>Campos de valor:</b> algarismos e um separador decimal. Em <b>Saída/Entrada</b>, o «-» troca de lado.</li>'+
@@ -2757,6 +2763,7 @@
       }
     },
     "cat-activity": function(id){ state.ui.view="transactions"; state.ui.txFilter={category:id}; state.ui.openAccount=null; state.ui.txLimit=300; render(); },
+    "tx-filter-clear": function(){ state.ui.txFilter=null; state.ui.txLimit=300; save(); render(); },
     "show-more-tx": function(){ state.ui.txLimit=(state.ui.txLimit||300)+300; save(); render(); },
     "report-toggle-cat": function(id){ var arr=(state.ui.reportCats||[]).slice(); var i=arr.indexOf(id); if(i>=0) arr.splice(i,1); else arr.push(id); state.ui.reportCats=arr; save(); render(); },
     "report-months": function(id){ state.ui.reportMonths=parseInt(id,10)||6; state.ui.reportFrom=null; state.ui.reportTo=null; save(); render(); },
