@@ -143,6 +143,21 @@
   .rta-actions button { background: rgba(255,255,255,.18); color: #fff; border: 1px solid rgba(255,255,255,.28); padding: 8px 13px; border-radius: 8px; font-weight: 600; font-size: 12.5px; }
   .rta-actions button:hover { background: rgba(255,255,255,.3); }
 
+  /* Aviso de divergência entre o orçamento e o dinheiro real nas contas */
+  .integrity-bar { display: flex; align-items: center; gap: 12px; margin: 10px 26px 0; padding: 11px 16px; border-radius: 12px; background: var(--warning-soft); border: 1px solid var(--warning); color: var(--warning); font-size: 13px; font-weight: 600; flex-wrap: wrap; }
+  .integrity-bar .grow { flex: 1; min-width: 170px; }
+  .integrity-bar button { background: var(--surface); border: 1px solid var(--warning); color: var(--warning); padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 12.5px; white-space: nowrap; }
+  .integrity-bar button:hover { background: var(--warning); color: #fff; }
+  .upcoming-bar { display: flex; align-items: center; gap: 12px; margin: 10px 26px 0; padding: 10px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); font-size: 13px; font-weight: 600; flex-wrap: wrap; }
+  .upcoming-bar .grow { flex: 1; min-width: 170px; }
+  .upcoming-bar b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .upcoming-bar button { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 12.5px; white-space: nowrap; }
+  .upcoming-bar button:hover { border-color: var(--primary); color: var(--primary); }
+  .int-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .int-row .who { min-width: 0; }
+  .int-row .who b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .int-row .amt { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+
   .content { padding: 20px 26px 60px; }
 
   .btn { border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 9px 15px; border-radius: 9px; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; }
@@ -323,6 +338,7 @@
     /* Conteúdo com espaço para a barra inferior + área segura do iPhone */
     .content { padding: 16px calc(13px + env(safe-area-inset-right)) calc(88px + env(safe-area-inset-bottom)) calc(13px + env(safe-area-inset-left)); }
     .rta-banner { margin: 14px 13px 0; padding: 14px 16px; }
+    .integrity-bar, .upcoming-bar { margin: 10px 13px 0; }
     .rta-amount { font-size: 22px; }
 
     /* Safari faz zoom ao focar campos < 16px — forçar 16px no telemóvel */
@@ -440,12 +456,18 @@
   function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
 
   // Visualização universal: "." separa milhares, "," separa cêntimos (ex.: 1.234,56 €)
+  var CURRENCIES = [["EUR","€"],["GBP","£"],["USD","$"],["BRL","R$"],["CHF","CHF"],["AOA","Kz"]];
+  function currencySym(){
+    var c = (state && state.settings && state.settings.currency) || "EUR";
+    for (var i=0;i<CURRENCIES.length;i++) if (CURRENCIES[i][0]===c) return CURRENCIES[i][1];
+    return c;
+  }
   function fmt(n) {
     n = round2(n || 0);
     var neg = n < 0; n = Math.abs(n);
     var s = n.toFixed(2).split(".");
     var intp = s[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-    return (neg ? "-" : "") + intp + "," + s[1] + " €";
+    return (neg ? "-" : "") + intp + "," + s[1] + " " + currencySym();
   }
   // Formatador de datas criado UMA vez e resultados em cache — criar um por linha é muito lento.
   var _dtf = null, _dtCache = {};
@@ -488,6 +510,7 @@
         s.assignments = s.assignments || {};
         s.recurring = s.recurring || [];
         s.backup = s.backup || { at:null, sig:null, autoDay:null };
+        delete s._tmpAccType;   // lixo de versões anteriores: era guardado por engano
         return s;
       }
     } catch (e) { console.warn("Falha ao ler dados", e); }
@@ -543,12 +566,18 @@
   var _undo = [], _undoTimer = null, UNDO_MAX = 5; // histórico de anulação (até 5 passos)
   var _csv = null;   // pré-visualização da importação de CSV
   var _drag = null;  // arrastar para reordenar
+  var _searchTimer = null;  // atraso da caixa de procura (não é guardado)
+  var _tmpAccType = null;   // tipo escolhido no modal de conta (não é guardado)
   function buildIndex(m){
     var cm={}, cc={}, km={}, kc={}, sumAll=0;
+    var bal={}, balCl={}, balUp={};   // saldo por conta: total, só confirmado, e até ao mês m
     for(var i=0;i<state.transactions.length;i++){
       var t=state.transactions[i], mm=monthOf(t.date), net=(t.inflow||0)-(t.outflow||0);
       sumAll += net;
       var inM=(mm===m), up=(mm<=m);
+      bal[t.accountId]=(bal[t.accountId]||0)+net;
+      if(t.cleared) balCl[t.accountId]=(balCl[t.accountId]||0)+net;
+      if(up) balUp[t.accountId]=(balUp[t.accountId]||0)+net;
       if(t.categoryId){
         if(inM) cm[t.categoryId]=(cm[t.categoryId]||0)+net;
         if(up) cc[t.categoryId]=(cc[t.categoryId]||0)+net;
@@ -561,7 +590,17 @@
         if(up) kc[t.accountId]=(kc[t.accountId]||0)+pd;
       }
     }
-    _idx={month:m, cm:cm, cc:cc, km:km, kc:kc, sumAll:round2(sumAll)};
+    // Índice das atribuições — uma passagem, em vez de percorrer o mapa inteiro por cada categoria.
+    var ac={}, aTot=0;
+    for(var k in state.assignments){
+      if(!state.assignments.hasOwnProperty(k)) continue;
+      var bar=k.indexOf("|"); if(bar<0) continue;
+      if(k.slice(bar+1) > m) continue;                      // só conta até ao mês em vista
+      var cid=k.slice(0,bar), v=state.assignments[k];
+      ac[cid]=(ac[cid]||0)+v; aTot+=v;
+    }
+    _idx={month:m, cm:cm, cc:cc, km:km, kc:kc, sumAll:round2(sumAll),
+          bal:bal, balCl:balCl, balUp:balUp, ac:ac, aTot:round2(aTot)};
     buildLookup();
   }
   // Tabelas de consulta directa — evitam percorrer listas para cada linha apresentada.
@@ -576,7 +615,7 @@
   function lkCat(id){ return _lookup ? (_lookup.cat[id]||null) : categoryById(id); }
 
   function activityFor(catId, m) {
-    var cat = categoryById(catId);
+    var cat = lkCat(catId);
     if (_idx && _idx.month === m) {
       if (cat && cat.cardId) return round2(_idx.km[cat.cardId] || 0);
       return round2(_idx.cm[catId] || 0);
@@ -591,16 +630,17 @@
   }
 
   function availableFor(catId, m) {
+    var cat = lkCat(catId);
+    if (_idx && _idx.month === m) {
+      var a = _idx.ac[catId] || 0;
+      if (cat && cat.cardId) return round2(a + (_idx.kc[cat.cardId] || 0));
+      return round2(a + (_idx.cc[catId] || 0));
+    }
     var assigned = 0;
     for (var k in state.assignments) {
       if (!state.assignments.hasOwnProperty(k)) continue;
       var parts = k.split("|");
       if (parts[0] === catId && parts[1] <= m) assigned += state.assignments[k];
-    }
-    var cat = categoryById(catId);
-    if (_idx && _idx.month === m) {
-      if (cat && cat.cardId) return round2(assigned + (_idx.kc[cat.cardId] || 0));
-      return round2(assigned + (_idx.cc[catId] || 0));
     }
     if (cat && cat.cardId) return round2(assigned + cardPaymentActivity(cat.cardId, m, true));
     var activity = 0;
@@ -612,6 +652,7 @@
   }
 
   function totalIncomeUpto(m) {
+    if (_idx && _idx.month === m) return round2(_idx.cc[INCOME] || 0);
     var s = 0;
     for (var i=0;i<state.transactions.length;i++) {
       var t = state.transactions[i];
@@ -620,13 +661,16 @@
     return round2(s);
   }
   function totalAssignedUpto(m) {
+    if (_idx && _idx.month === m) return _idx.aTot;
     var s = 0;
     for (var k in state.assignments) { if (state.assignments.hasOwnProperty(k) && k.split("|")[1] <= m) s += state.assignments[k]; }
     return round2(s);
   }
   function readyToAssign(m) { return round2(totalIncomeUpto(m) - totalAssignedUpto(m)); }
 
+  // Saldos vêm do índice (não dependem do mês em vista); só percorrem as transações se ainda não houver índice.
   function accountBalance(accId, clearedOnly) {
+    if (_idx) return round2((clearedOnly ? _idx.balCl : _idx.bal)[accId] || 0);
     var s = 0;
     for (var i=0;i<state.transactions.length;i++) {
       var t = state.transactions[i];
@@ -634,15 +678,91 @@
     }
     return round2(s);
   }
+  // Saldo de uma conta contando só o que acontece até ao fim do mês m (usado na verificação do orçamento).
+  function accountBalanceUpto(accId, m) {
+    if (_idx && _idx.month === m) return round2(_idx.balUp[accId] || 0);
+    var s = 0;
+    for (var i=0;i<state.transactions.length;i++) {
+      var t = state.transactions[i];
+      if (t.accountId === accId && monthOf(t.date) <= m) s += (t.inflow||0) - (t.outflow||0);
+    }
+    return round2(s);
+  }
   function netWorth() { var s=0; for (var i=0;i<state.accounts.length;i++) s += accountBalance(state.accounts[i].id); return round2(s); }
 
+  // ---------- Integridade do orçamento ----------
+  // Num orçamento base-zero tem de ser sempre verdade que:
+  //     Pronto a atribuir + Σ Disponível (todas as categorias) === dinheiro nas contas de orçamento
+  // Se não bater, é porque entrou ou saiu dinheiro do orçamento sem passar por uma categoria.
+  // Os cartões de crédito ficam de fora desta soma: o que se gasta neles já está reservado
+  // na respetiva categoria de pagamento, e a dívida não é dinheiro em caixa.
+  function budgetCashUpto(m){
+    var s=0;
+    for(var i=0;i<state.accounts.length;i++){ var a=state.accounts[i]; if(a.type==="budget") s+=accountBalanceUpto(a.id, m); }
+    return round2(s);
+  }
+  function budgetedTotal(m){
+    var s=readyToAssign(m);
+    for(var i=0;i<state.categories.length;i++) s+=availableFor(state.categories[i].id, m);
+    return round2(s);
+  }
+  // Positivo: há dinheiro nas contas que o orçamento não conhece.
+  // Negativo: o orçamento conta com dinheiro que já não existe nas contas.
+  function integrityDelta(m){ return round2(budgetCashUpto(m) - budgetedTotal(m)); }
+
+  // Lista as transações responsáveis pela diferença. A soma dos "delta" dá o integrityDelta.
+  function integrityIssues(m){
+    var semCat=[], paraFora=[], rendFora=[], cartaoSemCat=0;
+    var pares={};
+    for(var i=0;i<state.transactions.length;i++){ var tp=state.transactions[i]; if(tp.transfer){ (pares[tp.transfer]=pares[tp.transfer]||[]).push(tp); } }
+    for(var j=0;j<state.transactions.length;j++){
+      var t=state.transactions[j];
+      if(monthOf(t.date) > m) continue;
+      var acc=lkAcc(t.accountId); if(!acc) continue;
+      var net=(t.inflow||0)-(t.outflow||0);
+      if(t.transfer){
+        // Uma transferência só é problema quando tira (ou traz) dinheiro do orçamento
+        // para uma conta de acompanhamento sem lhe dar uma categoria.
+        if(acc.type!=="budget" || t.categoryId) continue;
+        var hs=pares[t.transfer]||[], outra=null;
+        for(var h=0;h<hs.length;h++) if(hs[h].id!==t.id) outra=hs[h];
+        var oa=outra?lkAcc(outra.accountId):null;
+        // Sem a outra metade (dados truncados) o dinheiro também desaparece do orçamento.
+        if(!oa || oa.type==="tracking") paraFora.push({t:t, acc:acc, outra:oa, delta:net});
+        continue;
+      }
+      if(t.categoryId===INCOME){
+        if(acc.type!=="budget") rendFora.push({t:t, acc:acc, delta:round2(-net)});
+        continue;
+      }
+      if(t.categoryId && !lkCat(t.categoryId)){          // categoria que já não existe
+        if(acc.type==="budget") semCat.push({t:t, acc:acc, delta:net, orfa:true});
+        continue;
+      }
+      if(!t.categoryId){
+        if(acc.type==="budget") semCat.push({t:t, acc:acc, delta:net});
+        else if(acc.type==="credit") cartaoSemCat++;      // não desequilibra, mas não reserva para a fatura
+      }
+    }
+    function porData(a,b){ return a.t.date<b.t.date?1:(a.t.date>b.t.date?-1:0); }
+    semCat.sort(porData); paraFora.sort(porData); rendFora.sort(porData);
+    return { semCat:semCat, paraFora:paraFora, rendFora:rendFora, cartaoSemCat:cartaoSemCat };
+  }
+
   // Transferência entre contas: cria duas metades ligadas pelo mesmo id 'transfer'. Sem categoria (não afeta o orçamento).
-  function createTransfer(fromId, toId, amount, date, cleared){
+  // Uma transferência entre uma conta de orçamento e uma de acompanhamento faz o dinheiro
+  // sair (ou entrar) do orçamento — nesse caso a metade que está do lado do orçamento
+  // precisa de categoria, senão as contas deixam de bater certo com o orçamento.
+  function crossesBudget(from, to){
+    return (from.type==="budget" && to.type==="tracking") || (from.type==="tracking" && to.type==="budget");
+  }
+  function createTransfer(fromId, toId, amount, date, cleared, budgetCat){
     var from=accountById(fromId), to=accountById(toId);
     if(!from||!to||fromId===toId||!(amount>0)) return false;
+    var cat = (budgetCat && crossesBudget(from,to)) ? budgetCat : null;
     var pair=uid();
-    state.transactions.push({id:uid(), date:date, accountId:fromId, payee:"↔ "+to.name, categoryId:null, memo:"", outflow:round2(amount), inflow:0, cleared:!!cleared, transfer:pair});
-    state.transactions.push({id:uid(), date:date, accountId:toId, payee:"↔ "+from.name, categoryId:null, memo:"", outflow:0, inflow:round2(amount), cleared:!!cleared, transfer:pair});
+    state.transactions.push({id:uid(), date:date, accountId:fromId, payee:"↔ "+to.name, categoryId:(cat && from.type==="budget")?cat:null, memo:"", outflow:round2(amount), inflow:0, cleared:!!cleared, transfer:pair});
+    state.transactions.push({id:uid(), date:date, accountId:toId, payee:"↔ "+from.name, categoryId:(cat && to.type==="budget")?cat:null, memo:"", outflow:0, inflow:round2(amount), cleared:!!cleared, transfer:pair});
     return true;
   }
 
@@ -684,6 +804,33 @@
     return created;
   }
   function recById(id){ for(var i=0;i<(state.recurring||[]).length;i++) if(state.recurring[i].id===id) return state.recurring[i]; return null; }
+
+  // O que as regras recorrentes ainda vão lançar dentro do mês m (de hoje em diante).
+  // O processRecurring() já lançou tudo o que estava em atraso, por isso parte-se do nextDate.
+  function upcomingRecurring(m){
+    if (m < nowMonthKey()) return [];                       // meses passados não têm futuro
+    var hoje=todayISO(), out=[], list=state.recurring||[];
+    for(var i=0;i<list.length;i++){
+      var r=list[i];
+      if(!r.active || !accountById(r.accountId)) continue;
+      var d=r.nextDate, guarda=0;
+      while(d && d.slice(0,7)<=m && guarda++<600){
+        if(d.slice(0,7)===m && d>=hoje) out.push({r:r, date:d});
+        d=advanceDate(d, r.freq);
+      }
+    }
+    out.sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:0); });
+    return out;
+  }
+  function upcomingTotals(m){
+    var l=upcomingRecurring(m), sai=0, entra=0, porCat={};
+    for(var i=0;i<l.length;i++){
+      var r=l[i].r;
+      sai+=(r.outflow||0); entra+=(r.inflow||0);
+      if(r.categoryId && r.categoryId!==INCOME && r.outflow) porCat[r.categoryId]=(porCat[r.categoryId]||0)+r.outflow;
+    }
+    return { lista:l, sai:round2(sai), entra:round2(entra), porCat:porCat };
+  }
   // Fixa os grupos de sistema (pagamentos de cartão) no topo, preservando a ordem dos restantes.
   function pinSystemGroups(){ var sys=[],norm=[]; for(var i=0;i<state.groups.length;i++){ (state.groups[i].system?sys:norm).push(state.groups[i]); } state.groups=sys.concat(norm); }
   function moveGroup(id, dir){
@@ -752,11 +899,29 @@
     }
     if (type==="quarterly" || type==="yearly") {
       var per = type==="quarterly"?3:12, cad = type==="quarterly"?"trimestre":"ano";
-      var slice = round2(amt/per);
-      var needQ = Math.max(0, round2(slice - assignedThis));
-      return { need:needQ, met: assignedThis>=slice-0.005, progress: Math.max(0,Math.min(1, slice>0?assignedThis/slice:0)),
-        label: needQ>0 ? ("Reservar "+fmt(needQ)+" este mês — "+fmt(slice)+"/mês para "+fmt(amt)+"/"+cad)
-                       : ("✅ Reservado "+fmt(slice)+" este mês (de "+fmt(amt)+"/"+cad+")") };
+      // Mês da despesa (opcional). Quando já passou, avança sozinho para o período seguinte,
+      // para o alvo continuar a funcionar ano após ano sem ser preciso mexer nele.
+      var dueEff = tg.due || null, gd = 0;
+      while (dueEff && monthsBetween(m, dueEff) < 0 && gd++ < 240) dueEff = shiftMonth(dueEff, per);
+
+      var falta = round2(amt - avail);
+      if (falta <= 0.005) {
+        return { need:0, met:true, progress:1,
+          label: "🎯 Já tem "+fmt(amt)+" juntos"+(dueEff?(" para "+monthLabel(dueEff)):"")+" — nada a reservar este mês" };
+      }
+      var fatia, restantes = per;
+      if (dueEff) { var dm = monthsBetween(m, dueEff); restantes = dm>=0 ? dm+1 : 1; fatia = round2(falta/restantes); }
+      else fatia = round2(amt/per);
+      // Nunca pedir mais do que falta para o total — é isto que faz o alvo "acabar".
+      var needQ = Math.max(0, round2(Math.min(fatia - assignedThis, falta)));
+      var lbl;
+      if (needQ > 0.005) {
+        lbl = dueEff ? ("Juntar "+fmt(needQ)+" este mês até "+monthLabel(dueEff)+" — faltam "+fmt(falta)+" de "+fmt(amt))
+                     : ("Reservar "+fmt(needQ)+" este mês — "+fmt(fatia)+"/mês para "+fmt(amt)+"/"+cad);
+      } else {
+        lbl = "✅ Reservado o deste mês — faltam "+fmt(falta)+" de "+fmt(amt)+(dueEff?(" até "+monthLabel(dueEff)):"");
+      }
+      return { need:needQ, met: needQ<=0.005, progress: Math.max(0,Math.min(1, amt>0?avail/amt:0)), label: lbl };
     }
     if (type==="byDate") {
       var target = tg.date || m;
@@ -828,6 +993,9 @@
   function render() {
     applyTheme();
     pinSystemGroups();
+    // Guardar ANTES de indexar: o save() invalida o índice, e assim ele fica válido
+    // também depois do render (os cliques seguintes já não voltam a percorrer tudo).
+    save();
     buildIndex(state.ui.month);
     renderSidebar();
     var v = state.ui.view;
@@ -844,7 +1012,6 @@
     if (v === "transactions") renderTransactions();
     if (v === "recurring") renderRecurring();
     if (v === "reports") renderReports();
-    save();
   }
 
   function renderSidebar() {
@@ -870,6 +1037,24 @@
     var cls = rta > 0.005 ? "" : (rta < -0.005 ? "over" : "zero");
     var msg = rta > 0.005 ? "Pronto a atribuir" : (rta < -0.005 ? "Atribuiu a mais — reduza nalguma categoria" : "Tudo atribuído — cada euro tem uma função 🎉");
     var undoBtn = (state.ui.lastFunding && state.ui.lastFunding.month===state.ui.month) ? '<button data-action="undo-funding" title="Reverter o último financiamento">↩ Anular</button>' : '';
+    var dv = integrityDelta(state.ui.month);
+    var aviso = "";
+    if (Math.abs(dv) >= 0.005) {
+      aviso = '<div class="integrity-bar"><span>⚠️</span><span class="grow">' +
+        (dv < 0 ? ('O orçamento conta com <b>'+fmt(-dv)+'</b> que já não estão nas contas de orçamento.')
+                : ('Há <b>'+fmt(dv)+'</b> nas contas de orçamento que ainda não passaram por nenhuma categoria.')) +
+        '</span><button data-action="integrity">Ver porquê</button></div>';
+    }
+    var up = upcomingTotals(state.ui.month);
+    var futuro = "";
+    if (up.lista.length) {
+      var partes = [];
+      if (up.sai > 0.005)   partes.push('<b>'+fmt(up.sai)+'</b> por sair');
+      if (up.entra > 0.005) partes.push('<b>'+fmt(up.entra)+'</b> por entrar');
+      futuro = '<div class="upcoming-bar"><span>📅</span><span class="grow">Ainda este mês: '+partes.join(' · ')+
+        ' ('+up.lista.length+' lançamento'+(up.lista.length===1?'':'s')+' recorrente'+(up.lista.length===1?'':'s')+')</span>'+
+        '<button data-action="upcoming">Ver</button></div>';
+    }
     el("rtaWrap").innerHTML =
       '<div class="rta-banner ' + cls + '">' +
         '<div><div class="rta-amount">' + fmt(rta) + '</div><div class="rta-label">' + msg + '</div></div>' +
@@ -878,7 +1063,7 @@
           '<button data-action="fund-preview">🎯 Financiar alvos…</button>' +
           undoBtn +
         '</div>' +
-      '</div>';
+      '</div>' + aviso + futuro;
   }
 
   // Estado de uma categoria no mês: "neg" (excesso), "warn" (abaixo do alvo), "ok" (cumprido), "none" (sem alvo)
@@ -903,6 +1088,7 @@
         '<button class="btn primary" data-action="add-group">+ Novo grupo</button>');
       return;
     }
+    var upc = upcomingTotals(m).porCat;   // o que cada categoria ainda tem por sair este mês
     var bf = state.ui.budgetFilters || {};
     var filtering = !!(bf.warn || bf.neg || bf.ok);
     var nShown=0, nTotal=0;
@@ -980,7 +1166,9 @@
             '<button data-action="edit-category" data-id="'+cat.id+'" title="Editar / alvo">✎</button>' +
             (ti && ti.need>0 ? '<button data-action="fund-one" data-id="'+cat.id+'" title="Financiar alvo">🎯</button>' : '') +
             (avail < -0.005 ? '<button data-action="cover-overspend" data-id="'+cat.id+'" title="Cobrir excesso">⚠️</button>' : '') +
-          '</span></div>' + (cat.note?'<div class="tag" style="margin-top:3px;">📝 '+esc(cat.note)+'</div>':'') + targetHtml + '</td>' +
+          '</span></div>' + (cat.note?'<div class="tag" style="margin-top:3px;">📝 '+esc(cat.note)+'</div>':'') + targetHtml +
+          (upc[cat.id] ? '<div class="target-note">📅 Ainda por sair este mês: '+fmt(upc[cat.id])+
+            (avail < upc[cat.id]-0.005 ? ' <b style="color:var(--warning)">— faltam '+fmt(round2(upc[cat.id]-avail))+'</b>' : '')+'</div>' : '') + '</td>' +
           '<td class="num"><input class="assign-input" type="text" inputmode="decimal" data-assign="'+cat.id+'" value="'+amtStr(assigned)+'" placeholder="0,00"></td>' +
           '<td class="num activity-cell"><button class="btn ghost sm" data-action="cat-activity" data-id="'+cat.id+'" style="font-variant-numeric:tabular-nums;">'+fmt(activity)+'</button></td>' +
           '<td class="num"><span class="avail-pill '+pillCls+'">'+fmt(avail)+'</span></td></tr>';
@@ -1070,7 +1258,8 @@
   }
 
   function txRow(t, runBal, withAccount) {
-    var catName = t.transfer ? '<span class="pill tracking">↔ Transferência</span>' :
+    var catName = t.transfer ? ('<span class="pill tracking">↔ Transferência</span>' +
+                    (t.categoryId ? ' <span class="tag">'+esc((lkCat(t.categoryId)||{name:"(apagada)"}).name)+'</span>' : '')) :
                   (t.categoryId === INCOME ? '<span class="pill budget">Rendimento</span>' :
                   (t.categoryId ? esc((lkCat(t.categoryId)||{name:"(apagada)"}).name) : '<span class="muted">—</span>'));
     var balCell = (runBal===undefined) ? '' : '<td class="num" style="font-variant-numeric:tabular-nums;font-weight:600;'+(runBal<-0.005?"color:var(--negative)":"")+'">'+fmt(runBal)+'</td>';
@@ -1177,7 +1366,7 @@
     for (var i=0;i<state.transactions.length;i++) {
       var t = state.transactions[i];
       if (monthOf(t.date) !== m) continue;
-      if (t.transfer) continue;
+      if (t.transfer && !t.categoryId) continue;   // transferência interna: não é despesa nem receita
       if (t.categoryId === INCOME) { totalIn += (t.inflow||0); continue; }
       if (t.outflow) {
         var name = t.categoryId ? ((categoryById(t.categoryId)||{name:"(apagada)"}).name) : "Sem categoria";
@@ -1201,7 +1390,7 @@
     var maxBar = 1;
     var seriesData = series.map(function(k){
       var inc=0, out=0;
-      for (var j=0;j<state.transactions.length;j++){ var t=state.transactions[j]; if(monthOf(t.date)!==k) continue; if(t.categoryId===INCOME) inc+=(t.inflow||0); else out+=(t.outflow||0); }
+      for (var j=0;j<state.transactions.length;j++){ var t=state.transactions[j]; if(monthOf(t.date)!==k) continue; if(t.transfer && !t.categoryId) continue; if(t.categoryId===INCOME) inc+=(t.inflow||0); else out+=(t.outflow||0); }
       maxBar = Math.max(maxBar, inc, out);
       return {k:k, inc:inc, out:out};
     });
@@ -1303,7 +1492,18 @@
   }
 
   // ---------- Modals ----------
-  function openModal(html) { el("modal").innerHTML = html; el("modalOverlay").classList.add("open"); var f=el("modal").querySelector("input,select,textarea"); if(f) setTimeout(function(){f.focus();},50); }
+  function focusaveis(){
+    var n = el("modal").querySelectorAll('button, input, select, textarea, [href], [tabindex]:not([tabindex="-1"])'), out=[];
+    for (var i=0;i<n.length;i++) if (!n[i].disabled && n[i].offsetParent !== null) out.push(n[i]);
+    return out;
+  }
+  function openModal(html) {
+    el("modal").innerHTML = html;
+    var h = el("modal").querySelector("h2");
+    el("modal").setAttribute("aria-label", h ? h.textContent : "Janela");
+    el("modalOverlay").classList.add("open");
+    var f=el("modal").querySelector("input,select,textarea"); if(f) setTimeout(function(){f.focus();},50);
+  }
   function closeModal() { el("modalOverlay").classList.remove("open"); el("modal").innerHTML=""; }
 
   function accountModal(acc) {
@@ -1325,8 +1525,8 @@
       '</div>'+
       '<div class="modal-foot"><span>'+(editing?'<button class="btn" data-action="archive-account" data-id="'+acc.id+'" title="Ocultar sem perder o histórico">🗄 Arquivar</button> <button class="btn danger" data-action="delete-account" data-id="'+acc.id+'">Eliminar</button>':'')+'</span>'+
         '<span><button class="btn" data-action="close">Cancelar</button> <button class="btn primary" data-action="save-account" data-id="'+(acc.id||"")+'">Guardar</button></span></div>');
-    var seg = el("acType"); state._tmpAccType = acc.type;
-    seg.addEventListener("click", function(e){ var b=e.target.closest("button"); if(!b)return; state._tmpAccType=b.getAttribute("data-t"); var bs=seg.querySelectorAll("button"); for(var i=0;i<bs.length;i++)bs[i].classList.toggle("active",bs[i]===b); el("acPayFromField").classList.toggle("hidden", state._tmpAccType==="budget"); });
+    var seg = el("acType"); _tmpAccType = acc.type;
+    seg.addEventListener("click", function(e){ var b=e.target.closest("button"); if(!b)return; _tmpAccType=b.getAttribute("data-t"); var bs=seg.querySelectorAll("button"); for(var i=0;i<bs.length;i++)bs[i].classList.toggle("active",bs[i]===b); el("acPayFromField").classList.toggle("hidden", _tmpAccType==="budget"); });
   }
 
   // Opções de categoria com o saldo disponível entre parênteses (referente ao mês em vista no orçamento).
@@ -1358,7 +1558,8 @@
           '<div class="field"><label>Conta</label><select id="txAcc">'+accOpts+'</select></div>'+
         '</div>'+
         '<div class="field"><label>Beneficiário</label><input id="txPayee" value="'+esc(tx.payee||"")+'" placeholder="Ex.: Continente, Salário, EDP…"></div>'+
-        '<div class="field"><label>Categoria</label><select id="txCat">'+catOpts+'</select></div>'+
+        '<div class="field"><label>Categoria</label><select id="txCat">'+catOpts+'</select>'+
+          '<div class="hint hidden" id="txCatWarn">⚠️ Sem categoria, este movimento muda o saldo da conta mas fica de fora do orçamento — as contas deixam de bater certo.</div></div>'+
         '<div class="grid-2">'+
           '<div class="field"><label>Saída (despesa)</label><input id="txOut" type="text" inputmode="decimal" value="'+amtStr(tx.outflow)+'" placeholder="0,00"></div>'+
           '<div class="field"><label>Entrada (receita)</label><input id="txIn" type="text" inputmode="decimal" value="'+amtStr(tx.inflow)+'" placeholder="0,00"></div>'+
@@ -1368,6 +1569,19 @@
       '</div>'+
       '<div class="modal-foot"><span>'+(editing?'<button class="btn danger" data-action="delete-tx" data-id="'+tx.id+'">Eliminar</button>':'<button class="btn sm" data-action="to-split">➗ Dividir</button>')+'</span>'+
         '<span><button class="btn" data-action="close">Cancelar</button> <button class="btn primary" data-action="save-tx" data-id="'+(tx.id||"")+'">Guardar</button></span></div>');
+    // Aviso discreto (não bloqueia): movimento numa conta de orçamento sem categoria.
+    function txWarn(){
+      var acc=lkAcc(el("txAcc").value);
+      var o=parseAmount(el("txOut").value); if(isNaN(o)) o=0;
+      var e=parseAmount(el("txIn").value);  if(isNaN(e)) e=0;
+      var mostrar = !!(acc && acc.type==="budget" && !el("txCat").value && (Math.abs(o)>0.005 || Math.abs(e)>0.005));
+      el("txCatWarn").classList.toggle("hidden", !mostrar);
+    }
+    ["txAcc","txCat","txOut","txIn"].forEach(function(f){
+      var n=el(f); if(!n) return;
+      n.addEventListener("change", txWarn); n.addEventListener("input", txWarn);
+    });
+    txWarn();
   }
 
   function groupModal(grp) {
@@ -1413,6 +1627,9 @@
           '<div class="field" id="catAmtField"><label id="catAmtLabel">Valor do alvo</label><input id="catTarget" type="text" inputmode="decimal" value="'+amtStr(tAmt)+'" placeholder="0,00"></div>'+
           '<div class="field hidden" id="catDateField"><label>Até ao mês</label><input id="catTargetDate" type="month" value="'+tDate+'"></div>'+
         '</div>'+
+        '<div class="field hidden" id="catDueField"><label>Mês da despesa <span class="muted" style="text-transform:none;letter-spacing:0;">(opcional)</span></label>'+
+          '<input id="catTargetDue" type="month" value="'+esc(tg.due||"")+'">'+
+          '<div class="hint" id="catDueHint"></div></div>'+
         '<div class="field hidden" id="catWeekdayField"><label>Dia da semana</label><select id="catWeekday">'+weekdayOpts+'</select></div>'+
         '<div class="field hidden" id="catFundField"><label>Método (alvo mensal)</label><select id="catFund">'+
           '<option value="refill"'+(curFund==="refill"?" selected":"")+'>Encher até este valor — mete só o que falta</option>'+
@@ -1429,11 +1646,16 @@
       el("catDateField").classList.toggle("hidden", v!=="byDate");
       el("catWeekdayField").classList.toggle("hidden", v!=="weekly");
       el("catFundField").classList.toggle("hidden", v!=="monthly");
+      var perio = (v==="quarterly"||v==="yearly");
+      el("catDueField").classList.toggle("hidden", !perio);
+      if (perio) el("catDueHint").textContent = v==="quarterly"
+        ? "Ex.: o mês em que paga o seguro trimestral. Indicando-o, a app reparte o que ainda falta pelos meses até lá e avança sozinha para o trimestre seguinte. Em branco, reserva 1/3 por mês."
+        : "Ex.: o mês em que paga o IUC. Indicando-o, a app reparte o que ainda falta pelos meses até lá e avança sozinha para o ano seguinte. Em branco, reserva 1/12 por mês.";
       var hints = { none:"Sem alvo — a categoria não mostra progresso.",
         monthly:"Quer ter este valor disponível todos os meses (ex.: renda, supermercado).",
         weekly:"Valor por semana. O total do mês = valor × nº desse dia da semana no mês (4 ou 5).",
-        quarterly:"Total gasto a cada 3 meses (ex.: seguro trimestral). Reserva 1/3 por mês.",
-        yearly:"Total gasto uma vez por ano (ex.: IUC, seguro anual). Reserva 1/12 por mês.",
+        quarterly:"Total gasto a cada 3 meses (ex.: seguro trimestral). Deixa de pedir dinheiro assim que tiver o total juntado.",
+        yearly:"Total gasto uma vez por ano (ex.: IUC, seguro anual). Deixa de pedir dinheiro assim que tiver o total juntado.",
         byDate:"Junta o valor total até ao mês indicado (ex.: férias, entrada de carro)." };
       el("catTargetHint").textContent = hints[v]||"";
       el("catAmtLabel").textContent = v==="monthly" ? "Valor por mês" : (v==="weekly" ? "Valor por semana" : (v==="byDate" ? "Total a juntar" : "Valor total do período"));
@@ -1446,27 +1668,38 @@
     openModal(
       '<div class="modal-head"><h2>💾 Dados e cópias de segurança</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
-        '<p class="muted" style="margin-top:0;">Os seus dados vivem <b>neste dispositivo</b>. Para não os perder, exporte um ficheiro <b>.json</b> de vez em quando (guardado fora deste aparelho) — ou ative a <b>sincronização</b> mais abaixo.</p>'+
+        '<p class="muted" style="margin-top:0;">Os seus dados vivem <b>só neste aparelho</b>, dentro do navegador. Há aqui três coisas diferentes — e só a <b>2</b> e a <b>3</b> os põem a salvo se perder o aparelho.</p>'+
+        '<div class="field"><label>Moeda</label><select id="curSel">'+
+          CURRENCIES.map(function(c){ return '<option value="'+c[0]+'"'+(((state.settings.currency||"EUR")===c[0])?" selected":"")+'>'+c[0]+' ('+c[1]+')</option>'; }).join("")+
+        '</select></div>'+
+
         '<div class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">'+
-          '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;">'+
-            '<input type="checkbox" data-action="toggle-autobackup" '+(state.settings.autoBackup!==false?"checked":"")+' style="width:auto;"> Guardar automaticamente um instantâneo diário (últimos 5 dias)</label>'+
-          '<div class="hint" style="margin-top:4px;">Fica <b>dentro da aplicação</b>, para poder voltar atrás se se enganar. Funciona no telemóvel e no PC e <b>não</b> transfere ficheiros. Só mantém os <b>5 dias</b> mais recentes — os anteriores são apagados sozinhos.</div>'+
+          '<div style="font-weight:700;font-size:13px;">1 · Histórico — voltar a um dia anterior</div>'+
+          '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;margin-top:8px;">'+
+            '<input type="checkbox" data-action="toggle-autobackup" '+(state.settings.autoBackup!==false?"checked":"")+' style="width:auto;"> Guardar o estado do orçamento uma vez por dia</label>'+
+          '<div class="hint" style="margin-top:4px;">Guarda uma cópia <b>dentro da própria aplicação</b>. Não descarrega ficheiro nenhum, por isso funciona igual no iPhone e no PC. Serve para <b>voltar atrás</b> quando se engana — não é uma cópia de segurança.<br>'+
+          'É guardada quando <b>abre</b> e quando <b>sai</b> da aplicação, e ficam os <b>5 dias</b> mais recentes. Cada dia tem um ponto só, com o estado mais recente desse dia — para desfazer enganos do próprio dia use o <b>↩ Anular</b>.<br>'+
+          '<b>⚠️ Fica no mesmo sítio que os seus dados</b> — se o navegador limpar o armazenamento, desaparece tudo junto. Para isso é que serve o ponto 2.</div>'+
           snapshotsHtml()+
         '</div>'+
+
         '<div class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">'+
-          '<div style="font-size:12.5px;font-weight:600;">'+
+          '<div style="font-weight:700;font-size:13px;">2 · Cópia de segurança em ficheiro</div>'+
+          '<div style="font-size:12.5px;font-weight:600;margin-top:8px;">'+
             (state.backup && state.backup.at
-              ? ('Última exportação para ficheiro: '+fmtDate(state.backup.at.slice(0,10))+((daysSinceBackup()||0)>0?(' ('+daysSinceBackup()+' dia'+((daysSinceBackup()===1)?'':'s')+')'):' (hoje)'))
-              : 'Ainda não exportou nenhum ficheiro de cópia de segurança.')+
+              ? ('Última: '+fmtDate(state.backup.at.slice(0,10))+((daysSinceBackup()||0)>0?(' ('+daysSinceBackup()+' dia'+((daysSinceBackup()===1)?'':'s')+')'):' (hoje)'))
+              : 'Ainda não guardou nenhuma cópia de segurança em ficheiro.')+
           '</div>'+
-          '<div class="hint" style="margin-top:4px;">'+(backupPending()?'⚠️ Há alterações por exportar para ficheiro.':'✅ A última exportação está atualizada.')+'</div>'+
+          '<div class="hint" style="margin-top:4px;">'+(backupPending()?'⚠️ Há alterações por guardar em ficheiro.':'✅ A última cópia está atualizada.')+'</div>'+
+          '<div class="hint" style="margin-top:6px;">É <b>sempre manual</b> — só acontece quando carrega no botão aqui em baixo. É a única cópia que sobrevive a perder o aparelho ou a uma limpeza do navegador, por isso guarde o ficheiro <b>fora daqui</b> (OneDrive, e-mail, pen). A aplicação não gere estes ficheiros: cada exportação cria um novo e a limpeza é sua.'+
+          (usaPartilha()?'<br>Neste aparelho abre a <b>partilha do iPhone</b>, para poder guardar em «Ficheiros» ou enviar para onde quiser.':'')+'</div>'+
         '</div>'+
-        '<div class="field"><button class="btn primary" data-action="export-json" style="width:100%;justify-content:center;">⬇ Exportar tudo (ficheiro .json)</button></div>'+
+        '<div class="field"><button class="btn primary" data-action="export-json" style="width:100%;justify-content:center;">⬇ Guardar cópia de segurança (.json)</button></div>'+
         '<div class="field"><button class="btn" data-action="export-csv" style="width:100%;justify-content:center;">⬇ Exportar transações (.csv)</button></div>'+
         '<div class="field"><label>Importar cópia de segurança (.json)</label><input id="importFile" type="file" accept="application/json,.json"><div class="hint">Substitui todos os dados atuais por este ficheiro.</div></div>'+
         '<div class="field"><button class="btn" data-action="import-csv" style="width:100%;justify-content:center;">📥 Importar transações do banco (.csv)</button><div class="hint">Acrescenta transações às existentes, sem substituir nada.</div></div>'+
         '<hr style="border:0;border-top:1px solid var(--border);margin:18px 0;">'+
-        '<div class="field"><button class="btn" data-action="open-sync" style="width:100%;justify-content:center;">☁️ Sincronização entre dispositivos</button>'+
+        '<div class="field"><label>3 · Sincronização entre dispositivos</label><button class="btn" data-action="open-sync" style="width:100%;justify-content:center;">☁️ Sincronização entre dispositivos</button>'+
           '<div class="hint">'+(syncReady()?('Ligada — '+esc(_syncStatus||"pronta")):'Guarde uma cópia cifrada num gist privado do GitHub para partilhar entre o telemóvel e o PC.')+'</div></div>'+
         '<div class="field"><button class="btn" data-action="archived-menu" style="width:100%;justify-content:center;">🗄 Ver arquivados</button></div>'+
         '<div class="field"><button class="btn" data-action="load-sample" style="width:100%;justify-content:center;">🧪 Carregar dados de exemplo</button></div>'+
@@ -1474,6 +1707,7 @@
       '</div>'+
       '<div class="modal-foot"><span class="muted" style="font-size:12px;">Versão 1.0 · Orçamento base-zero</span><button class="btn" data-action="close">Fechar</button></div>');
     el("importFile").addEventListener("change", function(e){ importJSON(e.target.files[0]); });
+    el("curSel").addEventListener("change", function(){ state.settings.currency=el("curSel").value; save(); render(); dataModal(); });
   }
 
   function syncModal(){
@@ -1483,6 +1717,7 @@
           '<div style="font-weight:700;">☁️ Ligado ao GitHub</div>'+
           '<div class="hint" id="syncStatus" style="margin-top:4px;">'+esc(_syncStatus || ("Gist: "+(_sync.gistId||"(por criar no 1.º envio)")))+'</div>'+
           (_sync.gistId?'<div class="hint" style="margin-top:6px;">ID deste gist (cole no outro dispositivo):<br><code style="user-select:all;word-break:break-all;font-size:12px;">'+esc(_sync.gistId)+'</code></div>':'')+
+          '<div class="hint" style="margin-top:6px;">Se apagar este gist no GitHub, a aplicação avisa-o e pergunta o que fazer — nunca cria outro sozinho.</div>'+
         '</div>'+
         '<div class="field"><label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;">'+
           '<input type="checkbox" data-action="sync-toggle-auto" '+(_sync.auto?"checked":"")+' style="width:auto;"> Sincronizar automaticamente ao guardar</label>'+
@@ -1506,6 +1741,29 @@
         (on ? '<span></span><button class="btn" data-action="close">Fechar</button>'
             : '<button class="btn" data-action="close">Cancelar</button><button class="btn primary" data-action="sync-connect">Ligar e sincronizar</button>')+
       '</div>');
+  }
+
+  function gistLostModal(){
+    var g = _gistPerdido || {};
+    openModal(
+      '<div class="modal-head"><h2>⚠️ Não encontrei o gist da sincronização</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body">'+
+        '<p style="margin-top:0;">O gist <code style="user-select:all;word-break:break-all;font-size:12px;">'+esc(g.id||"")+'</code> já não existe, ou este token deixou de lhe aceder.</p>'+
+        '<div class="hint" style="margin-bottom:14px;">'+
+          (g.jaSincronizou
+            ? 'Como este aparelho já tinha sincronizado com ele, o mais provável é ter sido <b>apagado no GitHub</b>.'
+            : 'Como este aparelho ainda não tinha sincronizado, o mais provável é o <b>ID estar errado</b>.')+
+          '<br><br><b>Não criei nenhum gist novo automaticamente.</b> Se cada aparelho criasse o seu, ficaria com dois orçamentos separados a divergir sem dar por isso. Escolha o que fazer:</div>'+
+        '<div class="field"><label>Usar outro gist que já exista</label>'+
+          '<input id="glId" placeholder="cole aqui o ID do gist" value="">'+
+          '<div class="hint">Se já criou um novo no outro aparelho, cole aqui o ID que lá aparece.</div></div>'+
+        '<div class="field"><button class="btn" data-action="gist-create-new" style="width:100%;justify-content:center;">☁️ Criar um gist novo com os dados deste aparelho</button>'+
+          '<div class="hint">Os outros aparelhos vão precisar do ID novo para voltarem a sincronizar.</div></div>'+
+        '<div class="field"><button class="btn danger" data-action="sync-disconnect" style="width:100%;justify-content:center;">Desligar a sincronização neste aparelho</button>'+
+          '<div class="hint">Os seus dados locais ficam intactos.</div></div>'+
+      '</div>'+
+      '<div class="modal-foot"><button class="btn" data-action="close">Decidir depois</button>'+
+        '<button class="btn primary" data-action="gist-use-id">Usar este ID</button></div>');
   }
 
   function conflictModal(){
@@ -1536,6 +1794,132 @@
       '<div class="modal-foot"><span></span><button class="btn" data-action="close">Fechar</button></div>');
   }
 
+  function integrityModal(){
+    var m=state.ui.month;
+    var dv=integrityDelta(m), iss=integrityIssues(m);
+    var caixa=budgetCashUpto(m), orc=budgetedTotal(m);
+
+    function linha(x, motivo, accao){
+      return '<div class="int-row"><span class="who"><b>'+esc(x.t.payee||"(sem beneficiário)")+'</b>'+
+        '<span class="tag">'+fmtDate(x.t.date)+' · '+esc(x.acc.name)+' · '+motivo+'</span></span>'+
+        '<span class="amt '+(x.delta<0?"tx-amt out":"tx-amt in")+'">'+fmt(x.delta)+'</span>'+
+        accao+'</div>';
+    }
+    function bloco(titulo, explica, lista, fab){
+      if(!lista.length) return "";
+      var soma=0; lista.forEach(function(x){ soma+=x.delta; });
+      return '<div class="field"><label>'+titulo+' ('+lista.length+' · '+fmt(round2(soma))+')</label>'+
+        '<div class="hint" style="margin:-2px 0 8px;">'+explica+'</div>'+
+        '<div style="max-height:210px;overflow:auto;">'+lista.map(fab).join("")+'</div></div>';
+    }
+
+    var corpo =
+      '<div class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">'+
+        '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Dinheiro nas contas de orçamento</span><b style="font-variant-numeric:tabular-nums;">'+fmt(caixa)+'</b></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Pronto a atribuir + Disponível das categorias</span><b style="font-variant-numeric:tabular-nums;">'+fmt(orc)+'</b></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:7px 0 0;margin-top:5px;border-top:1px solid var(--border);font-weight:700;">'+
+          '<span>Diferença</span><b class="'+(dv<0?"tx-amt out":"tx-amt in")+'" style="font-variant-numeric:tabular-nums;">'+fmt(dv)+'</b></div>'+
+      '</div>';
+
+    if (Math.abs(dv) < 0.005 && !iss.semCat.length && !iss.paraFora.length && !iss.rendFora.length) {
+      corpo += '<div class="muted" style="text-align:center;padding:18px 0;">✅ Está tudo certo — cada euro nas contas de orçamento tem uma função.</div>';
+    } else {
+      corpo +=
+        bloco("Despesas e receitas sem categoria",
+          "Mexeram no saldo da conta mas não passaram por nenhuma categoria, por isso o orçamento não deu por elas.",
+          iss.semCat,
+          function(x){ return linha(x, x.orfa?"a categoria foi apagada":"sem categoria",
+            '<button class="btn sm" data-action="edit-tx" data-id="'+x.t.id+'">Categorizar</button>'); }) +
+        bloco("Transferências para fora do orçamento",
+          "Saiu (ou entrou) dinheiro de uma conta de acompanhamento. Dê-lhe uma categoria para o orçamento acompanhar o movimento.",
+          iss.paraFora,
+          function(x){ return linha(x, x.outra ? ("para "+esc(x.outra.name)) : "a outra metade da transferência desapareceu",
+            '<button class="btn sm" data-action="fix-transfer" data-id="'+x.t.id+'">Categorizar</button>'); }) +
+        bloco("Rendimento fora das contas de orçamento",
+          "Foi registado como «Rendimento» numa conta que não entra no orçamento, por isso aumentou o Pronto a atribuir sem haver dinheiro para lhe corresponder.",
+          iss.rendFora,
+          function(x){ return linha(x, "conta de "+(x.acc.type==="credit"?"cartão":"acompanhamento"),
+            '<button class="btn sm" data-action="edit-tx" data-id="'+x.t.id+'">Corrigir</button>'); });
+
+      // Rede de segurança: se os movimentos listados não explicarem toda a diferença, dizê-lo
+      // em vez de deixar o utilizador a pensar que a lista está completa.
+      var explicado=0;
+      [iss.semCat, iss.paraFora, iss.rendFora].forEach(function(l){ l.forEach(function(x){ explicado+=x.delta; }); });
+      var resto=round2(dv-explicado);
+      if (Math.abs(resto) >= 0.005) {
+        corpo += '<div class="hint" style="color:var(--negative);font-weight:600;">Faltam '+fmt(resto)+
+          ' que os movimentos acima não explicam. Costuma acontecer com dados importados de um ficheiro alterado à mão. '+
+          'Exporte uma cópia de segurança antes de mexer.</div>';
+      }
+    }
+
+    if (iss.cartaoSemCat > 0) {
+      corpo += '<div class="hint" style="border-top:1px solid var(--border);padding-top:10px;">ℹ️ Há ainda <b>'+iss.cartaoSemCat+
+        '</b> movimento(s) no cartão de crédito sem categoria. Não desequilibram o orçamento, mas também não reservam dinheiro para a fatura.</div>';
+    }
+
+    openModal(
+      '<div class="modal-head"><h2>🔍 Orçamento vs. contas — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body">'+
+        '<p class="muted" style="margin-top:0;">Num orçamento base-zero, o dinheiro que está nas contas de orçamento tem de ser exatamente igual ao que está por atribuir mais o disponível de todas as categorias. Quando não bate, é porque houve movimentos que não passaram por nenhuma categoria.</p>'+
+        corpo+
+      '</div>'+
+      '<div class="modal-foot"><span></span><button class="btn primary" data-action="close">Fechar</button></div>');
+  }
+
+  function upcomingModal(){
+    var m=state.ui.month, up=upcomingTotals(m);
+    var linhas = up.lista.length ? up.lista.map(function(x){
+      var r=x.r, acc=lkAcc(r.accountId);
+      var cat = r.categoryId===INCOME ? "Rendimento"
+              : (r.categoryId ? esc((lkCat(r.categoryId)||{name:"(apagada)"}).name) : "sem categoria");
+      var amt = r.outflow ? '<span class="tx-amt out">'+fmt(-r.outflow)+'</span>' : '<span class="tx-amt in">'+fmt(r.inflow)+'</span>';
+      return '<div class="int-row"><span class="who"><b>'+esc(r.payee||"(sem beneficiário)")+'</b>'+
+        '<span class="tag">'+fmtDate(x.date)+' · '+esc(acc?acc.name:"—")+' · '+cat+'</span></span>'+
+        '<span class="amt">'+amt+'</span>'+
+        '<button class="btn sm" data-action="post-recurring-now" data-id="'+r.id+'" title="Lançar já esta transação">▶ Lançar</button></div>';
+    }).join("") : '<div class="muted" style="text-align:center;padding:18px 0;">Não falta lançar nada até ao fim do mês.</div>';
+
+    var resumo = "";
+    if (up.lista.length) {
+      var rta = readyToAssign(m);
+      resumo = '<div class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">'+
+        '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Por sair</span><b class="tx-amt out" style="font-variant-numeric:tabular-nums;">'+fmt(up.sai)+'</b></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Por entrar</span><b class="tx-amt in" style="font-variant-numeric:tabular-nums;">'+fmt(up.entra)+'</b></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:7px 0 0;margin-top:5px;border-top:1px solid var(--border);font-weight:700;"><span>Pronto a atribuir depois de tudo lançado</span>'+
+          '<b style="font-variant-numeric:tabular-nums;">'+fmt(round2(rta + up.entra))+'</b></div>'+
+        '<div class="hint" style="margin-top:6px;">As saídas já lançadas descontam na categoria respetiva, não no «Pronto a atribuir». As entradas de «Rendimento» é que vão aumentá-lo.</div>'+
+      '</div>';
+    }
+    openModal(
+      '<div class="modal-head"><h2>📅 Ainda por lançar — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body">'+
+        '<p class="muted" style="margin-top:0;">Regras recorrentes ativas que ainda vão ser lançadas automaticamente até ao fim do mês. Serve para saber o que já está comprometido antes de atribuir dinheiro.</p>'+
+        resumo+
+        '<div style="max-height:260px;overflow:auto;">'+linhas+'</div>'+
+      '</div>'+
+      '<div class="modal-foot"><span></span><button class="btn primary" data-action="close">Fechar</button></div>');
+  }
+
+  function fixTransferModal(id){
+    var t=txById(id); if(!t){ toast("Transação não encontrada."); return; }
+    var saida=(t.outflow||0)>0.005;
+    var outra=null, hs=state.transactions.filter(function(x){return x.transfer===t.transfer;});
+    for(var i=0;i<hs.length;i++) if(hs[i].id!==t.id) outra=hs[i];
+    var oa=outra?lkAcc(outra.accountId):null;
+    openModal(
+      '<div class="modal-head"><h2>Categorizar transferência</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body">'+
+        '<p class="muted" style="margin-top:0;">'+(saida
+          ? ('Saíram <b>'+fmt(t.outflow)+'</b> do orçamento para «'+esc(oa?oa.name:"outra conta")+'». Escolha de que categoria deve sair esse dinheiro.')
+          : ('Entraram <b>'+fmt(t.inflow)+'</b> no orçamento vindos de «'+esc(oa?oa.name:"outra conta")+'». Escolha «Rendimento» para ficarem prontos a atribuir.'))+'</p>'+
+        '<div class="field"><label>Categoria</label><select id="ftCat">'+catOptionsHTML(saida?"":INCOME)+'</select>'+
+          '<div class="hint">O movimento continua a ser uma transferência — a categoria serve só para o orçamento saber por onde o dinheiro passou.</div></div>'+
+      '</div>'+
+      '<div class="modal-foot"><span></span><span><button class="btn" data-action="close">Cancelar</button> '+
+        '<button class="btn primary" data-action="save-fix-transfer" data-id="'+t.id+'">Guardar</button></span></div>');
+  }
+
   function helpModal() {
     openModal(
       '<div class="modal-head"><h2>❓ Como funciona</h2><button class="x" data-action="close">×</button></div>'+
@@ -1557,7 +1941,11 @@
         '<li><b>Transação dividida</b> (<b>➗ Dividir</b>): reparte uma única compra por várias categorias (ex.: no hipermercado, parte em «Supermercado», parte em «Casa»). Cada parte fica na sua categoria; aparece com 🔗 na lista e eliminar uma remove a transação toda.</li>'+
         '<li><b>Contas de orçamento</b> (à ordem, poupança, dinheiro) entram no orçamento. <b>Contas de acompanhamento</b> (cartões, empréstimos, investimentos) não afetam o «Pronto a atribuir».</li>'+
         '<li><b>Excesso</b> (Disponível a vermelho) significa que gastou mais do que atribuiu — atribua mais a essa categoria para o cobrir.</li>'+
-        '<li><b>Cópia de segurança:</b> os dados vivem só neste navegador (que os pode limpar ao fim de algum tempo, sobretudo no iPhone). A aplicação guarda um ficheiro <b>.json</b> automaticamente <b>uma vez por dia</b> e avisa-o quando há alterações por guardar — pode desligar em <b>Dados / Cópias de segurança</b>. Guarde esses ficheiros em local seguro.</li>'+
+        '<li><b>Orçamento vs. contas:</b> o dinheiro nas contas de orçamento tem de ser sempre igual ao «Pronto a atribuir» mais o «Disponível» de todas as categorias. Se algum movimento ficar <b>sem categoria</b>, ou se transferir dinheiro para uma <b>conta de acompanhamento</b> sem lhe dar categoria, aparece um aviso ⚠️ por baixo do «Pronto a atribuir» — carregue em <b>Ver porquê</b> para ver e corrigir os movimentos em causa.</li>'+
+        '<li><b>Onde vivem os dados:</b> só <b>neste aparelho</b>, dentro do navegador — que os pode limpar ao fim de algum tempo sem uso, sobretudo no iPhone. Em <b>Dados / Cópias de segurança</b> há três níveis de proteção, e convém não os confundir:<br>'+
+          '<b>1 · Histórico</b> — a app guarda sozinha o estado do orçamento uma vez por dia, <b>dentro dela própria</b> (nunca descarrega ficheiros, funciona igual no iPhone e no PC), ao abrir e ao sair. Ficam os <b>5 dias</b> mais recentes e servem para <b>voltar a um dia anterior</b>. Como ficam no mesmo sítio que os dados, <b>não</b> o salvam se perder o aparelho.<br>'+
+          '<b>2 · Cópia de segurança em ficheiro (.json)</b> — <b>sempre manual</b>, só quando carrega no botão. É a única que sobrevive a perder o aparelho; guarde-a fora daqui. A app avisa quando já vai com uns dias.<br>'+
+          '<b>3 · Sincronização</b> — mantém o telemóvel e o PC com os mesmos dados, através de uma cópia cifrada no GitHub.</li>'+
       '</ul></div>'+
       '<div class="modal-foot"><span></span><button class="btn primary" data-action="close">Entendido</button></div>');
   }
@@ -1679,6 +2067,8 @@
       '<div class="modal-body">'+
         '<div class="field"><label>'+(payCard?"Pagar a partir de":"De (sai desta conta)")+'</label><select id="tfFrom">'+opts(fromId)+'</select></div>'+
         '<div class="field"><label>'+(payCard?"Cartão / dívida a pagar":"Para (entra nesta conta)")+'</label><select id="tfTo">'+opts(toId)+'</select></div>'+
+        '<div class="field hidden" id="tfCatField"><label id="tfCatLabel">Categoria</label><select id="tfCat">'+catOptionsHTML("")+'</select>'+
+          '<div class="hint" id="tfCatHint"></div></div>'+
         '<div class="grid-2">'+
           '<div class="field"><label>Valor</label><input id="tfAmt" type="text" inputmode="decimal" value="'+amtStr(amtDefault)+'" placeholder="0,00"></div>'+
           '<div class="field"><label>Data</label><input id="tfDate" type="date" value="'+todayISO()+'"></div>'+
@@ -1687,6 +2077,21 @@
         '<div class="hint" style="margin-top:8px;">Uma transferência move dinheiro entre contas — não tem categoria e não afeta o «Pronto a atribuir».</div>'+
       '</div>'+
       '<div class="modal-foot"><span></span><span><button class="btn" data-action="close">Cancelar</button> <button class="btn primary" data-action="do-transfer">'+(payCard?"Pagar":"Transferir")+'</button></span></div>');
+    function tfSync(){
+      var f=lkAcc(el("tfFrom").value), t=lkAcc(el("tfTo").value);
+      var cruza = !!(f && t && crossesBudget(f,t));
+      el("tfCatField").classList.toggle("hidden", !cruza);
+      if(!cruza) return;
+      var sai = f.type==="budget";
+      el("tfCatLabel").textContent = sai ? "Categoria de onde sai o dinheiro" : "Categoria onde entra o dinheiro";
+      el("tfCatHint").textContent = sai
+        ? "Este dinheiro deixa o orçamento. Escolha a categoria que o suporta, para as contas continuarem a bater certo com o orçamento."
+        : "Este dinheiro entra no orçamento. Escolha «Rendimento» para ficar pronto a atribuir.";
+      if(!sai && !el("tfCat").value) el("tfCat").value = INCOME;
+    }
+    el("tfFrom").addEventListener("change", tfSync);
+    el("tfTo").addEventListener("change", tfSync);
+    tfSync();
   }
 
   function readSplit(){
@@ -1765,12 +2170,23 @@
     "close": closeModal,
     "help": helpModal,
     "data-menu": dataModal,
+    "integrity": function(){ integrityModal(); },
+    "upcoming": function(){ upcomingModal(); },
+    "fix-transfer": function(id){ fixTransferModal(id); },
+    "save-fix-transfer": function(id){
+      var t=txById(id); if(!t) return;
+      var c=el("ftCat").value||null;
+      if(!c){ toast("Escolha uma categoria."); return; }
+      pushUndo("Transferência categorizada.");
+      t.categoryId=c;
+      closeModal(); save(); render(); toast("Transferência categorizada."); showUndo();
+    },
 
     "add-account": function(){ accountModal(); },
     "edit-account": function(id){ accountModal(accountById(id)); },
     "save-account": function(id){
       var name = val("acName"); if(!name){ toast("Indique um nome."); return; }
-      var type = state._tmpAccType || "budget";
+      var type = _tmpAccType || "budget";
       var note = val("acNote");
       var payFrom = el("acPayFrom") ? (el("acPayFrom").value||null) : null;
       if (id) {
@@ -1900,7 +2316,8 @@
       closeModal(); save(); render(); showUndo();
     },
     "toggle-group": function(id){ state.collapsed[id]=!state.collapsed[id]; save(); render(); },
-    "budget-filter": function(id){ var was=!!(state.ui.budgetFilters||{})[id]; var f={}; if(!was) f[id]=true; state.ui.budgetFilters=f; save(); render(); },
+    // Filtros acumuláveis: pode ver ao mesmo tempo, por exemplo, "abaixo do alvo" e "excedido".
+    "budget-filter": function(id){ var f=state.ui.budgetFilters||{}; if(f[id]) delete f[id]; else f[id]=true; state.ui.budgetFilters=f; save(); render(); },
     "budget-filter-clear": function(){ state.ui.budgetFilters={}; save(); render(); },
 
     "add-category": function(id){ categoryModal(null, id); },
@@ -1915,6 +2332,7 @@
         if (tType==="byDate") target.date = el("catTargetDate").value || shiftMonth(state.ui.month,6);
         if (tType==="weekly") target.weekday = parseInt(el("catWeekday").value,10);
         if (tType==="monthly") target.fund = el("catFund").value;
+        if (tType==="quarterly" || tType==="yearly") { var dd=el("catTargetDue").value; if(dd) target.due=dd; }
       }
       var note=val("catNote");
       var prio=el("catPrio")?el("catPrio").value:"normal";
@@ -1935,8 +2353,10 @@
     "cover-overspend": function(id){
       var m=state.ui.month; var avail=availableFor(id,m);
       if (avail>=0) return;
-      var key=id+"|"+m; state.assignments[key]=round2((state.assignments[key]||0)+Math.abs(avail));
-      save(); render(); toast("Excesso coberto.");
+      var key=id+"|"+m;
+      state.ui.lastFunding={month:m, entries:[{key:key, prev: state.assignments.hasOwnProperty(key)?state.assignments[key]:null}]};
+      state.assignments[key]=round2((state.assignments[key]||0)+Math.abs(avail));
+      save(); render(); toast("Excesso coberto — pode anular no topo.");
     },
     "fund-one": function(id){
       var m=state.ui.month; var c=categoryById(id); if(!c) return;
@@ -2020,7 +2440,7 @@
       if(!accountById(r.accountId)){ toast("A conta desta regra já não existe."); return; }
       state.transactions.push({id:uid(), date:r.nextDate, accountId:r.accountId, payee:r.payee||"", categoryId:r.categoryId||null, memo:r.memo||"", outflow:r.outflow||0, inflow:r.inflow||0, cleared:false});
       r.nextDate=advanceDate(r.nextDate, r.freq);
-      save(); render(); toast("Transação lançada. Próxima: "+fmtDate(r.nextDate));
+      closeModal(); save(); render(); toast("Transação lançada. Próxima: "+fmtDate(r.nextDate));
     },
 
     "transfer": function(){ transferModal(); },
@@ -2033,7 +2453,10 @@
       var from=el("tfFrom").value, to=el("tfTo").value, amt=num("tfAmt"), date=val("tfDate")||todayISO(), cl=el("tfClear").checked;
       if(from===to){ toast("Escolha contas diferentes."); return; }
       if(amt<=0){ toast("Indique um valor."); return; }
-      if(createTransfer(from,to,amt,date,cl)){ closeModal(); save(); render(); toast("Transferência registada."); }
+      var cruza = !el("tfCatField").classList.contains("hidden");
+      var cat = cruza ? (el("tfCat").value||null) : null;
+      if(cruza && !cat){ toast("Escolha a categoria — este movimento entra ou sai do orçamento."); return; }
+      if(createTransfer(from,to,amt,date,cl,cat)){ closeModal(); save(); render(); toast("Transferência registada."); }
       else toast("Não foi possível transferir.");
     },
 
@@ -2071,7 +2494,29 @@
       _sync.syncedSig = vazio ? backupSig() : undefined;
       saveSyncCfg(); closeModal(); toast("A ligar…"); syncNow();
     },
-    "sync-disconnect": function(){ if(!confirm("Desligar a sincronização neste dispositivo? O token e a palavra-passe são apagados daqui (os dados e o gist mantêm-se).")) return; _sync={auto:false}; saveSyncCfg(); closeModal(); toast("Sincronização desligada."); },
+    "sync-disconnect": function(){ if(!confirm("Desligar a sincronização neste dispositivo? O token e a palavra-passe são apagados daqui (os dados e o gist mantêm-se).")) return; _sync={auto:false}; _gistPerdido=null; saveSyncCfg(); closeModal(); toast("Sincronização desligada."); },
+    "gist-use-id": function(){
+      var v = el("glId") ? el("glId").value.trim() : "";
+      if(!v){ toast("Cole o ID do gist que quer usar."); return; }
+      // Recomeça a contagem: se houver diferenças entre este aparelho e o gist,
+      // o fluxo normal deteta o conflito e deixa escolher qual manter.
+      _sync.gistId=v; _sync.baseRev=0; _sync.syncedSig=undefined; saveSyncCfg();
+      _gistPerdido=null; closeModal(); toast("A tentar com esse ID…"); syncNow();
+    },
+    "gist-create-new": function(){
+      if(!confirm("Criar um gist novo a partir dos dados DESTE aparelho?\nOs outros aparelhos vão precisar do ID novo para voltarem a sincronizar.")) return;
+      closeModal();
+      (async function(){
+        try {
+          _sync.gistId=null; _sync.baseRev=0; _sync.syncedSig=undefined; saveSyncCfg();
+          await pushLocal(1);
+          _gistPerdido=null;
+          setSyncStatus("Gist novo criado ✓");
+          toast("Gist novo criado — copie o ID para os outros aparelhos.");
+          syncModal();
+        } catch(e){ toast("Não foi possível criar: "+e.message); }
+      })();
+    },
     "sync-keep-local": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ await pushLocal(pc.remoteRev+1); setSyncStatus("Guardado na nuvem ✓"); toast("Mantido este dispositivo — enviado para a nuvem."); }catch(e){ toast("Falhou: "+e.message); } _pendingConflict=null; })(); },
     "sync-use-remote": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ adoptRemote(await decEnvelope(pc.enc, _sync.pass), pc.remoteRev); toast("Adotada a versão da nuvem."); }catch(e){ toast("Falhou: "+e.message); } _pendingConflict=null; })(); },
     "load-sample": function(){ var hasData=state.accounts.length||state.categories.length||state.groups.length||state.transactions.length||(state.recurring&&state.recurring.length); if(hasData && !confirm("Atenção: os dados atuais serão substituídos pelos dados de exemplo. Esta ação não pode ser anulada. Pretende continuar?")) return; loadSample(); },
@@ -2147,7 +2592,7 @@
   }
   function restoreSnapshot(idx){
     var snaps = loadSnaps(), s = snaps[idx]; if(!s) return;
-    if(!confirm("Repor o instantâneo de "+fmtDate(s.day)+"?\nOs dados atuais deste dispositivo serão substituídos por esta versão.")) return;
+    if(!confirm("Voltar ao orçamento tal como estava em "+fmtDate(s.day)+"?\nOs dados atuais deste aparelho são substituídos por essa versão.")) return;
     try {
       var obj = JSON.parse(s.data);
       if(!obj.accounts || !obj.transactions) throw new Error("formato");
@@ -2155,17 +2600,16 @@
       obj.collapsed = obj.collapsed || {}; obj.assignments = obj.assignments || {};
       obj.ui = { view:"budget", month: nowMonthKey() };
       state = obj; _undo=[]; hideUndo(); _idx=null; save(); closeModal(); render();
-      toast("Reposto o instantâneo de "+fmtDate(s.day)+". Se sincroniza, envie para atualizar os outros aparelhos.");
-    } catch(e){ toast("Instantâneo inválido."); }
+      toast("Voltou ao orçamento de "+fmtDate(s.day)+". Se sincroniza, envie para atualizar os outros aparelhos.");
+    } catch(e){ toast("Esse ponto do histórico está inválido."); }
   }
   function downloadSnapshot(idx){
     var snaps = loadSnaps(), s = snaps[idx]; if(!s) return;
-    download("orcamento-"+s.day+".json", s.data, "application/json");
-    toast("Instantâneo de "+fmtDate(s.day)+" transferido.");
+    guardarFicheiro("orcamento-"+s.day+".json", s.data, "application/json", function(){ toast("Histórico de "+fmtDate(s.day)+" guardado em ficheiro."); });
   }
   function snapshotsHtml(){
     var snaps = loadSnaps();
-    if(!snaps.length) return '<div class="hint" style="margin-top:8px;">Ainda não há instantâneos guardados.</div>';
+    if(!snaps.length) return '<div class="hint" style="margin-top:8px;">Ainda não há histórico guardado — aparece da próxima vez que abrir a aplicação.</div>';
     var h = '<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">';
     for(var i=snaps.length-1;i>=0;i--){ var s=snaps[i];
       h += '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 8px 6px 10px;">'+
@@ -2187,6 +2631,7 @@
   var SYNC_KEY = "meu-orcamento-sync-v1";
   var _sync = loadSyncCfg();
   var _syncing = false, _syncStatus = "", _pendingConflict = null, _autoTimer = null;
+  var _gistPerdido = null;   // o gist configurado deixou de existir — à espera de decisão do utilizador
 
   function loadSyncCfg(){ try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || {}; } catch(e){ return {}; } }
   function saveSyncCfg(){ try { localStorage.setItem(SYNC_KEY, JSON.stringify(_sync)); } catch(e){} }
@@ -2271,7 +2716,7 @@
     _syncing = true; setSyncStatus("A sincronizar…");
     try {
       var outer = null;
-      if (_sync.gistId) { try { outer = await gistRead(); } catch(e){ if (/\(404\)/.test(e.message)) { _sync.gistId=null; saveSyncCfg(); } else throw e; } }
+      if (_sync.gistId) { outer = await gistRead(); }
       var remoteRev = outer ? (outer.rev||0) : 0, base = _sync.baseRev||0, changed = localChangedSinceSync();
       if (outer && remoteRev > base) {
         if (!changed) {
@@ -2290,11 +2735,29 @@
         setSyncStatus("Já sincronizado ✓");
         if (!opts.silent) toast("Já está sincronizado.");
       }
-    } catch(e){ setSyncStatus("Erro: "+e.message); toast("Sincronização falhou: "+e.message); }
+    } catch(e){
+      // Gist não encontrado (apagado no GitHub, ID errado, ou o token deixou de lhe aceder).
+      // NUNCA criar outro em silêncio: com dois aparelhos ligados, cada um criaria o seu
+      // e os orçamentos passavam a divergir sem ninguém dar por isso.
+      if (/\(404\)/.test(e.message) && _sync.gistId) {
+        _gistPerdido = { id:_sync.gistId, jaSincronizou: (_sync.baseRev||0) > 0 };
+        setSyncStatus("Gist não encontrado ⚠️");
+        _syncing = false; gistLostModal(); return;
+      }
+      if (/\(401\)|\(403\)/.test(e.message)) {
+        setSyncStatus("Token recusado ⚠️");
+        toast("O GitHub recusou o token — pode ter expirado ou sido revogado.");
+        _syncing = false; return;
+      }
+      setSyncStatus("Erro: "+e.message); toast("Sincronização falhou: "+e.message);
+    }
     _syncing = false;
   }
   function scheduleAutoSync(){
-    if (!_sync.auto || !syncReady() || _syncing) return;
+    if (!_sync.auto || !syncReady() || _syncing || _gistPerdido) return;
+    // Mudar de mês ou de separador também chama save(). Sem dados novos não vale a pena
+    // ir à rede — evita um pedido ao GitHub por cada clique de navegação.
+    if (!localChangedSinceSync()) return;
     clearTimeout(_autoTimer);
     _autoTimer = setTimeout(function(){ syncNow({silent:true}); }, 4000);
   }
@@ -2307,11 +2770,40 @@
     document.body.appendChild(a); a.click();
     setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
   }
+  // No iPhone com a aplicação instalada no ecrã principal, o download silencioso falha.
+  // Nesse caso usa-se a partilha do sistema, que deixa guardar em Ficheiros, enviar por
+  // e-mail, mandar para o iCloud/OneDrive, etc. Nos restantes casos, download normal.
+  function podePartilharFicheiros(){
+    try { return !!(navigator.canShare && navigator.canShare({ files:[new File(["a"], "t.txt", {type:"text/plain"})] })); }
+    catch(e){ return false; }
+  }
+  function appInstaladaIOS(){
+    var ios = /iPad|iPhone|iPod/.test(navigator.userAgent || "") ||
+              (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    var standalone = (window.navigator.standalone === true) ||
+                     (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+    return ios && standalone;
+  }
+  function usaPartilha(){ return appInstaladaIOS() && podePartilharFicheiros(); }
+  function guardarFicheiro(nome, texto, tipo, aoConseguir){
+    if (usaPartilha()) {
+      try {
+        navigator.share({ files:[new File([texto], nome, {type:tipo})], title:nome })
+          .then(function(){ if(aoConseguir) aoConseguir("partilha"); })
+          .catch(function(){});                                  // o utilizador cancelou
+        return;
+      } catch(e){}
+    }
+    download(nome, texto, tipo);
+    if (aoConseguir) aoConseguir("download");
+  }
   function exportJSON(silent) {
-    download("orcamento-" + todayISO() + ".json", JSON.stringify(state, null, 2), "application/json");
-    markBackupDone();
-    save(); hideBackupBar(); renderSidebar();
-    if(!silent) toast("Cópia de segurança exportada.");
+    var nome = "orcamento-" + todayISO() + ".json";
+    guardarFicheiro(nome, JSON.stringify(state, null, 2), "application/json", function(via){
+      markBackupDone();
+      save(); hideBackupBar(); renderSidebar();
+      if(!silent) toast(via==="partilha" ? "Cópia de segurança guardada." : "Cópia de segurança exportada.");
+    });
   }
   function exportCSV() {
     var rows = [["Data","Conta","Beneficiário","Categoria","Nota","Saída","Entrada","Confirmada"]];
@@ -2322,8 +2814,7 @@
       rows.push([t.date, acc?acc.name:"", t.payee||"", cat, t.memo||"", (t.outflow||0).toFixed(2).replace(".",","), (t.inflow||0).toFixed(2).replace(".",","), t.cleared?"Sim":"Não"]);
     }
     var csv = rows.map(function(r){ return r.map(function(c){ var s=String(c); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";"); }).join("\n");
-    download("transacoes-" + todayISO() + ".csv", "﻿"+csv, "text/csv;charset=utf-8");
-    toast("CSV exportado.");
+    guardarFicheiro("transacoes-" + todayISO() + ".csv", "﻿"+csv, "text/csv;charset=utf-8", function(){ toast("CSV exportado."); });
   }
   // ---------- Importação de CSV ----------
   function splitCSVLine(line, d){
@@ -2488,8 +2979,6 @@
     function T(day,acc,payee,cid,out,inf,cl){ s.transactions.push({id:uid(),date:m+"-"+pad(day),accountId:acc,payee:payee,categoryId:cid,memo:"",outflow:out||0,inflow:inf||0,cleared:cl!==false}); }
     T(1, accCO.id, "Salário", INCOME, 0, 1850, true);
     T(2, accCO.id, "Senhorio", cRenda.id, 650, 0, true);
-    T(3, accPoup.id, "Transferência poupança", null, 0, 0, true); // placeholder skipped below
-    s.transactions.pop();
     T(4, accCO.id, "EDP", cLuz.id, 98.40, 0, true);
     T(5, accCO.id, "MEO", cNet.id, 44.99, 0, true);
     T(6, accCO.id, "Continente", cSuper.id, 86.75, 0, true);
@@ -2497,8 +2986,11 @@
     T(10, accCO.id, "Passe Navegante", cTransp.id, 40, 0, true);
     T(12, accCO.id, "Pingo Doce", cSuper.id, 62.30, 0, true);
     T(14, accCC.id, "Netflix", cLazer.id, 13.99, 0, false);
-    T(15, accCO.id, "Transferência p/ Poupança", cEmerg.id, 150, 0, true);
-    T(15, accPoup.id, "Depósito poupança", null, 0, 150, true);
+    // A Poupança é uma conta de orçamento: pôr lá dinheiro é uma TRANSFERÊNCIA, não uma despesa.
+    // O «Fundo de emergência» mantém o que lhe foi atribuído, e as contas continuam a bater certo.
+    var pTr=uid();
+    s.transactions.push({id:uid(), date:m+"-15", accountId:accCO.id,   payee:"↔ Poupança",       categoryId:null, memo:"", outflow:150, inflow:0,   cleared:true, transfer:pTr});
+    s.transactions.push({id:uid(), date:m+"-15", accountId:accPoup.id, payee:"↔ Conta à ordem",  categoryId:null, memo:"", outflow:0,   inflow:150, cleared:true, transfer:pTr});
     T(18, accCO.id, "Galp combustível", cTransp.id, 55, 0, true);
     T(20, accCC.id, "Zara", cRoupa.id, 49.90, 0, false);
     T(22, accCO.id, "Continente", cSuper.id, 74.20, 0, true);
@@ -2543,6 +3035,15 @@
   // Overlay click closes modal
   el("modalOverlay").addEventListener("click", function(e){ if(e.target===el("modalOverlay")) closeModal(); });
   document.addEventListener("keydown", function(e){ if(e.key==="Escape") closeModal(); });
+  // Prende o Tab dentro do modal aberto, para não se andar às cegas por trás do fundo escurecido.
+  document.addEventListener("keydown", function(e){
+    if (e.key!=="Tab" || !el("modalOverlay").classList.contains("open")) return;
+    var f=focusaveis(); if(!f.length) return;
+    var primeiro=f[0], ultimo=f[f.length-1];
+    if (el("modal").contains(document.activeElement)===false) { e.preventDefault(); primeiro.focus(); return; }
+    if (e.shiftKey && document.activeElement===primeiro) { e.preventDefault(); ultimo.focus(); }
+    else if (!e.shiftKey && document.activeElement===ultimo) { e.preventDefault(); primeiro.focus(); }
+  });
 
   // Assigned inline edit (change / enter)
   document.addEventListener("change", function(e){
@@ -2570,7 +3071,14 @@
     if ((_id==="txOut"||_id==="rcOut") && e.target.value){ var _o=el(_id==="txOut"?"txIn":"rcIn"); if(_o) _o.value=""; }
     else if ((_id==="txIn"||_id==="rcIn") && e.target.value){ var _o2=el(_id==="txIn"?"txOut":"rcOut"); if(_o2) _o2.value=""; }
     if (_id && _id.indexOf("spAmt")===0){ var _els=document.querySelectorAll("[id^='spAmt']"), _tot=0; for(var _qi=0;_qi<_els.length;_qi++){ var _vv=parseAmount(_els[_qi].value); if(!isNaN(_vv)) _tot+=_vv; } var _h=el("splitTotal"); if(_h) _h.textContent=fmt(_tot); }
-    if (e.target.id==="txSearch"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.q=e.target.value; clearTimeout(toastTimer); var v=e.target.value; setTimeout(function(){ if(el("txSearch")&&el("txSearch").value===v){ renderTransactions(); var s=el("txSearch"); if(s){ s.focus(); s.setSelectionRange(v.length,v.length); } } },250); }
+    if (e.target.id==="txSearch"){
+      state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.q=e.target.value;
+      var v=e.target.value;
+      clearTimeout(_searchTimer);   // temporizador próprio — antes limpava o do toast, que ficava preso no ecrã
+      _searchTimer=setTimeout(function(){
+        if(el("txSearch")&&el("txSearch").value===v){ renderTransactions(); var s=el("txSearch"); if(s){ s.focus(); s.setSelectionRange(v.length,v.length); } }
+      },250);
+    }
   });
 
   // ---------- Arrastar para reordenar (categorias e grupos) ----------
@@ -2632,6 +3140,20 @@
     if (state.settings.autoBackup !== false) { try { takeDailySnapshot(); } catch(e){} }
     setTimeout(maybeShowBackupReminder, 1200);
   })();
+
+  // ...e também ao SAIR (mudar de separador, fechar, ir para outra app no telemóvel).
+  // Só com a abertura, o trabalho da última sessão de cada dia ficava por guardar até
+  // à abertura seguinte — que podia nunca chegar, se o navegador limpasse o armazenamento.
+  // O takeDailySnapshot() substitui a entrada do próprio dia, por isso continua a ser
+  // um ponto por dia; o que muda é ser o estado mais recente desse dia, e não o inicial.
+  function snapshotAoSair(){
+    if (!state || state.settings.autoBackup === false) return;
+    try { takeDailySnapshot(); } catch(e){}
+  }
+  document.addEventListener("visibilitychange", function(){
+    if (document.visibilityState === "hidden") snapshotAoSair();   // o que funciona no iOS
+  });
+  window.addEventListener("pagehide", snapshotAoSair);
 
   // Sincronização na nuvem ao abrir (se estiver ligada e automática).
   if (_sync.auto && syncReady()) setTimeout(function(){ syncNow({silent:true}); }, 1500);
