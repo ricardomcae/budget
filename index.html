@@ -145,10 +145,10 @@
   .rta-banner.zero { background: linear-gradient(135deg, var(--primary), var(--accent2)); }
   .rta-banner.over { background: linear-gradient(135deg, #b91c1c, #dc2626); }
   .rta-amount { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
-  .rta-label { font-size: 12.5px; opacity: .92; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
+  .rta-label { font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
   .rta-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .rta-actions button { background: rgba(255,255,255,.18); color: #fff; border: 1px solid rgba(255,255,255,.28); padding: 8px 13px; border-radius: 8px; font-weight: 600; font-size: 12.5px; }
-  .rta-actions button:hover { background: rgba(255,255,255,.3); }
+  .rta-actions button { background: rgba(255,255,255,.94); color: var(--primary-dark); border: 1px solid transparent; padding: 8px 13px; border-radius: 8px; font-weight: 600; font-size: 12.5px; }
+  .rta-actions button:hover { background: #fff; }
 
   /* Aviso de divergência entre o orçamento e o dinheiro real nas contas */
   .integrity-bar { display: flex; align-items: center; gap: 12px; margin: 10px 26px 0; padding: 11px 16px; border-radius: 12px; background: var(--warning-soft); border: 1px solid var(--warning); color: var(--warning); font-size: 13px; font-weight: 600; flex-wrap: wrap; }
@@ -216,6 +216,7 @@
   .target-bar { height: 5px; border-radius: 4px; background: var(--neutral-soft); margin-top: 5px; overflow: hidden; width: 100%; }
   .target-bar > span { display: block; height: 100%; background: var(--primary); border-radius: 4px; transition: width .18s, background .18s; }
   .target-bar > span.full { background: var(--positive); }   /* alvo cumprido */
+  .target-bar > span.ok   { background: var(--primary); }    /* já reservou o deste mês, o alvo é que ainda vai a meio */
   .target-bar > span.warn { background: var(--warning); }    /* abaixo do alvo */
   .target-bar > span.neg  { background: var(--negative); }   /* excesso (negativo) */
   tr[data-drag] { cursor: grab; }
@@ -314,7 +315,7 @@
   .modal-head button.x { background: transparent; border: 0; font-size: 20px; color: var(--text-muted); width: 32px; height: 32px; border-radius: 8px; }
   .modal-head button.x:hover { background: var(--surface-2); color: var(--text); }
   .modal-body { padding: 20px 22px; }
-  .modal-foot { padding: 16px 22px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+  .modal-foot { flex-wrap: wrap; padding: 16px 22px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 10px; align-items: center; }
   .field { margin-bottom: 14px; }
   .field label { display: block; font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .4px; }
   .field input, .field select, .field textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); }
@@ -344,7 +345,7 @@
   .so-fone { display: none; }
   button { -webkit-tap-highlight-color: transparent; }
 
-  @media (max-width: 820px) {
+  @media (max-width: 820px), (max-height: 500px) {
     .app { grid-template-columns: 1fr; }
     /* Barra lateral -> barra de navegação inferior (estilo iOS) */
     .sidebar {
@@ -357,7 +358,7 @@
     }
     .brand, .side-section, .side-accounts, .add-acc, .side-total, .side-footer { display: none; }
     .nav { flex-direction: row; width: 100%; padding: 5px 3px; gap: 0; }
-    .nav button { flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 1px; font-size: 9px; letter-spacing: -.2px; border-radius: 9px; min-width: 0; }
+    .nav button { flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 1px; font-size: 10.5px; letter-spacing: -.3px; border-radius: 9px; min-width: 0; }
     .nav button .ic { font-size: 19px; width: auto; }
 
     /* Cabeçalho — respeita a área segura do iPhone (notch/Dynamic Island) na aplicação instalada */
@@ -399,7 +400,7 @@
       min-width: 0; max-width: 100%; width: 100%; box-sizing: border-box;
       text-align: start; line-height: 1.35; height: auto;
     }
-    .grid-2 > *, .toolbar > * { min-width: 0; }
+    .grid-2 > *, .toolbar > *, .split-line > * { min-width: 0; }
 
     /* Lista de transações: a nota vai quase sempre vazia e roubava largura, e o texto
        a partir em duas linhas deixava as alturas das linhas todas diferentes. */
@@ -416,9 +417,21 @@
     .modal { max-width: 100%; }
     .toolbar { gap: 8px; }
     .toolbar .search { min-width: 140px; flex: 1; }
-    .bar-row { grid-template-columns: 92px 1fr 68px; }
+    .bar-row { grid-template-columns: 88px 1fr 80px; }
+    .bar-val { white-space: nowrap; }
     .kpi-grid { grid-template-columns: 1fr 1fr; }
-    .undo-bar { bottom: calc(78px + env(safe-area-inset-bottom)); }
+    .kpi { padding: 14px 12px; }
+    .kpi .k-value { font-size: 19px; white-space: nowrap; }
+    .undo-bar, .toast { bottom: calc(78px + env(safe-area-inset-bottom)); }
+    /* Sem rato não há hover, e o dedo é grosso: a área sensível cresce para os 44px
+       que a Apple recomenda, sem mexer no tamanho visível do botão. */
+    .prio-btn, .cleared-dot, .cat-actions button, .row-actions button, .grp-add,
+    .modal-head button.x, .theme-toggle, .month-nav button.arrow { position: relative; }
+    .prio-btn::after, .cleared-dot::after, .cat-actions button::after, .row-actions button::after,
+    .grp-add::after, .modal-head button.x::after, .theme-toggle::after, .month-nav button.arrow::after {
+      content: ""; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px;
+      transform: translate(-50%, -50%); }
+    .btn.sm, .today-btn { min-height: 38px; }
   }
 </style>
 </head>
@@ -1104,7 +1117,7 @@
       // Mês da despesa (opcional). Quando já passou, avança sozinho para o período seguinte,
       // para o alvo continuar a funcionar ano após ano sem ser preciso mexer nele.
       var dueEff = tg.due || null, gd = 0;
-      while (dueEff && monthsBetween(m, dueEff) < 0 && gd++ < 240) dueEff = shiftMonth(dueEff, per);
+      while (dueEff && monthsBetween(m, dueEff) < 0 && gd++ < 4000) dueEff = shiftMonth(dueEff, per);
 
       var falta = round2(amt - avail);
       if (falta <= 0.005) {
@@ -1114,6 +1127,7 @@
       var fatia, restantes = per;
       if (dueEff) { var dm = monthsBetween(m, dueEff); restantes = dm>=0 ? dm+1 : 1; fatia = round2(falta/restantes); }
       else fatia = round2(amt/per);
+      if (falta > 0.005 && fatia < 0.01) fatia = 0.01;      // idem: não encravar nos últimos cêntimos
       // Nunca pedir mais do que falta para o total — é isto que faz o alvo "acabar".
       var needQ = Math.max(0, round2(Math.min(fatia - assignedThis, falta)));
       var lbl;
@@ -1123,15 +1137,22 @@
       } else {
         lbl = "✅ Reservado o deste mês — faltam "+fmt(falta)+" de "+fmt(amt)+(dueEff?(" até "+monthLabel(dueEff)):"");
       }
-      return { need:needQ, met: needQ<=0.005, progress: Math.max(0,Math.min(1, amt>0?avail/amt:0)), label: lbl };
+      return { need:needQ, met: falta<=0.005, doMes: needQ<=0.005, progress: Math.max(0,Math.min(1, amt>0?avail/amt:0)), label: lbl };
     }
     if (type==="byDate") {
       var target = tg.date || m;
       var diff = monthsBetween(m, target), left = diff>=0 ? diff+1 : 1;
-      var need3 = Math.max(0, round2((amt - avail) / left)), remain = round2(amt - avail);
-      return { need:need3, met: avail>=amt-0.005, progress: Math.max(0,Math.min(1, avail/amt)),
-        label: avail>=amt-0.005 ? ("🎯 Objetivo atingido ("+fmt(amt)+")")
-              : ("Juntar "+fmt(need3)+"/mês até "+monthLabel(target)+" — faltam "+fmt(remain)+" de "+fmt(amt)) };
+      var remain = round2(amt - avail);
+      // Descontar o que já foi atribuído ESTE mês, senão cada financiamento voltava a
+      // pedir uma fatia nova e atribuía a mais em silêncio.
+      var fatia3 = round2(remain / left);
+      if (remain > 0.005 && fatia3 < 0.01) fatia3 = 0.01;   // nunca deixar o alvo encravado nos últimos cêntimos
+      var need3 = Math.max(0, round2(Math.min(fatia3 - assignedThis, remain)));
+      var lbl3;
+      if (remain <= 0.005) lbl3 = "🎯 Objetivo atingido ("+fmt(amt)+")";
+      else if (need3 > 0.005) lbl3 = "Juntar "+fmt(need3)+"/mês até "+monthLabel(target)+" — faltam "+fmt(remain)+" de "+fmt(amt);
+      else lbl3 = "✅ Reservado o deste mês — faltam "+fmt(remain)+" de "+fmt(amt)+" até "+monthLabel(target);
+      return { need:need3, met: remain<=0.005, doMes: need3<=0.005, progress: Math.max(0,Math.min(1, avail/amt)), label: lbl3 };
     }
     return null;
   }
@@ -1245,6 +1266,8 @@
   //   "sem"     -> sem alvo, não há como saber o que é de mais
   function tetoDaCategoria(cat, m) {
     var tg = cat.target;
+    // A categoria do cartão precisa exatamente do que falta liquidar. O que passe disso é excedente.
+    if (cat.cardId) return { teto: Math.max(0, round2(-accountBalanceUpto(cat.cardId, m))), tipo:"alvo" };
     if (!tg || !(tg.amount > 0)) return { teto:null, tipo:"sem" };
     var t = tg.type || "monthly";
     if (t === "monthly" && tg.fund === "setAside") return { teto:null, tipo:"acumula" };
@@ -1258,7 +1281,6 @@
     var list = orderedCategories(), entries = [], total = 0;
     for (var i=0;i<list.length;i++){
       var c = list[i];
-      if (c.cardId) continue;                                  // a do cartão é automática
       var tem = availableFor(c.id, m);
       if (tem <= 0.005) continue;
       var t = tetoDaCategoria(c, m), excesso = 0;
@@ -1318,9 +1340,10 @@
 
   function renderRTA() {
     var rta = readyToAssign(state.ui.month);
+    var excedente = surplusPlan(state.ui.month, !!state.ui.surplusSemAlvo).total;
     var cls = rta > 0.005 ? "" : (rta < -0.005 ? "over" : "zero");
     var msg = rta > 0.005 ? "Pronto a atribuir" : (rta < -0.005 ? "Atribuiu mais do que tinha" : "Tudo atribuído — cada euro tem uma função 🎉");
-    var undoBtn = (state.ui.lastFunding && state.ui.lastFunding.month===state.ui.month) ? '<button data-action="undo-funding" title="Reverter o último financiamento">↩ Anular</button>' : '';
+    var undoBtn = (state.ui.lastFunding && state.ui.lastFunding.month===state.ui.month) ? '<button data-action="undo-funding" title="Reverter a última alteração">↩ Anular</button>' : '';
     var dv = integrityDelta(state.ui.month);
     var aviso = "";
     if (Math.abs(dv) >= 0.005) {
@@ -1343,9 +1366,9 @@
       '<div class="rta-banner ' + cls + '">' +
         '<div><div class="rta-amount">' + fmt(rta) + '</div><div class="rta-label">' + msg + '</div></div>' +
         '<div class="rta-actions">' +
-          '<button data-action="add-income">+ Registar rendimento</button>' +
           (rta < -0.005 ? '<button data-action="recover-preview">↩ Repor a zero…</button>'
                         : '<button data-action="fund-preview">🎯 Financiar alvos…</button>') +
+          (excedente < -0.005 ? '<button data-action="surplus-preview">🧹 Libertar '+fmt(-excedente)+'</button>' : '') +
           undoBtn +
         '</div>' +
       '</div>' + aviso + futuro;
@@ -1362,7 +1385,7 @@
     }
     var ti = targetInfo(cat, m);
     if (!ti) return "none";
-    return ti.met ? "ok" : "warn";
+    return (ti.doMes!=null ? ti.doMes : ti.met) ? "ok" : "warn";
   }
 
   // Filtros da barra do orçamento. Dentro de cada grupo é "ou"; entre os dois grupos é "e"
@@ -1441,8 +1464,9 @@
         var ti = targetInfo(cat, m);
         var cstat = catStatus(cat, m);
         if (ti) {
-          if (!ti.met && pillCls === "pos") pillCls = "warn";
-          var barCls = cstat==="neg" ? "neg" : (ti.met ? "full" : "warn");
+          var okMes = (ti.doMes!=null ? ti.doMes : ti.met);
+          if (!okMes && pillCls === "pos") pillCls = "warn";
+          var barCls = cstat==="neg" ? "neg" : (ti.met ? "full" : (okMes ? "ok" : "warn"));
           var barW = cstat==="neg" ? 100 : ti.progress*100;
           targetHtml = '<div class="target-bar"><span class="'+barCls+'" style="width:'+barW+'%"></span></div>' +
             '<div class="target-note">' + ti.label + '</div>';
@@ -1488,8 +1512,6 @@
       '<div class="toolbar">' +
         '<button class="btn primary hide-phone" data-action="add-tx">➕ Nova transação</button>' +
         '<button class="btn" data-action="add-group">+ Grupo</button>' +
-        (function(){ var ex=surplusPlan(m, !!state.ui.surplusSemAlvo).total;
-          return ex < -0.005 ? '<button class="btn" data-action="surplus-preview" title="Devolver ao Pronto a atribuir o que está acima dos alvos">🧹 Libertar '+fmt(-ex)+'</button>' : ''; })() +
         '<span class="muted hide-phone" style="font-size:12.5px;margin-inline-start:6px;">Mostrar:</span>' +
         fBtn('f-ok','budget-filter','ok',bf.ok,'🟢','Alvo cumprido','Só as categorias com o alvo cumprido') +
         fBtn('f-warn','budget-filter','warn',bf.warn,'🟡','Abaixo do alvo','Só as categorias com o alvo por cumprir') +
@@ -2474,7 +2496,9 @@
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li><b>🎯 Financiar alvos</b> mostra o impacto antes de aplicar, e pode <b>Anular</b> a seguir. «Repartir o que está por atribuir» nunca o deixa negativo, e reparte de três maneiras: <b>por prioridade</b> (serve as Altas primeiro), <b>proporcional</b> (todas ficam igualmente perto do alvo — quem precisa de mais leva mais) ou <b>pela ordem da lista</b> (completa de cima para baixo até acabar).</li>'+
         '<li><b>↩ Repor a zero:</b> se atribuir mais do que tem, o «Pronto a atribuir» fica <b>negativo</b> e aparece este botão. Retira das categorias que têm dinheiro até voltar a zero, com as mesmas três maneiras de repartir — mas ao contrário: <b>por prioridade</b> tira primeiro das <b>Baixas</b>, para proteger as Altas. Nenhuma categoria fica negativa, e pode <b>Anular</b> a seguir.</li>'+
-        '<li><b>🧹 Libertar excedente:</b> aparece na barra do orçamento quando alguma categoria tem <b>mais do que o alvo dela pede</b> — por exemplo «repor até 200 €» com 500 € lá dentro. Mostra primeiro o que ia acontecer, e só liberta se confirmar. Estar <b>adiantado</b> num objetivo com data não conta como excedente: se quer 3.000 € e já juntou 2.000 €, o dinheiro é seu e fica onde está — esticar o prazo apenas <b>baixa a mensalidade</b>. As de «reservar todos os meses» nunca entram, porque aí o dinheiro é mesmo para acumular.</li>'+
+        '<li><b>🧹 Libertar excedente:</b> aparece na faixa do «Pronto a atribuir», ao lado das outras, quando alguma categoria tem <b>mais do que o alvo dela pede</b> — por exemplo «repor até 200 €» com 500 € lá dentro. No <b>cartão de crédito</b>, o teto é o que falta liquidar: se atribuiu 500 € e só deve 200 €, liberta os 300 € de folga. Mostra primeiro o que ia acontecer, e só liberta se confirmar. Estar <b>adiantado</b> num objetivo com data não conta como excedente: se quer 3.000 € e já juntou 2.000 €, o dinheiro é seu e fica onde está — esticar o prazo apenas <b>baixa a mensalidade</b>. As de «reservar todos os meses» nunca entram, porque aí o dinheiro é mesmo para acumular.</li>'+
+        '<li><b>Esc</b> dentro de um campo desfaz o que estava a escrever e larga o campo, sem gravar. Dentro de uma janela, é preciso carregar duas vezes: a primeira sai do campo, a segunda fecha a janela.</li>'+
+        '<li>O <b>↩ Anular</b> da faixa reverte a última alteração aos valores atribuídos — tanto as operações em bloco como um valor que tenha mudado à mão numa linha.</li>'+
         '<li><b>Prioridade</b> ▲ ● ▼ à frente de cada categoria, muda com um clique. Ao financiar por prioridade serve as <b>Altas</b> primeiro; entre iguais, manda a <b>ordem da lista</b>.</li>'+
         '<li><b>↔</b> move dinheiro entre categorias (ou de/para o «Pronto a atribuir») sem mexer no rendimento.</li>'+
       '</ul>'+
@@ -3070,7 +3094,6 @@
     "archived-menu": function(){ archivedModal(); },
 
     "add-tx": function(_id, ds){ txModal(null, ds && ds.account); },
-    "add-income": function(){ var t={ date: state.ui.month+"-15", accountId:(state.accounts[0]||{}).id, payee:"Rendimento", categoryId:INCOME, memo:"", outflow:0, inflow:0, cleared:true }; txModal(t); },
     "edit-tx": function(id){
       var t=txById(id);
       if(t&&t.transfer){ transferModal({editPair:t.transfer}); return; }   // edita o par, não a metade
@@ -4002,7 +4025,22 @@
 
   // Clicar no fundo escurecido fecha a janela
   el("modalOverlay").addEventListener("click", function(e){ if(e.target===el("modalOverlay")) closeModal(); });
-  document.addEventListener("keydown", function(e){ if(e.key==="Escape") closeModal(); });
+  document.addEventListener("keydown", function(e){
+    if (e.key !== "Escape") return;
+    // Dentro de um campo, o Esc desfaz o que se estava a escrever e larga o campo —
+    // só o segundo Esc é que fecha a janela.
+    var t = e.target, tag = t && t.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+      if (t.hasAttribute("data-prev")) t.value = t.getAttribute("data-prev");
+      t.blur(); return;
+    }
+    closeModal();
+  });
+  // Ao entrar num campo guarda-se o valor de partida, para o Esc o poder repor.
+  document.addEventListener("focusin", function(e){
+    var t = e.target, tag = t && t.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") t.setAttribute("data-prev", t.value);
+  });
   // Prende o Tab dentro do modal aberto, para não se andar às cegas por trás do fundo escurecido.
   document.addEventListener("keydown", function(e){
     if (e.key!=="Tab" || !el("modalOverlay").classList.contains("open")) return;
@@ -4020,8 +4058,10 @@
       var cid = inp.getAttribute("data-assign");
       var v = parseAmount(inp.value); v = isNaN(v)?0:round2(v);
       var key = cid + "|" + state.ui.month;
+      var antes = state.assignments.hasOwnProperty(key) ? state.assignments[key] : null;
       if (v===0) delete state.assignments[key]; else state.assignments[key]=v;
-      state.ui.lastFunding=null;
+      // Guardar o valor anterior para o «↩ Anular» da faixa também servir as edições à mão.
+      state.ui.lastFunding = { month: state.ui.month, entries:[{ key:key, prev:antes }] };
       save(); render(); return;
     }
     if (e.target.id==="txFilterAcc"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.account=e.target.value||null; render(); }
