@@ -195,6 +195,12 @@
   tr.cat-row:last-child td { border-bottom: 0; }
   .cat-name-cell { display: flex; align-items: center; gap: 10px; }
   .cat-name { font-weight: 600; }
+  /* Prioridade: sempre visível e clicável (alta → normal → baixa → alta). */
+  .prio-btn { flex: 0 0 auto; width: 22px; height: 22px; padding: 0; border-radius: 6px; border: 1px solid transparent; background: transparent; font-size: 11px; line-height: 1; display: inline-grid; place-items: center; transition: background .12s, border-color .12s; }
+  .prio-btn:hover { border-color: var(--border); background: var(--surface-2); }
+  .prio-btn.p-alta { color: var(--primary); font-size: 12px; }
+  .prio-btn.p-normal { color: var(--text-muted); opacity: .4; }
+  .prio-btn.p-baixa { color: var(--text-muted); }
   .cat-name-cell .cat-actions { display: flex; gap: 4px; opacity: 0; }
   tr.cat-row:hover .cat-actions { opacity: 1; }
   .cat-actions button { background: transparent; border: 0; color: var(--text-muted); font-size: 13px; padding: 2px 5px; border-radius: 5px; }
@@ -1023,6 +1029,8 @@
   }
   var PRIO_RANK = { alta:0, normal:1, baixa:2 };
   var PRIO_LABEL = { alta:"Alta", normal:"Normal", baixa:"Baixa" };
+  var PRIO_ICON  = { alta:"▲", normal:"●", baixa:"▼" };
+  var PRIO_CICLO = ["alta","normal","baixa"];        // cada clique desce um nível; do fundo volta ao topo
   // mode "full" = cobre a totalidade dos alvos em falta.
   // mode "cap"  = financia só até esgotar o Pronto a atribuir, segundo a estratégia:
   //   "order"    – pela ordem do orçamento (enche cada uma até acabar o dinheiro)
@@ -1238,9 +1246,11 @@
             '<div class="target-note">Excesso de '+fmt(Math.abs(avail))+' — atribua mais a esta categoria</div>';
         }
         var prio = cat.priority||"normal";
-        var prioMark = prio==="alta" ? ' <span class="tag" title="Prioridade alta">⬆</span>' : (prio==="baixa" ? ' <span class="tag" title="Prioridade baixa">⬇</span>' : '');
+        var prioBtn = '<button class="prio-btn p-'+prio+'" data-action="cycle-prio" data-id="'+cat.id+'"'+
+          ' title="Prioridade '+PRIO_LABEL[prio].toLowerCase()+' — clique para mudar"'+
+          ' aria-label="Prioridade de '+esc(cat.name)+': '+PRIO_LABEL[prio]+'. Clique para mudar.">'+PRIO_ICON[prio]+'</button>';
         rows += '<tr class="cat-row" data-id="'+cat.id+'" draggable="true" data-drag="cat" data-drag-id="'+cat.id+'"><td>' +
-          '<div class="cat-name-cell"><span class="cat-name">'+esc(cat.name)+'</span>' + prioMark +
+          '<div class="cat-name-cell">' + prioBtn + '<span class="cat-name">'+esc(cat.name)+'</span>' +
           '<span class="cat-actions">' +
             '<button data-action="move-cat-up" data-id="'+cat.id+'" title="Subir">▲</button>' +
             '<button data-action="move-cat-down" data-id="'+cat.id+'" title="Descer">▼</button>' +
@@ -1748,7 +1758,7 @@
         '<div class="field"><label>Nota (opcional)</label><input id="catNote" maxlength="300" value="'+esc(cat.note||"")+'" placeholder="Ex.: rever no fim do mês"></div>'+
         '<div class="field"><label>Prioridade</label><select id="catPrio">'+
           ['alta','normal','baixa'].map(function(p){ return '<option value="'+p+'"'+((cat.priority||"normal")===p?" selected":"")+'>'+PRIO_LABEL[p]+'</option>'; }).join("")+
-        '</select><div class="hint">Usada ao financiar alvos «Até ao disponível» com a estratégia por prioridade.</div></div>'+
+        '</select><div class="hint">Usada ao financiar alvos «Até ao disponível» com a estratégia por prioridade. No orçamento também pode carregar no ▲ ● ▼ à frente do nome para mudar sem abrir esta janela.</div></div>'+
         '<div class="field"><label>Tipo de alvo</label><select id="catTType">'+
           opt("none","— Sem alvo —")+
           opt("monthly","Mensal — ter/reservar todos os meses")+
@@ -2093,7 +2103,7 @@
         '<li><b>Financiar alvos</b> mostra primeiro o impacto (quanto <b>sobra</b> ou fica <b>negativo</b>) e só aplica ao <b>Confirmar</b>. Pode <b>Anular</b> a seguir. A opção <b>«Até ao disponível»</b> financia por ordem, sem ficar negativo. O 🎯 de cada linha financia uma só categoria.</li>'+
         '<li><b>Mover dinheiro:</b> o <b>↔</b> numa categoria transfere saldo disponível para outra categoria (ou de/para o «Pronto a atribuir») sem tocar no rendimento.</li>'+
         '<li><b>Reordenar:</b> as setas <b>▲▼</b> mudam a ordem, ou <b>arraste</b> a linha da categoria/grupo para a posição pretendida (arrastar uma categoria para outro grupo também a muda de grupo).</li>'+
-        '<li><b>Prioridade:</b> cada categoria pode ser <b>Alta</b>, <b>Normal</b> ou <b>Baixa</b>. Ao financiar «Até ao disponível» pode repartir <b>por ordem</b>, <b>por prioridade</b> (enche primeiro as Altas) ou <b>proporcionalmente</b>.</li>'+
+        '<li><b>Prioridade:</b> cada categoria pode ser <b>Alta ▲</b>, <b>Normal ●</b> ou <b>Baixa ▼</b>. O ícone aparece à frente do nome no orçamento e <b>muda com um clique</b> — cada clique desce um nível e, do fundo, volta ao topo. Também se pode mudar no ✎ da categoria. Serve para financiar alvos «Até ao disponível» com a estratégia <b>por prioridade</b>, que enche primeiro as Altas, depois as Normais, depois as Baixas.</li>'+
         '<li><b>Beneficiários:</b> à medida que vai registando, a app aprende. Ao escrever no campo <b>Beneficiário</b> aparecem os que já usou, e ao escolher um a <b>categoria</b> é preenchida com a que lhe deu da última vez — se ainda não tiver escolhido nenhuma. Pode sempre trocar.</li>'+
         '<li><b>Importar do banco:</b> em <b>Dados e cópias</b> pode importar um <b>.csv</b> com as transações; a estrutura esperada está explicada nesse ecrã. Na pré-visualização, as linhas que já existem (mesma conta, data e valor) aparecem marcadas como <b>«já existe»</b> e são <b>saltadas por predefinição</b> — assim pode importar extratos que se sobrepõem sem duplicar nada.</li>'+
         '<li><b>Anular:</b> o botão <b>↩ Anular</b> repõe as últimas <b>5</b> ações (eliminações, importações, duplicações).</li>'+
@@ -2679,6 +2689,12 @@
       closeModal(); save(); render(); toast("Movido "+fmt(amt)+" — pode anular no topo.");
     },
 
+    "cycle-prio": function(id){
+      var c=categoryById(id); if(!c || c.cardId) return;
+      var i=PRIO_CICLO.indexOf(c.priority||"normal");
+      c.priority=PRIO_CICLO[(i+1)%PRIO_CICLO.length];
+      save(); render(); toast("Prioridade "+PRIO_LABEL[c.priority].toLowerCase()+" — "+c.name);
+    },
     "move-cat-up": function(id){ moveCategory(id,-1); save(); render(); },
     "move-cat-down": function(id){ moveCategory(id, 1); save(); render(); },
     "move-group-up": function(id){ moveGroup(id,-1); save(); render(); },
