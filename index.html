@@ -1193,6 +1193,52 @@
     return { entries:entries, total:total, rtaBefore:round2(rta), rtaAfter:round2(rta-total) };
   }
 
+  // Operação simétrica do financiamento: quando se atribuiu mais do que havia, retira
+  // das categorias até o «Pronto a atribuir» voltar a zero.
+  // A diferença de fundo é o limite de cada categoria — aqui é o que ela TEM, não o que lhe falta.
+  // E por prioridade tira-se primeiro das BAIXAS, para proteger as Altas: ao contrário do
+  // financiamento, onde as Altas são as primeiras a ser servidas.
+  function recoverPlan(m, strategy) {
+    strategy = strategy || "priority";
+    var rta = readyToAssign(m), falta = round2(-rta);
+    if (falta <= 0.005) return { entries:[], total:0, rtaBefore:rta, rtaAfter:rta, disponivel:0 };
+
+    var list = orderedCategories(), podem = [], totalTem = 0;
+    for (var i=0;i<list.length;i++){
+      var c = list[i];
+      if (c.cardId) continue;                        // a do cartão é automática, não se mexe
+      var tem = availableFor(c.id, m);
+      if (tem > 0.005) { podem.push({ catId:c.id, name:c.name, tem:round2(tem), prio:(c.priority||"normal") }); totalTem += tem; }
+    }
+    totalTem = round2(totalTem);
+    var entries = [];
+    if (strategy === "prop") {
+      if (totalTem <= falta + 0.005) entries = podem.map(function(p){ return {catId:p.catId, name:p.name, add:round2(-p.tem), prio:p.prio}; });
+      else {
+        entries = podem.map(function(p){ return {catId:p.catId, name:p.name, add:round2(-falta*(p.tem/totalTem)), prio:p.prio}; });
+        var soma=0; entries.forEach(function(e){ soma+=e.add; });
+        var dif = round2(-falta - soma);
+        if (entries.length && Math.abs(dif) >= 0.005) entries[entries.length-1].add = round2(entries[entries.length-1].add + dif);
+        entries = entries.filter(function(e){ return e.add < -0.005; });
+      }
+    } else {
+      var ordem = podem.slice();
+      if (strategy === "priority") ordem.sort(function(a,b){ return (PRIO_RANK[b.prio]==null?1:PRIO_RANK[b.prio]) - (PRIO_RANK[a.prio]==null?1:PRIO_RANK[a.prio]); });
+      else ordem.reverse();                          // pela ordem da lista, mas de baixo para cima
+      var resta = falta;
+      for (var j=0;j<ordem.length;j++){
+        if (resta <= 0.005) break;
+        var tira = Math.min(ordem[j].tem, round2(resta));
+        if (tira <= 0.005) continue;
+        entries.push({catId:ordem[j].catId, name:ordem[j].name, add:round2(-tira), prio:ordem[j].prio});
+        resta = round2(resta - tira);
+      }
+    }
+    var total=0; entries.forEach(function(e){ total += e.add; });
+    total = round2(total);
+    return { entries:entries, total:total, rtaBefore:rta, rtaAfter:round2(rta - total), disponivel:totalTem };
+  }
+
   // ---------- Desenho do ecrã ----------
   function applyTheme(){ if (document.body) document.body.classList.toggle("theme-rose", !!(state.settings && state.settings.theme==="rose")); }
   function render() {
@@ -1240,7 +1286,7 @@
   function renderRTA() {
     var rta = readyToAssign(state.ui.month);
     var cls = rta > 0.005 ? "" : (rta < -0.005 ? "over" : "zero");
-    var msg = rta > 0.005 ? "Pronto a atribuir" : (rta < -0.005 ? "Atribuiu a mais — reduza nalguma categoria" : "Tudo atribuído — cada euro tem uma função 🎉");
+    var msg = rta > 0.005 ? "Pronto a atribuir" : (rta < -0.005 ? "Atribuiu mais do que tinha" : "Tudo atribuído — cada euro tem uma função 🎉");
     var undoBtn = (state.ui.lastFunding && state.ui.lastFunding.month===state.ui.month) ? '<button data-action="undo-funding" title="Reverter o último financiamento">↩ Anular</button>' : '';
     var dv = integrityDelta(state.ui.month);
     var aviso = "";
@@ -1265,7 +1311,8 @@
         '<div><div class="rta-amount">' + fmt(rta) + '</div><div class="rta-label">' + msg + '</div></div>' +
         '<div class="rta-actions">' +
           '<button data-action="add-income">+ Registar rendimento</button>' +
-          '<button data-action="fund-preview">🎯 Financiar alvos…</button>' +
+          (rta < -0.005 ? '<button data-action="recover-preview">↩ Repor a zero…</button>'
+                        : '<button data-action="fund-preview">🎯 Financiar alvos…</button>') +
           undoBtn +
         '</div>' +
       '</div>' + aviso + futuro;
@@ -2391,6 +2438,7 @@
       sec("Distribuir o dinheiro")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li><b>🎯 Financiar alvos</b> mostra o impacto antes de aplicar, e pode <b>Anular</b> a seguir. «Repartir o que está por atribuir» nunca o deixa negativo, e reparte de três maneiras: <b>por prioridade</b> (serve as Altas primeiro), <b>proporcional</b> (todas ficam igualmente perto do alvo — quem precisa de mais leva mais) ou <b>pela ordem da lista</b> (completa de cima para baixo até acabar).</li>'+
+        '<li><b>↩ Repor a zero:</b> se atribuir mais do que tem, o «Pronto a atribuir» fica <b>negativo</b> e aparece este botão. Retira das categorias que têm dinheiro até voltar a zero, com as mesmas três maneiras de repartir — mas ao contrário: <b>por prioridade</b> tira primeiro das <b>Baixas</b>, para proteger as Altas. Nenhuma categoria fica negativa, e pode <b>Anular</b> a seguir.</li>'+
         '<li><b>Prioridade</b> ▲ ● ▼ à frente de cada categoria, muda com um clique. Ao financiar por prioridade serve as <b>Altas</b> primeiro; entre iguais, manda a <b>ordem da lista</b>.</li>'+
         '<li><b>↔</b> move dinheiro entre categorias (ou de/para o «Pronto a atribuir») sem mexer no rendimento.</li>'+
       '</ul>'+
@@ -2478,6 +2526,49 @@
     seg.addEventListener("click", function(e){ var b=e.target.closest("button"); if(!b) return; state.ui._fundMode=b.getAttribute("data-m"); fundModal(); });
     var fs=el("fundStrat");
     if(fs) fs.addEventListener("change", function(){ state.ui.fundStrategy=fs.value; save(); fundModal(); });
+  }
+
+  function recoverModal() {
+    var m = state.ui.month;
+    var strat = state.ui.recoverStrategy || "priority";
+    var plan = recoverPlan(m, strat);
+    var falta = round2(-plan.rtaBefore);
+    var chega = plan.rtaAfter > -0.005;
+
+    var rows;
+    if (plan.entries.length) rows = plan.entries.map(function(e){
+      var pl = (e.prio && e.prio!=="normal") ? ' <span class="tag">('+PRIO_LABEL[e.prio]+')</span>' : '';
+      return '<div style="display:flex;justify-content:space-between;padding:7px 2px;border-bottom:1px solid var(--border);">'+
+        '<span>'+esc(e.name)+pl+'</span><b class="tx-amt out" style="font-variant-numeric:tabular-nums;">'+fmt(e.add)+'</b></div>';
+    }).join("");
+    else rows = '<div class="muted" style="padding:14px 0;text-align:center;">Não há categorias com dinheiro disponível para retirar.</div>';
+
+    var undoBtn = (state.ui.lastFunding && state.ui.lastFunding.month===m) ? '<button class="btn" data-action="undo-funding">↩ Reverter último</button>' : '<span></span>';
+    openModal(
+      '<div class="modal-head"><h2>↩ Repor a zero — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body">'+
+        '<p class="muted" style="margin-top:0;">Atribuiu <b>'+fmt(falta)+'</b> a mais do que tinha. Isto retira esse valor das categorias que têm dinheiro disponível, até o «Pronto a atribuir» voltar a zero. Nenhuma categoria fica negativa.</p>'+
+        '<div class="field"><label>De onde tirar primeiro</label>'+
+        '<select id="recStrat">'+
+          '<option value="priority"'+(strat==="priority"?" selected":"")+'>Por prioridade — tira primeiro das Baixas, para proteger as Altas</option>'+
+          '<option value="prop"'+(strat==="prop"?" selected":"")+'>Proporcional — todas perdem a mesma percentagem do que têm</option>'+
+          '<option value="order"'+(strat==="order"?" selected":"")+'>Pela ordem da lista — tira de baixo para cima</option>'+
+        '</select></div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;text-align:center;">'+
+          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">Em falta</div><div class="k-value neg" style="font-size:17px;">'+fmt(plan.rtaBefore)+'</div></div>'+
+          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">A retirar</div><div class="k-value" style="font-size:17px;">'+fmt(plan.total)+'</div></div>'+
+          '<div class="kpi" style="padding:12px 8px;"><div class="k-label">Depois</div><div class="k-value '+(chega?"":"neg")+'" style="font-size:17px;">'+fmt(plan.rtaAfter)+'</div></div>'+
+        '</div>'+
+        '<div class="hint" style="margin-bottom:12px;">'+(chega
+          ? 'Fica exatamente a zero. 🎯'
+          : ('⚠️ As categorias só têm '+fmt(plan.disponivel)+' disponíveis ao todo — mesmo esvaziando-as fica em '+fmt(plan.rtaAfter)+'. Falta registar rendimento.'))+'</div>'+
+        '<div style="max-height:220px;overflow:auto;">'+rows+'</div>'+
+      '</div>'+
+      '<div class="modal-foot">'+undoBtn+
+        '<span><button class="btn" data-action="close">Cancelar</button> '+
+        (plan.entries.length?'<button class="btn primary" data-action="apply-recover">Confirmar</button>':'')+'</span></div>');
+    var rs=el("recStrat");
+    if(rs) rs.addEventListener("change", function(){ state.ui.recoverStrategy=rs.value; save(); recoverModal(); });
   }
 
   var RTA_ID = "__rta__";
@@ -3075,6 +3166,20 @@
       save(); render(); toast("Alvo financiado — pode anular no topo.");
     },
     "fund-preview": function(){ if(!state.categories.length){ toast("Crie categorias com alvos primeiro."); return; } state.ui._fundMode="full"; fundModal(); },
+    "recover-preview": function(){ recoverModal(); },
+    "apply-recover": function(){
+      var m=state.ui.month, plan=recoverPlan(m, state.ui.recoverStrategy);
+      if(!plan.entries.length){ toast("Não há de onde tirar."); return; }
+      var snap=[];
+      for(var i=0;i<plan.entries.length;i++){
+        var e=plan.entries[i], key=e.catId+"|"+m;
+        snap.push({key:key, prev: state.assignments.hasOwnProperty(key)?state.assignments[key]:null});
+        state.assignments[key]=round2((state.assignments[key]||0)+e.add);
+      }
+      state.ui.lastFunding={month:m, entries:snap};
+      closeModal(); save(); render();
+      toast("Retirado "+fmt(-plan.total)+" de "+plan.entries.length+" categorias.");
+    },
     "apply-funding": function(){
       var m=state.ui.month, mode=state.ui._fundMode||"full";
       var plan=fundingPlan(mode,m,state.ui.fundStrategy);
