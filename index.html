@@ -280,8 +280,13 @@
   .report-block h3 { margin: 0 0 16px; font-size: 15px; }
   .bar-row { display: grid; grid-template-columns: 150px 1fr 90px; align-items: center; gap: 12px; margin-bottom: 10px; }
   .bar-row .b-name { font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .bar-track { background: var(--surface-2); border-radius: 6px; height: 22px; overflow: hidden; }
+  .bar-track { background: var(--surface-2); border-radius: 6px; height: 22px; overflow: hidden; position: relative; }
   .bar-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--primary), var(--accent2)); min-width: 2px; }
+  /* Valor dentro da barra. O halo na cor do cartão mantém-no legível por cima do
+     preenchimento ou fora dele, sem depender de a barra ser clara ou escura. */
+  .bar-num { position: absolute; inset-inline-end: 7px; top: 0; line-height: 22px; font-size: 11px; font-weight: 700;
+    font-variant-numeric: tabular-nums; color: var(--text); pointer-events: none;
+    text-shadow: 0 0 3px var(--surface), 0 0 3px var(--surface), 0 0 2px var(--surface); }
   .bar-val { text-align: end; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 12.5px; }
   .rep-chips { display: flex; flex-wrap: wrap; gap: 7px; }
   .rep-chip { border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); padding: 5px 12px; border-radius: 20px; font-size: 12.5px; font-weight: 600; }
@@ -423,7 +428,6 @@
 
     <div class="side-footer">
       <button data-action="add-tx"><span>➕</span> Nova transação</button>
-      <button data-action="transfer"><span>↔</span> Transferir</button>
       <button data-action="payees"><span>🏷️</span> Beneficiários</button>
       <button data-action="data-menu" id="btnData"><span>💾</span> Dados e cópias</button>
       <button data-action="help"><span>❓</span> Como funciona</button>
@@ -890,12 +894,13 @@
     return count;
   }
   function isoOf(dt){ return dt.getFullYear()+"-"+pad(dt.getMonth()+1)+"-"+pad(dt.getDate()); }
-  var FREQ_LABEL = { weekly:"Semanal", biweekly:"Quinzenal", monthly:"Mensal", yearly:"Anual" };
+  var FREQ_LABEL = { weekly:"Semanal", biweekly:"Quinzenal", monthly:"Mensal", semiannual:"Semestral", yearly:"Anual" };
   function advanceDate(iso, freq){
     var p=iso.split("-"), y=+p[0], mo=+p[1]-1, d=+p[2];
     if(freq==="weekly") return isoOf(new Date(y,mo,d+7));
     if(freq==="biweekly") return isoOf(new Date(y,mo,d+14));
     if(freq==="yearly"){ var lastY=new Date(y+1,mo+1,0).getDate(); return (y+1)+"-"+pad(mo+1)+"-"+pad(Math.min(d,lastY)); }
+    if(freq==="semiannual"){ var sm=mo+6, sy=y; if(sm>11){ sm-=12; sy++; } var lastS=new Date(sy,sm+1,0).getDate(); return sy+"-"+pad(sm+1)+"-"+pad(Math.min(d,lastS)); }
     var nm=mo+1, ny=y; if(nm>11){nm-=12;ny++;}
     var lastM=new Date(ny,nm+1,0).getDate();
     return ny+"-"+pad(nm+1)+"-"+pad(Math.min(d,lastM));
@@ -1331,7 +1336,10 @@
           (filtering ? ('A mostrar '+nShown+' de '+nTotal+' categorias') : 'Clique num valor em <b>Atribuído</b> para editar') + '</span>' +
       '</div>' +
       '<div class="budget-card"><table class="budget"><thead><tr>' +
-        '<th class="first">Categoria</th><th>Atribuído</th><th>Atividade</th><th>Disponível</th>' +
+        '<th class="first">Categoria'+
+          '<button class="btn ghost sm" data-action="expand-all" title="Abrir todos os grupos" aria-label="Abrir todos os grupos" style="padding:1px 5px;margin-inline-start:8px;">⊕</button>'+
+          '<button class="btn ghost sm" data-action="collapse-all" title="Fechar todos os grupos" aria-label="Fechar todos os grupos" style="padding:1px 5px;">⊖</button>'+
+        '</th><th>Atribuído</th><th>Atividade</th><th>Disponível</th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   }
 
@@ -1424,32 +1432,47 @@
         '<button data-action="delete-tx" data-id="'+t.id+'" title="Eliminar">🗑</button></td></tr>';
   }
 
+  // Períodos prontos, para não ser preciso andar a escolher datas à mão no dia a dia.
+  var PERIODOS = [["","Sempre"],["mes","Este mês"],["mesant","Mês passado"],["m3","Últimos 3 meses"],
+                  ["m12","Últimos 12 meses"],["ano","Este ano"],["custom","Intervalo à escolha…"]];
+  function periodoDatas(per){
+    var hoje=todayISO(), mAtual=nowMonthKey();
+    if (per==="mes")    return { from:mAtual+"-01", to:hoje };
+    if (per==="mesant") { var a=shiftMonth(mAtual,-1), p=a.split("-"); return { from:a+"-01", to:a+"-"+pad(new Date(+p[0], +p[1], 0).getDate()) }; }
+    if (per==="m3")     return { from:shiftMonth(mAtual,-2)+"-01", to:hoje };
+    if (per==="m12")    return { from:shiftMonth(mAtual,-11)+"-01", to:hoje };
+    if (per==="ano")    return { from:mAtual.slice(0,4)+"-01-01", to:hoje };
+    return null;
+  }
   function renderTransactions() {
     var f = state.ui.txFilter || {};
     var list = state.transactions.slice().sort(function(a,b){ return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+    var jan = (f.per && f.per!=="custom") ? periodoDatas(f.per) : null;
+    var de = jan ? jan.from : f.from, ate = jan ? jan.to : f.to;
     if (f.account) list = list.filter(function(t){return t.accountId===f.account;});
     if (f.category) list = list.filter(function(t){return t.categoryId===f.category;});
-    if (f.from) list = list.filter(function(t){return t.date>=f.from;});
-    if (f.to) list = list.filter(function(t){return t.date<=f.to;});
+    if (de) list = list.filter(function(t){return t.date>=de;});
+    if (ate) list = list.filter(function(t){return t.date<=ate;});
     if (f.q) { var q=f.q.toLowerCase(); list = list.filter(function(t){ return (t.payee||"").toLowerCase().indexOf(q)>=0 || (t.memo||"").toLowerCase().indexOf(q)>=0; }); }
 
+    var perOpts = PERIODOS.map(function(p){ return '<option value="'+p[0]+'"'+((f.per||"")===p[0]?" selected":"")+'>'+p[1]+'</option>'; }).join("");
     var accOpts = '<option value="">Todas as contas</option>' + state.accounts.map(function(a){return '<option value="'+a.id+'"'+(f.account===a.id?" selected":"")+'>'+esc(a.name)+'</option>';}).join("");
     var catOpts = '<option value="">Todas as categorias</option><option value="'+INCOME+'"'+(f.category===INCOME?" selected":"")+'>Rendimento</option>' +
       state.categories.filter(function(c){return !c.cardId;}).map(function(c){return '<option value="'+c.id+'"'+(f.category===c.id?" selected":"")+'>'+esc(c.name)+'</option>';}).join("");
 
     // Chega-se aqui filtrado a partir da atividade de uma categoria — sem isto não há
     // forma óbvia de voltar a ver tudo.
-    var temFiltro = !!(f.account || f.category || f.from || f.to || (f.q||"").trim());
+    var temFiltro = !!(f.account || f.category || f.per || f.from || f.to || (f.q||"").trim());
     var head = '<div class="toolbar">'+
-      // No telemóvel estes três já estão na barra de cima (➕ e 🏷️); aqui só ocupavam espaço.
+      // O «Dividir» e o «Beneficiários» saíram daqui: o primeiro está dentro da nova
+      // transação, o segundo na barra lateral (e no 🏷️ do topo, no telemóvel).
       '<button class="btn primary hide-phone" data-action="add-tx">➕ Nova transação</button>'+
-      '<button class="btn" data-action="add-split">➗ Dividir</button>'+
-      '<button class="btn hide-phone" data-action="payees">🏷️ Beneficiários</button>'+
       '<input class="search" id="txSearch" placeholder="Procurar beneficiário ou nota…" value="'+esc(f.q||"")+'">'+
       '<select class="filter" id="txFilterAcc">'+accOpts+'</select>'+
       '<select class="filter" id="txFilterCat">'+catOpts+'</select>'+
-      '<input class="filter" id="txFilterFrom" type="date" title="De" value="'+esc(f.from||"")+'">'+
-      '<input class="filter" id="txFilterTo" type="date" title="Até" value="'+esc(f.to||"")+'">'+
+      '<select class="filter" id="txFilterPer">'+perOpts+'</select>'+
+      (f.per==="custom" ? '<input class="filter" id="txFilterFrom" type="date" title="De" value="'+esc(f.from||"")+'">'+
+                          '<input class="filter" id="txFilterTo" type="date" title="Até" value="'+esc(f.to||"")+'">' : '')+
       (temFiltro ? '<button class="btn sm" data-action="tx-filter-clear" title="Ver todas as transações">✕ Limpar filtros</button>' : '')+
       '<div class="spacer"></div>'+
       '<button class="btn sm" data-action="export-csv">⬇ CSV</button>'+
@@ -1537,111 +1560,118 @@
 
   function renderReports() {
     var m = state.ui.month;
-    // Spending by category for the month
-    var spend = {};
-    var totalOut = 0, totalIn = 0;
+
+    // ---------- Período: comanda TODOS os blocos deste ecrã ----------
+    var nMonths = state.ui.reportMonths || 6;
+    var customPer = !!(state.ui.reportFrom && state.ui.reportTo && state.ui.reportFrom<=state.ui.reportTo);
+    var meses = [];
+    if (customPer) { var cur=state.ui.reportFrom, g=0; while(cur<=state.ui.reportTo && g<60){ meses.push(cur); cur=shiftMonth(cur,1); g++; } }
+    else { for (var em=nMonths-1; em>=0; em--) meses.push(shiftMonth(m,-em)); }
+    if (!meses.length) meses = [m];
+    var noPeriodo = {}; meses.forEach(function(k){ noPeriodo[k]=true; });
+    var etiqueta = meses.length===1 ? monthLabel(meses[0]) : (monthLabel(meses[0])+" a "+monthLabel(meses[meses.length-1]));
+
+    // ---------- Uma passagem pelas transações do período ----------
+    var totalIn=0, totalOut=0, spend={}, porMes={};
+    meses.forEach(function(k){ porMes[k]={inc:0,out:0}; });
     for (var i=0;i<state.transactions.length;i++) {
-      var t = state.transactions[i];
-      if (monthOf(t.date) !== m) continue;
-      if (t.transfer && !t.categoryId) continue;   // transferência interna: não é despesa nem receita
-      if (t.categoryId === INCOME) { totalIn += (t.inflow||0); continue; }
+      var t = state.transactions[i], mm = monthOf(t.date);
+      if (!noPeriodo[mm]) continue;
+      if (t.transfer && !t.categoryId) continue;          // transferência interna não é despesa nem receita
+      if (t.categoryId === INCOME) { totalIn += (t.inflow||0); porMes[mm].inc += (t.inflow||0); continue; }
       if (t.outflow) {
-        var name = t.categoryId ? ((categoryById(t.categoryId)||{name:"(apagada)"}).name) : "Sem categoria";
-        spend[name] = (spend[name]||0) + t.outflow;
-        totalOut += t.outflow;
+        var nome = t.categoryId ? ((lkCat(t.categoryId)||{name:"(apagada)"}).name) : "Sem categoria";
+        spend[nome] = (spend[nome]||0) + t.outflow;
+        totalOut += t.outflow; porMes[mm].out += t.outflow;
       }
     }
+    var net = round2(totalIn - totalOut);
+
+    var repPer = [1,6,12,24].map(function(nn){
+      return '<button data-action="report-months" data-id="'+nn+'" class="'+((!customPer&&nMonths===nn)?'active':'')+'">'+(nn===1?'1 mês':nn+' meses')+'</button>';
+    }).join("");
+    var blocoPeriodo = '<div class="report-block" style="padding:14px 18px;margin-bottom:18px;">'+
+      '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">'+
+        '<span style="font-weight:700;font-size:13px;">Período</span>'+
+        '<div class="seg" style="flex:1;min-width:220px;max-width:340px;">'+repPer+'</div>'+
+        '<span class="muted" style="font-size:12.5px;">ou</span>'+
+        '<input class="filter" id="repFrom" type="month" value="'+esc(state.ui.reportFrom||"")+'">'+
+        '<span class="muted" style="font-size:12.5px;">até</span>'+
+        '<input class="filter" id="repTo" type="month" value="'+esc(state.ui.reportTo||"")+'">'+
+        (customPer?'<button class="btn sm" data-action="report-clear-range">Limpar</button>':'')+
+        '<div class="spacer"></div>'+
+        '<b style="font-size:13px;white-space:nowrap;">'+etiqueta+'</b>'+
+      '</div>'+
+      '<div class="hint" style="margin-top:8px;">Tudo o que se segue — totais, despesa por categoria e gráficos — usa este período.</div>'+
+    '</div>';
+
+    // ---------- Despesa por categoria ----------
     var arr = Object.keys(spend).map(function(k){return {name:k,val:spend[k]};}).sort(function(a,b){return b.val-a.val;});
     var maxV = arr.length ? arr[0].val : 1;
     var bars = arr.length ? arr.map(function(x){
-      return '<div class="bar-row"><div class="b-name">'+esc(x.name)+'</div>'+
+      return '<div class="bar-row"><div class="b-name" title="'+esc(x.name)+'">'+esc(x.name)+'</div>'+
         '<div class="bar-track"><div class="bar-fill" style="width:'+Math.max(2,(x.val/maxV)*100)+'%"></div></div>'+
         '<div class="bar-val">'+fmt(x.val)+'</div></div>';
-    }).join("") : '<div class="muted" style="padding:8px 0;">Sem despesas registadas neste mês.</div>';
+    }).join("") : '<div class="muted" style="padding:8px 0;">Sem despesas registadas neste período.</div>';
 
-    // 6-month income vs expense trend
-    var trend = "";
-    var mk = m;
-    var series = [];
-    for (var s=5;s>=0;s--) { series.push(shiftMonth(mk, -s)); }
+    // ---------- Rendimento vs Despesa, mês a mês, com os valores nas barras ----------
     var maxBar = 1;
-    var seriesData = series.map(function(k){
-      var inc=0, out=0;
-      for (var j=0;j<state.transactions.length;j++){ var t=state.transactions[j]; if(monthOf(t.date)!==k) continue; if(t.transfer && !t.categoryId) continue; if(t.categoryId===INCOME) inc+=(t.inflow||0); else out+=(t.outflow||0); }
-      maxBar = Math.max(maxBar, inc, out);
-      return {k:k, inc:inc, out:out};
-    });
-    trend = seriesData.map(function(d){
-      var p = d.k.split("-");
-      var lab = MONTHS_PT[parseInt(p[1],10)-1].slice(0,3);
-      return '<div class="bar-row" style="grid-template-columns:80px 1fr 1fr;">'+
-        '<div class="b-name">'+lab+' '+p[0].slice(2)+'</div>'+
-        '<div class="bar-track" title="Rendimento"><div class="bar-fill" style="width:'+(d.inc/maxBar*100)+'%;background:linear-gradient(90deg,var(--positive),#4ade80);"></div></div>'+
-        '<div class="bar-track" title="Despesa"><div class="bar-fill" style="width:'+(d.out/maxBar*100)+'%;background:linear-gradient(90deg,#dc2626,#f87171);"></div></div>'+
+    meses.forEach(function(k){ maxBar = Math.max(maxBar, porMes[k].inc, porMes[k].out); });
+    var trend = meses.map(function(k){
+      var d = porMes[k], p = k.split("-");
+      var lab = MONTHS_PT[parseInt(p[1],10)-1].slice(0,3)+" "+p[0].slice(2);
+      return '<div class="bar-row" style="grid-template-columns:74px 1fr 1fr;">'+
+        '<div class="b-name">'+lab+'</div>'+
+        '<div class="bar-track" title="Rendimento"><div class="bar-fill" style="width:'+(d.inc/maxBar*100)+'%;background:linear-gradient(90deg,var(--positive),#4ade80);"></div>'+
+          (d.inc>0.005?'<span class="bar-num">'+fmt(d.inc)+'</span>':'')+'</div>'+
+        '<div class="bar-track" title="Despesa"><div class="bar-fill" style="width:'+(d.out/maxBar*100)+'%;background:linear-gradient(90deg,#dc2626,#f87171);"></div>'+
+          (d.out>0.005?'<span class="bar-num">'+fmt(d.out)+'</span>':'')+'</div>'+
         '</div>';
     }).join("");
 
-    var net = round2(totalIn - totalOut);
-
-    // ----- Evolução do gasto por categoria (escolha de categorias + período) -----
+    // ---------- Evolução por categoria ----------
     if (state.ui.reportCats === undefined) {
       var _tot={}; for (var _i=0;_i<state.transactions.length;_i++){ var _t=state.transactions[_i]; if(_t.outflow&&_t.categoryId){ _tot[_t.categoryId]=(_tot[_t.categoryId]||0)+_t.outflow; } }
       state.ui.reportCats = Object.keys(_tot).filter(function(id){var c=categoryById(id); return c&&!c.cardId;}).sort(function(a,b){return _tot[b]-_tot[a];}).slice(0,2);
     }
     var mode = state.ui.reportMode || "gasto";
-    var nMonths = state.ui.reportMonths || 6;
-    var customPer = !!(state.ui.reportFrom && state.ui.reportTo && state.ui.reportFrom<=state.ui.reportTo);
-    var evoMonths=[];
-    if (customPer) { var cur=state.ui.reportFrom, guard=0; while(cur<=state.ui.reportTo && guard<48){ evoMonths.push(cur); cur=shiftMonth(cur,1); guard++; } }
-    else { for (var em=nMonths-1; em>=0; em--) evoMonths.push(shiftMonth(m, -em)); }
-    var monthIdx={}; evoMonths.forEach(function(mm,ix){ monthIdx[mm]=ix; });
+    var monthIdx={}; meses.forEach(function(mm2,ix){ monthIdx[mm2]=ix; });
     var selCats = (state.ui.reportCats||[]).filter(function(id){ var c=categoryById(id); return c && !c.cardId; });
-    var valById={}; selCats.forEach(function(id){ valById[id]=evoMonths.map(function(mm){ return mode==="atribuido" ? assignedFor(id, mm) : 0; }); });
+    var valById={}; selCats.forEach(function(id){ valById[id]=meses.map(function(mm2){ return mode==="atribuido" ? assignedFor(id, mm2) : 0; }); });
     if (mode !== "atribuido") {
       for (var si=0; si<state.transactions.length; si++){ var stx=state.transactions[si]; if(!stx.outflow||!stx.categoryId) continue; if(valById[stx.categoryId]===undefined) continue; var ix=monthIdx[monthOf(stx.date)]; if(ix===undefined) continue; valById[stx.categoryId][ix]+=stx.outflow; }
     }
     var evoSeries = selCats.map(function(id,ix){ return {catId:id, name:(categoryById(id)||{name:""}).name, color:REPORT_COLORS[ix%REPORT_COLORS.length], values:valById[id].map(function(v){return round2(v);})}; });
     var allRepCats = state.categories.filter(function(c){ return !c.cardId && !c.hidden; });
     var repChips = allRepCats.map(function(c){ var sIx=selCats.indexOf(c.id); var act=sIx>=0; var col=act?REPORT_COLORS[sIx%REPORT_COLORS.length]:null; return '<button class="rep-chip'+(act?' active':'')+'" data-action="report-toggle-cat" data-id="'+c.id+'"'+(act?' style="background:'+col+';border-color:'+col+';color:#fff"':'')+'>'+esc(c.name)+'</button>'; }).join("");
-    var repPer = [6,12,24].map(function(nn){ return '<button data-action="report-months" data-id="'+nn+'" class="'+((!customPer&&nMonths===nn)?'active':'')+'">'+nn+' meses</button>'; }).join("");
     var repMode = '<button data-action="report-mode" data-id="gasto" class="'+(mode!=="atribuido"?'active':'')+'">Gasto</button><button data-action="report-mode" data-id="atribuido" class="'+(mode==="atribuido"?'active':'')+'">Atribuído</button>';
     var evoBlock = '<div class="report-block"><h3>📈 Evolução por categoria</h3>'+
-      '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">'+
-        '<div class="seg" style="flex:1;min-width:180px;max-width:260px;">'+repMode+'</div>'+
-        '<div class="seg" style="flex:1;min-width:200px;max-width:320px;">'+repPer+'</div>'+
-      '</div>'+
-      '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;font-size:12.5px;color:var(--text-muted);">'+
-        '<span>ou intervalo:</span>'+
-        '<input class="filter" id="repFrom" type="month" value="'+esc(state.ui.reportFrom||"")+'">'+
-        '<span>até</span>'+
-        '<input class="filter" id="repTo" type="month" value="'+esc(state.ui.reportTo||"")+'">'+
-        (customPer?'<button class="btn sm" data-action="report-clear-range">Limpar</button>':'')+
-      '</div>'+
+      '<div class="seg" style="max-width:260px;margin-bottom:12px;">'+repMode+'</div>'+
       '<div id="evoHost" class="evo-host"></div>'+
       (allRepCats.length ? '<div class="rep-chips" style="margin-top:16px;">'+repChips+'</div>' : '<div class="muted" style="margin-top:12px;">Ainda não há categorias.</div>')+
     '</div>';
 
-    var pnVals = netWorthSeries(evoMonths);
+    // ---------- Património líquido ----------
+    var pnVals = netWorthSeries(meses);
     var pnDelta = round2(pnVals[pnVals.length-1] - pnVals[0]);
     var pnBlock = '<div class="report-block"><h3>💰 Evolução do património líquido</h3>'+
-      '<div class="hint" style="margin:-8px 0 12px;">Tudo o que tem, menos tudo o que deve, no fim de cada mês — no mesmo período escolhido acima. '+
-      (evoMonths.length>1
-        ? ('De '+monthLabel(evoMonths[0])+' a '+monthLabel(evoMonths[evoMonths.length-1])+': <b class="'+(pnDelta>=0?"tx-amt in":"tx-amt out")+'">'+(pnDelta>=0?"+":"")+fmt(pnDelta)+'</b>.')
-        : '')+'</div>'+
+      '<div class="hint" style="margin:-8px 0 12px;">Tudo o que tem, menos tudo o que deve, no fim de cada mês.'+
+      (meses.length>1 ? (' Variação no período: <b class="'+(pnDelta>=0?"tx-amt in":"tx-amt out")+'">'+(pnDelta>=0?"+":"")+fmt(pnDelta)+'</b>.') : '')+'</div>'+
       '<div id="pnHost" class="evo-host"></div></div>';
 
     el("content").innerHTML =
+      blocoPeriodo +
       '<div class="kpi-grid">'+
-        '<div class="kpi"><div class="k-label">Rendimento do mês</div><div class="k-value pos">'+fmt(totalIn)+'</div></div>'+
-        '<div class="kpi"><div class="k-label">Despesa do mês</div><div class="k-value neg">'+fmt(totalOut)+'</div></div>'+
+        '<div class="kpi"><div class="k-label">Rendimento</div><div class="k-value pos">'+fmt(totalIn)+'</div></div>'+
+        '<div class="kpi"><div class="k-label">Despesa</div><div class="k-value neg">'+fmt(totalOut)+'</div></div>'+
         '<div class="kpi"><div class="k-label">Resultado</div><div class="k-value '+(net>=0?"pos":"neg")+'">'+fmt(net)+'</div></div>'+
-        '<div class="kpi"><div class="k-label">Património líquido</div><div class="k-value">'+fmt(netWorth())+'</div></div>'+
+        '<div class="kpi"><div class="k-label">Património no fim</div><div class="k-value">'+fmt(pnVals[pnVals.length-1])+'</div></div>'+
       '</div>'+
-      '<div class="report-block"><h3>Despesa por categoria — '+monthLabel(m)+'</h3>'+bars+'</div>'+
-      '<div class="report-block"><h3>Rendimento (verde) vs Despesa (vermelho) — últimos 6 meses</h3>'+trend+'</div>'+
+      '<div class="report-block"><h3>Despesa por categoria</h3>'+bars+'</div>'+
+      '<div class="report-block"><h3>Rendimento (verde) vs Despesa (vermelho)</h3>'+trend+'</div>'+
       evoBlock + pnBlock;
-    drawEvo(evoSeries, evoMonths);
-    drawInto("pnHost", [{ name:"Património líquido", color:REPORT_COLORS[0], values:pnVals }], evoMonths, "Sem dados no período escolhido.");
+    drawEvo(evoSeries, meses);
+    drawInto("pnHost", [{ name:"Património líquido", color:REPORT_COLORS[0], values:pnVals }], meses, "Sem dados no período escolhido.");
   }
 
   function renderRecurring(){
@@ -2361,7 +2391,7 @@
       '<div class="modal-body">'+
         '<div class="grid-2">'+
           '<div class="field"><label>Próxima data</label><input id="rcDate" type="date" value="'+esc(r.nextDate)+'"></div>'+
-          '<div class="field"><label>Frequência</label><select id="rcFreq">'+fo("weekly","Semanal")+fo("biweekly","Quinzenal")+fo("monthly","Mensal")+fo("yearly","Anual")+'</select></div>'+
+          '<div class="field"><label>Frequência</label><select id="rcFreq">'+fo("weekly","Semanal")+fo("biweekly","Quinzenal")+fo("monthly","Mensal")+fo("semiannual","Semestral")+fo("yearly","Anual")+'</select></div>'+
         '</div>'+
         '<div class="field"><label>Conta</label><select id="rcAcc">'+accOpts+'</select></div>'+
         '<div class="field"><label>Beneficiário</label><input id="rcPayee" maxlength="100" list="payeeList" autocomplete="off" value="'+esc(r.payee||"")+'" placeholder="Ex.: Senhorio, Salário, Netflix…">'+
@@ -2787,6 +2817,8 @@
       closeModal(); save(); render(); showUndo();
     },
     "toggle-group": function(id){ state.collapsed[id]=!state.collapsed[id]; save(); render(); },
+    "expand-all": function(){ state.collapsed={}; save(); render(); },
+    "collapse-all": function(){ var c={}; for(var i=0;i<state.groups.length;i++) c[state.groups[i].id]=true; state.collapsed=c; save(); render(); },
     // Filtros acumuláveis: pode ver ao mesmo tempo, por exemplo, "abaixo do alvo" e "excedido".
     "budget-filter": function(id){ var f=state.ui.budgetFilters||{}; if(f[id]) delete f[id]; else f[id]=true; state.ui.budgetFilters=f; save(); render(); },
     "prio-filter": function(id){ var f=state.ui.prioFilters||{}; if(f[id]) delete f[id]; else f[id]=true; state.ui.prioFilters=f; save(); render(); },
@@ -3584,6 +3616,7 @@
     if (e.target.id==="txFilterCat"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.category=e.target.value||null; render(); }
     if (e.target.id==="txFilterFrom"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.from=e.target.value||null; render(); }
     if (e.target.id==="txFilterTo"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.to=e.target.value||null; render(); }
+    if (e.target.id==="txFilterPer"){ state.ui.txFilter=state.ui.txFilter||{}; var pv=e.target.value; state.ui.txFilter.per=pv||null; if(pv!=="custom"){ state.ui.txFilter.from=null; state.ui.txFilter.to=null; } render(); }
     if (e.target.id==="repFrom"){ state.ui.reportFrom=e.target.value||null; if(state.ui.reportFrom&&!state.ui.reportTo) state.ui.reportTo=state.ui.month; render(); }
     if (e.target.id==="repTo"){ state.ui.reportTo=e.target.value||null; if(state.ui.reportTo&&!state.ui.reportFrom) state.ui.reportFrom=shiftMonth(state.ui.reportTo,-5); render(); }
   });
