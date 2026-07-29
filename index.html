@@ -121,7 +121,9 @@
   .add-acc { margin: 8px 16px; padding: 8px; border: 1px dashed rgba(255,255,255,.2); background: transparent; color: var(--sidebar-text); border-radius: 8px; font-weight: 600; font-size: 12.5px; }
   .add-acc:hover { border-color: var(--primary); color: #fff; }
   .side-footer { margin-top: auto; padding: 12px 16px 4px; display: flex; flex-direction: column; gap: 4px; }
-  .side-footer button { background: transparent; border: 0; color: var(--sidebar-text); text-align: start; padding: 7px 12px; border-radius: 7px; font-size: 12.5px; font-weight: 600; display:flex; align-items:center; gap:9px; }
+  /* Uma linha só, sempre — o ponto de aviso não pode empurrar o texto para baixo. */
+  .side-footer button { background: transparent; border: 0; color: var(--sidebar-text); text-align: start; padding: 7px 12px; border-radius: 7px; font-size: 12.5px; font-weight: 600; display:flex; align-items:center; gap:9px; white-space: nowrap; overflow: hidden; }
+  .side-footer button > span:first-child { flex: 0 0 auto; }
   .side-footer button:hover { background: rgba(255,255,255,.06); color: var(--sidebar-text-strong); }
 
   /* Main */
@@ -393,7 +395,7 @@
 
     <div class="side-footer">
       <button data-action="add-tx"><span>➕</span> Nova transação</button>
-      <button data-action="data-menu" id="btnData"><span>💾</span> Dados / Cópias de segurança</button>
+      <button data-action="data-menu" id="btnData"><span>💾</span> Dados e cópias</button>
       <button data-action="help"><span>❓</span> Como funciona</button>
     </div>
   </aside>
@@ -1029,7 +1031,7 @@
     el("netWorth").textContent = fmt(netWorth());
     var pend = backupPending();
     var bd = el("btnData");
-    if (bd) bd.innerHTML = '<span>💾</span> Dados / Cópias de segurança' + (pend ? '<span class="dot-badge" title="Há alterações por guardar em ficheiro"></span>' : '');
+    if (bd) bd.innerHTML = '<span>💾</span> Dados e cópias' + (pend ? '<span class="dot-badge" title="Há alterações por guardar em ficheiro"></span>' : '');
   }
 
   function renderRTA() {
@@ -1084,7 +1086,7 @@
     var m = state.ui.month;
     if (!state.groups.length) {
       el("content").innerHTML = emptyState("📊", "Comece o seu orçamento",
-        "Crie grupos e categorias para dar uma função a cada euro. Para experimentar com dados de exemplo, use «Dados / Cópias de segurança».",
+        "Crie grupos e categorias para dar uma função a cada euro. Para experimentar com dados de exemplo, use «Dados e cópias».",
         '<button class="btn primary" data-action="add-group">+ Novo grupo</button>');
       return;
     }
@@ -1933,7 +1935,7 @@
         '<li><b>Mover dinheiro:</b> o <b>↔</b> numa categoria transfere saldo disponível para outra categoria (ou de/para o «Pronto a atribuir») sem tocar no rendimento.</li>'+
         '<li><b>Reordenar:</b> as setas <b>▲▼</b> mudam a ordem, ou <b>arraste</b> a linha da categoria/grupo para a posição pretendida (arrastar uma categoria para outro grupo também a muda de grupo).</li>'+
         '<li><b>Prioridade:</b> cada categoria pode ser <b>Alta</b>, <b>Normal</b> ou <b>Baixa</b>. Ao financiar «Até ao disponível» pode repartir <b>por ordem</b>, <b>por prioridade</b> (enche primeiro as Altas) ou <b>proporcionalmente</b>.</li>'+
-        '<li><b>Importar do banco:</b> em <b>Dados / Cópias de segurança</b> pode importar um <b>.csv</b> com as transações; a estrutura esperada está explicada nesse ecrã.</li>'+
+        '<li><b>Importar do banco:</b> em <b>Dados e cópias</b> pode importar um <b>.csv</b> com as transações; a estrutura esperada está explicada nesse ecrã.</li>'+
         '<li><b>Anular:</b> o botão <b>↩ Anular</b> repõe as últimas <b>5</b> ações (eliminações, importações, duplicações).</li>'+
         '<li><b>Recorrentes</b> (separador 📅): crie regras (renda, salário, subscrições) que são lançadas automaticamente na data. O <b>▶</b> lança já a próxima; o <b>✓</b> ativa/desativa.</li>'+
         '<li><b>Transferir / Pagar cartão:</b> em <b>Contas</b>, o «↔ Transferir» move dinheiro entre contas. Numa conta de cartão/dívida com saldo negativo, o <b>💳 Pagar</b> abate o valor a partir da sua conta à ordem (pode definir uma conta de pagamento predefinida ao editar o cartão).</li>'+
@@ -1942,7 +1944,7 @@
         '<li><b>Contas de orçamento</b> (à ordem, poupança, dinheiro) entram no orçamento. <b>Contas de acompanhamento</b> (cartões, empréstimos, investimentos) não afetam o «Pronto a atribuir».</li>'+
         '<li><b>Excesso</b> (Disponível a vermelho) significa que gastou mais do que atribuiu — atribua mais a essa categoria para o cobrir.</li>'+
         '<li><b>Orçamento vs. contas:</b> o dinheiro nas contas de orçamento tem de ser sempre igual ao «Pronto a atribuir» mais o «Disponível» de todas as categorias. Se algum movimento ficar <b>sem categoria</b>, ou se transferir dinheiro para uma <b>conta de acompanhamento</b> sem lhe dar categoria, aparece um aviso ⚠️ por baixo do «Pronto a atribuir» — carregue em <b>Ver porquê</b> para ver e corrigir os movimentos em causa.</li>'+
-        '<li><b>Onde vivem os dados:</b> só <b>neste aparelho</b>, dentro do navegador — que os pode limpar ao fim de algum tempo sem uso, sobretudo no iPhone. Em <b>Dados / Cópias de segurança</b> há três níveis de proteção, e convém não os confundir:<br>'+
+        '<li><b>Onde vivem os dados:</b> só <b>neste aparelho</b>, dentro do navegador — que os pode limpar ao fim de algum tempo sem uso, sobretudo no iPhone. Em <b>Dados e cópias</b> há três níveis de proteção, e convém não os confundir:<br>'+
           '<b>1 · Histórico</b> — a app guarda sozinha o estado do orçamento uma vez por dia, <b>dentro dela própria</b> (nunca descarrega ficheiros, funciona igual no iPhone e no PC), ao abrir e ao sair. Ficam os <b>5 dias</b> mais recentes e servem para <b>voltar a um dia anterior</b>. Como ficam no mesmo sítio que os dados, <b>não</b> o salvam se perder o aparelho.<br>'+
           '<b>2 · Cópia de segurança em ficheiro (.json)</b> — <b>sempre manual</b>, só quando carrega no botão. É a única que sobrevive a perder o aparelho; guarde-a fora daqui. A app avisa quando já vai com uns dias.<br>'+
           '<b>3 · Sincronização</b> — mantém o telemóvel e o PC com os mesmos dados, através de uma cópia cifrada no GitHub.</li>'+
@@ -2220,9 +2222,9 @@
     },
     "open-account": function(id){ state.ui.view="accounts"; state.ui.openAccount=id; render(); },
     "back-accounts": function(){ state.ui.openAccount=null; render(); },
-    "archive-account": function(id){ var a=accountById(id); if(a){ a.hidden=true; if(state.ui.openAccount===id) state.ui.openAccount=null; closeModal(); save(); render(); toast("Conta arquivada — reponha em Dados / Cópias → Arquivados."); } },
+    "archive-account": function(id){ var a=accountById(id); if(a){ a.hidden=true; if(state.ui.openAccount===id) state.ui.openAccount=null; closeModal(); save(); render(); toast("Conta arquivada — reponha em Dados e cópias → Arquivados."); } },
     "restore-account": function(id){ var a=accountById(id); if(a){ a.hidden=false; save(); render(); archivedModal(); } },
-    "archive-category": function(id){ var c=categoryById(id); if(c){ c.hidden=true; closeModal(); save(); render(); toast("Categoria arquivada — reponha em Dados / Cópias → Arquivados."); } },
+    "archive-category": function(id){ var c=categoryById(id); if(c){ c.hidden=true; closeModal(); save(); render(); toast("Categoria arquivada — reponha em Dados e cópias → Arquivados."); } },
     "restore-category": function(id){ var c=categoryById(id); if(c){ c.hidden=false; save(); render(); archivedModal(); } },
     "archived-menu": function(){ archivedModal(); },
 
