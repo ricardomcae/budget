@@ -183,7 +183,7 @@
   select.filter, input.filter { padding: 8px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font-weight: 600; }
 
   /* Tabela do orçamento */
-  .budget-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
+  .budget-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; box-shadow: var(--shadow); }
   table.budget { width: 100%; border-collapse: collapse; }
   table.budget thead th { text-align: end; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; padding: 12px 18px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
   table.budget thead th.first { text-align: start; }
@@ -246,11 +246,15 @@
   .avail-pill.warn { background: var(--warning-soft); color: var(--warning); }
 
   /* Tabela genérica (transações / contas) */
-  .data-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
+  .data-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; box-shadow: var(--shadow); }
   table.data { width: 100%; border-collapse: collapse; }
   table.data th { text-align: start; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; padding: 11px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2); white-space: nowrap; }
-  table.data td { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  table.data tr:last-child td { border-bottom: 0; }
+  table.data td { padding: 10px 16px; vertical-align: middle; }
+  /* O separador vive na LINHA, não em cada célula — assim não pode ficar aos degraus. */
+  table.data tbody tr { border-bottom: 1px solid var(--border); }
+  /* Nada parte de linha: com alturas iguais, as linhas ficam sempre direitas em qualquer largura. */
+  table.data td, table.data th { white-space: nowrap; }
+  table.data tbody tr:last-child { border-bottom: 0; }
   table.data tbody tr:hover, table.data tr.hoverable:hover { background: var(--surface-2); }
   .pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 600; }
   .pill.budget { background: var(--primary-soft); color: var(--primary-dark); }
@@ -377,7 +381,6 @@
     input, select, textarea, .assign-input { font-size: 16px; }
 
     /* Orçamento compacto; ações sempre visíveis (não há hover no toque) */
-    .budget-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     table.budget thead th, .grp-row td, tr.cat-row td { padding: 8px 6px; }
     .cat-actions, .grp-add { opacity: 1 !important; }
     .cat-name-cell { flex-wrap: wrap; gap: 6px; }
@@ -401,14 +404,11 @@
     /* Lista de transações: a nota vai quase sempre vazia e roubava largura, e o texto
        a partir em duas linhas deixava as alturas das linhas todas diferentes. */
     .col-nota { display: none !important; }
-    table.data { min-width: 560px; }
-    table.data td, table.data th { white-space: nowrap; }
-    table.data td:nth-child(2), table.data td:nth-child(3) { max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+    table.data { min-width: 520px; }
     .btn.f-filtro { padding: 6px 9px; font-size: 13px; }
-    .btn.f-filtro .rot { display: none; }
+    .rot { display: none; }          /* rótulo longo: fica só o símbolo ou a forma curta */
 
     /* Tabelas largas (transações/contas/recorrentes) com deslize horizontal suave */
-    .data-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     table.data { min-width: 620px; }
 
     /* Modais e gráficos */
@@ -1697,10 +1697,10 @@
         '<span class="muted hide-phone" style="font-size:12.5px;">até</span>'+
         '<input class="filter hide-phone" id="repTo" type="month" value="'+esc(state.ui.reportTo||"")+'">'+
         (customPer?'<button class="btn sm" data-action="report-clear-range">Limpar</button>':'')+
-        '<div class="spacer"></div>'+
-        '<b style="font-size:13px;white-space:nowrap;">'+etiqueta+'</b>'+
       '</div>'+
-      '<div class="hint" style="margin-top:8px;">Tudo o que se segue — totais, despesa por categoria e gráficos — usa este período.</div>'+
+      // O período em texto fica em linha própria: na barra dos botões encavalitava-se neles.
+      '<div class="hint" style="margin-top:10px;"><b style="color:var(--text);font-size:13px;">'+etiqueta+'</b>'+
+        ' — é este o período usado nos totais, na despesa por categoria e nos gráficos.</div>'+
     '</div>';
 
     // ---------- Despesa por categoria ----------
