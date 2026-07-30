@@ -100,7 +100,10 @@
     padding: 16px 0; gap: 4px;
     position: sticky; top: 0; height: 100vh; overflow-y: auto;
   }
-  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 20px 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 8px 14px 12px; margin: 0 6px 4px; width: calc(100% - 12px);
+    background: transparent; border: 0; border-radius: 9px; cursor: pointer; text-align: start; color: inherit; }
+  .brand:hover { background: rgba(255,255,255,.06); }
+  .brand h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; }
   .brand .logo { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, var(--primary), var(--accent2)); display: grid; place-items: center; font-size: 18px; }
   .brand h1 { font-size: 16px; margin: 0; color: var(--sidebar-text-strong); font-weight: 700; letter-spacing: .2px; }
   .brand small { display: block; font-size: 10.5px; color: var(--sidebar-text); font-weight: 500; }
@@ -479,13 +482,13 @@
 <div class="app">
   <!-- SIDEBAR -->
   <aside class="sidebar">
-    <div class="brand">
+    <button class="brand" data-action="budgets" title="Trocar ou gerir orçamentos">
       <div class="logo">💰</div>
-      <div>
-        <h1>O Meu Orçamento</h1>
-        <small>Orçamento base-zero</small>
+      <div style="min-width:0;text-align:start;">
+        <h1 id="budName">O Meu Orçamento</h1>
+        <small>Trocar orçamento ▾</small>
       </div>
-    </div>
+    </button>
     <nav class="nav" id="nav">
       <button data-view="budget" class="active"><span class="ic">📊</span> Orçamento</button>
       <button data-view="accounts"><span class="ic">🏦</span> Contas</button>
@@ -518,6 +521,7 @@
         <button class="today-btn" data-action="this-month">Hoje</button>
       </div>
       <div class="topbar-actions mobile-only">
+        <button class="btn sm" data-action="budgets" aria-label="Trocar orçamento">📚</button>
         <button class="btn sm" data-action="add-tx" aria-label="Nova transação">➕</button>
         <button class="btn sm" data-action="payees" aria-label="Beneficiários">🏷️</button>
         <button class="btn sm" data-action="data-menu" aria-label="Dados e cópias de segurança">💾</button>
@@ -546,6 +550,31 @@
 (function () {
   // ---------- Constantes e auxiliares ----------
   var STORAGE_KEY = "meu-orcamento-v1";
+  // ---------- Vários orçamentos (Pessoal, Família, …) ----------
+  // Cada orçamento vive numa chave própria; `state` continua a ser SEMPRE o que está aberto,
+  // por isso o resto da app não muda nada. Um índice guarda a lista e qual está ativo.
+  var BUDGETS_KEY = "meu-orcamento-lista-v1";
+  function novoId(){ return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+  function budKey(id){ return STORAGE_KEY + "::" + id; }
+  function loadIndex(){ try { return JSON.parse(localStorage.getItem(BUDGETS_KEY)); } catch(e){ return null; } }
+  function saveIndex(ix){ try { localStorage.setItem(BUDGETS_KEY, JSON.stringify(ix)); } catch(e){} }
+  var _bindex = null;   // { active:id, list:[{id,name}] }
+  // Garante que há sempre pelo menos um orçamento. Migra a versão antiga (um só, na chave
+  // STORAGE_KEY) para o primeiro orçamento da lista, sem perder nada.
+  function ensureBudgets(){
+    _bindex = loadIndex();
+    if (_bindex && _bindex.list && _bindex.list.length && _bindex.active) return;
+    var antigo = null;
+    try { antigo = localStorage.getItem(STORAGE_KEY); } catch(e){}
+    var id = novoId();
+    if (antigo) {
+      try { localStorage.setItem(budKey(id), antigo); localStorage.removeItem(STORAGE_KEY); } catch(e){}
+    }
+    _bindex = { active:id, list:[{ id:id, name:"O meu orçamento" }] };
+    saveIndex(_bindex);
+  }
+  function budgetName(id){ for(var i=0;i<_bindex.list.length;i++) if(_bindex.list[i].id===id) return _bindex.list[i].name; return ""; }
+  function activeId(){ return _bindex.active; }
   var INCOME = "__income__"; // identificador da categoria especial do «Pronto a atribuir»
 
   var PAGINA = 50;   // linhas por página nas listas de transações
@@ -610,8 +639,9 @@
   var state = load();
 
   function load() {
+    ensureBudgets();
     try {
-      var raw = localStorage.getItem(STORAGE_KEY);
+      var raw = localStorage.getItem(budKey(_bindex.active));
       if (raw) {
         var s = JSON.parse(raw);
         s.settings = s.settings || { locale: "pt-PT", currency: "EUR" };
@@ -632,7 +662,7 @@
   function save() {
     _idx = null; _payees = null;
     var guardou = true;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    try { localStorage.setItem(budKey(_bindex.active), JSON.stringify(state)); }
     catch (e) { guardou = false; }
     if (guardou) _semEspaco = false;
     else if (!_semEspaco) { _semEspaco = true; try { storageFullModal(); } catch(e2){ toast("Não foi possível guardar — armazenamento cheio."); } }
@@ -646,7 +676,7 @@
       for (var k in localStorage) {
         if (!localStorage.hasOwnProperty(k)) continue;
         var n = (((localStorage.getItem(k)||"").length) + k.length) * 2;
-        if (k===STORAGE_KEY) dados+=n; else if (k===SNAP_KEY) hist+=n; else outros+=n;
+        if (k.indexOf(STORAGE_KEY)===0) dados+=n; else if (k.indexOf(SNAP_KEY)===0) hist+=n; else outros+=n;
       }
       return { dados:dados, hist:hist, outros:outros, total:dados+hist+outros };
     } catch(e){ return null; }
@@ -1262,6 +1292,60 @@
     return { entries:entries, total:total, rtaBefore:round2(rta), rtaAfter:round2(rta-total) };
   }
 
+  // ---------- Trocar e gerir orçamentos ----------
+  function loadBudgetRaw(id){
+    try {
+      var raw = localStorage.getItem(budKey(id));
+      if (!raw) return JSON.parse(JSON.stringify(DEFAULT_STATE));
+      var o = JSON.parse(raw);
+      o.settings = o.settings || { locale:"pt-PT", currency:"EUR" };
+      o.collapsed = o.collapsed || {}; o.assignments = o.assignments || {};
+      o.recurring = o.recurring || []; o.ui = o.ui || { view:"budget", month:nowMonthKey() };
+      o.backup = o.backup || { at:null, sig:null, autoDay:null };
+      return o;
+    } catch(e){ return JSON.parse(JSON.stringify(DEFAULT_STATE)); }
+  }
+  function switchBudget(id){
+    if (id === _bindex.active) { closeModal(); return; }
+    if (!budgetName(id)) return;
+    save();                                  // grava o que está aberto
+    _bindex.active = id; saveIndex(_bindex);
+    state = loadBudgetRaw(id);
+    if (!state.ui) state.ui = { view:"budget", month:nowMonthKey() };
+    _idx=null; _payees=null; _undo=[]; hideUndo();
+    var posted = processRecurring();
+    closeModal(); render();
+    toast("Orçamento: "+budgetName(id)+(posted>0?(" · lançadas "+posted+" recorrentes"):""));
+  }
+  function createBudget(nome){
+    nome = corta(nome, LIM_NOME) || "Novo orçamento";
+    var id = novoId();
+    var vazio = JSON.parse(JSON.stringify(DEFAULT_STATE)); vazio.ui = { view:"budget", month:nowMonthKey() };
+    try { localStorage.setItem(budKey(id), JSON.stringify(vazio)); } catch(e){ toast("Sem espaço para outro orçamento."); return; }
+    _bindex.list.push({ id:id, name:nome });
+    save(); _bindex.active = id; saveIndex(_bindex);
+    state = vazio; _idx=null; _payees=null; _undo=[]; hideUndo();
+    closeModal(); render(); toast("Orçamento «"+nome+"» criado.");
+  }
+  function renameBudget(id, nome){
+    nome = corta(nome, LIM_NOME); if(!nome) return;
+    for(var i=0;i<_bindex.list.length;i++) if(_bindex.list[i].id===id) _bindex.list[i].name=nome;
+    saveIndex(_bindex); scheduleAutoSync(); render(); budgetsModal();
+  }
+  function deleteBudget(id){
+    if (_bindex.list.length<=1){ toast("Tem de haver pelo menos um orçamento."); return; }
+    var nome = budgetName(id);
+    if(!confirm("Eliminar o orçamento «"+nome+"» e tudo o que tem dentro?\nEsta ação não se pode anular.")) return;
+    try { localStorage.removeItem(budKey(id)); localStorage.removeItem(SNAP_KEY+"::"+id); } catch(e){}
+    _bindex.list = _bindex.list.filter(function(b){ return b.id!==id; });
+    if (_bindex.active===id) {
+      _bindex.active = _bindex.list[0].id; saveIndex(_bindex);
+      state = loadBudgetRaw(_bindex.active); _idx=null; _payees=null; _undo=[]; hideUndo();
+    } else saveIndex(_bindex);
+    scheduleAutoSync(); render(); budgetsModal();
+    toast("Orçamento «"+nome+"» eliminado.");
+  }
+
   // Operação simétrica do financiamento: quando se atribuiu mais do que havia, retira
   // das categorias até o «Pronto a atribuir» voltar a zero.
   // A diferença de fundo é o limite de cada categoria — aqui é o que ela TEM, não o que lhe falta.
@@ -1515,6 +1599,7 @@
   }
 
   function renderSidebar() {
+    var bn = el("budName"); if (bn) bn.textContent = budgetName(_bindex.active) || "Orçamento";
     var wrap = el("sideAccounts");
     var accs = state.accounts.filter(function(a){return !a.hidden;});
     if (!accs.length) { wrap.innerHTML = '<div style="padding:8px 12px;font-size:12px;color:#64748b;">Sem contas ainda</div>'; }
@@ -2387,7 +2472,7 @@
           '<div style="font-weight:700;font-size:13px;">3 · Sincronização entre dispositivos</div>'+
           '<div style="font-size:12.5px;font-weight:600;margin-top:8px;">'+
             (syncReady() ? ('Ligada — '+esc(_syncStatus||"pronta")) : 'Desligada neste aparelho.')+'</div>'+
-          '<div class="hint" style="margin-top:4px;">Mantém o telemóvel e o PC com os mesmos dados, numa cópia cifrada guardada num gist privado do GitHub.</div>'+
+          '<div class="hint" style="margin-top:4px;">Mantém o telemóvel e o PC com os mesmos dados — <b>todos os orçamentos</b> — numa cópia cifrada guardada num único gist privado do GitHub.</div>'+
           '<button class="btn" data-action="open-sync" style="width:100%;justify-content:center;margin-top:10px;">☁️ '+(syncReady()?"Gerir sincronização":"Ligar sincronização")+'</button>'+
         '</div>'+
         '<div class="field"><button class="btn" data-action="archived-menu" style="width:100%;justify-content:center;">🗄 Contas e categorias arquivadas</button>'+
@@ -2552,6 +2637,40 @@
         '<button class="btn primary" data-action="save-payee" data-id="'+k+'">Guardar</button></span></div>');
   }
 
+  function budgetsModal(){
+    var linhas = _bindex.list.map(function(b){
+      var ativo = b.id===_bindex.active;
+      var st = loadBudgetRaw(b.id);
+      var resumo = (st.accounts||[]).length+" conta"+((st.accounts||[]).length===1?"":"s")+" · "+
+                   (st.transactions||[]).length+" transaç"+((st.transactions||[]).length===1?"ão":"ões");
+      return '<div class="int-row" style="align-items:center;">'+
+        '<span class="who"><b>'+(ativo?'✓ ':'')+esc(b.name)+'</b><span class="tag">'+resumo+'</span></span>'+
+        '<span style="display:flex;gap:6px;">'+
+          (ativo ? '<span class="pill budget" style="align-self:center;">aberto</span>'
+                 : '<button class="btn sm" data-action="budget-switch" data-id="'+b.id+'">Abrir</button>')+
+          '<button class="btn sm" data-action="budget-rename" data-id="'+b.id+'" title="Mudar o nome">✎</button>'+
+          (_bindex.list.length>1 ? '<button class="btn sm danger" data-action="budget-delete" data-id="'+b.id+'" title="Eliminar">🗑</button>' : '')+
+        '</span></div>';
+    }).join("");
+    openModal(
+      '<div class="modal-head"><h2>📚 Os meus orçamentos</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body">'+
+        '<p class="muted" style="margin-top:0;">Cada orçamento é <b>completamente separado</b> — contas, categorias e transações próprias. Troque quando quiser; se sincroniza, vão todos no <b>mesmo</b> gist.</p>'+
+        linhas+
+        '<div class="field" style="margin-top:14px;"><button class="btn primary" data-action="budget-new" style="width:100%;justify-content:center;">+ Novo orçamento</button></div>'+
+      '</div>'+
+      '<div class="modal-foot"><span></span><button class="btn" data-action="close">Fechar</button></div>');
+  }
+  function budgetNameModal(id){
+    var novo = !id, atual = id ? budgetName(id) : "";
+    openModal(
+      '<div class="modal-head"><h2>'+(novo?"Novo orçamento":"Mudar o nome")+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body"><div class="field"><label>Nome</label>'+
+        '<input id="budNome" maxlength="60" value="'+esc(atual)+'" placeholder="Ex.: Pessoal, Família"></div></div>'+
+      '<div class="modal-foot"><span></span><span><button class="btn" data-action="budgets">Cancelar</button> '+
+        '<button class="btn primary" data-action="'+(novo?"budget-create":"budget-do-rename")+'"'+(id?(' data-id="'+id+'"'):'')+'>Guardar</button></span></div>');
+  }
+
   function integrityModal(){
     var m=state.ui.month;
     var dv=integrityDelta(m), iss=integrityIssues(m);
@@ -2712,6 +2831,7 @@
                 '<li>As cinco <b>mostram o que ia acontecer antes de mexer em alguma coisa</b>, nenhuma tira dinheiro das contas — só muda a função que ele tem — e todas se desfazem com o <b>↩ Anular</b> que fica no topo.</li>'+
         '<li><b>O ✓ e o «Por confirmar»:</b> o ✓ marca que o banco já processou a transação. Mexe no <b>Confirmado</b>, não no <b>Saldo</b> — um café pago ontem está pago, tenha o banco lançado ou não, e o orçamento tem de contar com isso. A diferença entre os dois é o <b>Por confirmar</b>, que aparece no cabeçalho da conta e no ecrã das transações: quando chega a zero, a app bate certo com o extrato.</li>'+
         '<li><b>Total do mês:</b> por cima das colunas, a soma do <b>Atribuído</b>, da <b>Atividade</b> e do <b>Disponível</b>. As categorias de <b>pagamento de cartão</b> ficam de fora das três: a atividade delas é o espelho positivo do que se gastou — 50 € de mercearia no cartão dão −50 na Mercearia e +50 no cartão — e somá-las daria zero, como se não se tivesse gasto nada. Os valores do cartão continuam na linha do grupo dele.</li>'+
+        '<li><b>Vários orçamentos</b> (📚, no cabeçalho): pode ter um <b>Pessoal</b> e um <b>Família</b>, por exemplo. Cada um é <b>completamente separado</b> — contas, categorias e transações próprias — e troca-se com um toque. Se sincroniza, vão <b>todos no mesmo gist</b>; só há uma coisa a saber: se editar orçamentos <b>diferentes</b> em aparelhos diferentes antes de sincronizar, a aplicação pergunta qual manter, como faria com qualquer conflito.</li>'+
         '<li><b>Datas e teclado:</b> as datas escrevem-se sempre em <b>dd/mm/aaaa</b>, mesmo que tenha o browser noutro idioma — pode escrever só os números, que as barras aparecem sozinhas, ou usar o 📅 para as escolher no calendário. Dentro de qualquer janela, o <b>Enter</b> vale por carregar no botão principal.</li>'+
         '<li><b>Esc</b> dentro de um campo desfaz o que estava a escrever e larga o campo, sem gravar. Dentro de uma janela, é preciso carregar duas vezes: a primeira sai do campo, a segunda fecha a janela.</li>'+
         '<li>O <b>↩ Anular</b> da faixa reverte a última alteração aos valores atribuídos — tanto as operações em bloco como um valor que tenha mudado à mão numa linha.</li>'+
@@ -3286,6 +3406,13 @@
     "close": closeModal,
     "help": helpModal,
     "data-menu": dataModal,
+    "budgets": function(){ budgetsModal(); },
+    "budget-switch": function(id){ switchBudget(id); },
+    "budget-new": function(){ budgetNameModal(null); },
+    "budget-create": function(){ createBudget(val("budNome")); },
+    "budget-rename": function(id){ budgetNameModal(id); },
+    "budget-do-rename": function(id){ renameBudget(id, val("budNome")); },
+    "budget-delete": function(id){ deleteBudget(id); },
     "integrity": function(){ integrityModal(); },
     "payees": function(){ payeesModal(); },
     "rename-payee": function(k){ renamePayeeModal(k); },
@@ -3312,7 +3439,7 @@
     },
     "limpar-historico": function(){
       if(!confirm("Apagar os pontos de histórico guardados?\nOs seus dados atuais não são afetados — perde apenas a possibilidade de voltar a um dia anterior.")) return;
-      try { localStorage.removeItem(SNAP_KEY); } catch(e){}
+      try { localStorage.removeItem(snapKey()); } catch(e){}
       _semEspaco=false;
       if (save()) { closeModal(); render(); toast("Histórico apagado — já há espaço para guardar."); }
       else toast("Ainda não chega. Guarde uma cópia em ficheiro e apague transações antigas.");
@@ -3771,8 +3898,8 @@
       if(_sync.auto === undefined) _sync.auto = true;
       _sync.baseRev = 0;
       // Se este dispositivo ainda não tem dados próprios, adota a nuvem sem conflito.
-      var vazio = !state.transactions.length && !state.categories.length;
-      _sync.syncedSig = vazio ? backupSig() : undefined;
+      var vazio = !state.transactions.length && !state.categories.length && _bindex.list.length===1;
+      _sync.syncedSig = vazio ? allSig() : undefined;
       saveSyncCfg(); closeModal(); toast("A ligar…"); syncNow();
     },
     "sync-disconnect": function(){ if(!confirm("Desligar a sincronização neste dispositivo? O token e a palavra-passe são apagados daqui (os dados e o gist mantêm-se).")) return; _sync={auto:false}; _gistPerdido=null; saveSyncCfg(); closeModal(); toast("Sincronização desligada."); },
@@ -3809,13 +3936,34 @@
   // ---------- Importar / Exportar ----------
   // ---------- Estado da cópia de segurança em ficheiro ----------
   // Assinatura barata dos dados: contagens + somas. Deteta acrescentos, remoções e alterações de valores.
+  function sigOf(st){
+    var s2=0; for(var i=0;i<st.transactions.length;i++){ var t=st.transactions[i]; s2+=(t.inflow||0)-(t.outflow||0); }
+    var sa=0, ka=0; for(var k in st.assignments){ if(st.assignments.hasOwnProperty(k)){ sa+=st.assignments[k]; ka++; } }
+    return [st.accounts.length, st.groups.length, st.categories.length, st.transactions.length,
+            ka, (st.recurring||[]).length, round2(s2), round2(sa)].join("/");
+  }
   function backupSig(){
-    var st;
-    if (_idx && typeof _idx.sumAll === "number") { st = _idx.sumAll; }   // reaproveita o varrimento do render
-    else { st=0; for(var i=0;i<state.transactions.length;i++){ var t=state.transactions[i]; st+=(t.inflow||0)-(t.outflow||0); } }
-    var sa=0, ka=0; for(var k in state.assignments){ if(state.assignments.hasOwnProperty(k)){ sa+=state.assignments[k]; ka++; } }
-    return [state.accounts.length, state.groups.length, state.categories.length, state.transactions.length,
-            ka, (state.recurring||[]).length, round2(st), round2(sa)].join("/");
+    if (_idx && typeof _idx.sumAll === "number") {   // reaproveita o varrimento do render, para o ativo
+      var sa=0, ka=0; for(var k in state.assignments){ if(state.assignments.hasOwnProperty(k)){ sa+=state.assignments[k]; ka++; } }
+      return [state.accounts.length, state.groups.length, state.categories.length, state.transactions.length,
+              ka, (state.recurring||[]).length, round2(_idx.sumAll), round2(sa)].join("/");
+    }
+    return sigOf(state);
+  }
+  // Assinatura de TODOS os orçamentos, para a sincronização perceber que algum mudou.
+  function allSig(){
+    var partes = [_bindex.active];
+    for (var i=0;i<_bindex.list.length;i++){
+      var b=_bindex.list[i], st = (b.id===_bindex.active) ? state : loadBudgetRaw(b.id);
+      partes.push(b.id, b.name, sigOf(st));
+    }
+    return partes.join("|");
+  }
+  // O pacote que vai para o gist: os orçamentos todos, o ativo do primeiro-a-ser-visto no fim.
+  function syncContainer(){
+    return { v:2, active:_bindex.active, budgets: _bindex.list.map(function(b){
+      return { id:b.id, name:b.name, data: (b.id===_bindex.active) ? state : loadBudgetRaw(b.id) };
+    }) };
   }
   function backupPending(){
     if(!state.transactions.length && !state.categories.length) return false;
@@ -3853,11 +4001,12 @@
   // porque NÃO transfere ficheiros (evita o download que o iOS bloqueia em silêncio).
   var SNAP_KEY = "meu-orcamento-snaps-v1";
   var SNAP_MAX = 5;
-  function loadSnaps(){ try { return JSON.parse(localStorage.getItem(SNAP_KEY)) || []; } catch(e){ return []; } }
+  function snapKey(){ return SNAP_KEY + "::" + _bindex.active; }
+  function loadSnaps(){ try { return JSON.parse(localStorage.getItem(snapKey())) || []; } catch(e){ return []; } }
   function saveSnaps(arr){
-    try { localStorage.setItem(SNAP_KEY, JSON.stringify(arr)); return true; }
+    try { localStorage.setItem(snapKey(), JSON.stringify(arr)); return true; }
     catch(e){ // sem espaço: descarta os mais antigos e tenta de novo
-      while(arr.length>1){ arr.shift(); try{ localStorage.setItem(SNAP_KEY, JSON.stringify(arr)); return true; }catch(_e){} }
+      while(arr.length>1){ arr.shift(); try{ localStorage.setItem(snapKey(), JSON.stringify(arr)); return true; }catch(_e){} }
       return false; }
   }
   function takeDailySnapshot(){
@@ -3978,17 +4127,34 @@
   }
 
   // ---- Máquina de sincronização (deteção de conflitos, sem perda silenciosa) ----
-  function localChangedSinceSync(){ return _sync.syncedSig === undefined || backupSig() !== _sync.syncedSig; }
+  function localChangedSinceSync(){ return _sync.syncedSig === undefined || allSig() !== _sync.syncedSig; }
   async function pushLocal(rev){
-    var outer = { v:1, rev:rev, updatedAt:new Date().toISOString(), device:_sync.device, enc: await encEnvelope(state, _sync.pass) };
+    var outer = { v:2, rev:rev, updatedAt:new Date().toISOString(), device:_sync.device, enc: await encEnvelope(syncContainer(), _sync.pass) };
     if (_sync.gistId) await gistWrite(outer); else _sync.gistId = await gistCreate(outer);
-    _sync.baseRev = rev; _sync.syncedSig = backupSig(); saveSyncCfg();
+    _sync.baseRev = rev; _sync.syncedSig = allSig(); saveSyncCfg();
   }
-  function adoptRemote(remoteState, rev){
+  function adoptRemote(remoto, rev){
+    // Compatibilidade: a nuvem pode ainda ter o formato antigo (um só orçamento).
+    if (remoto && remoto.accounts && !remoto.budgets) {
+      remoto = { v:2, active:_bindex.active, budgets:[{ id:_bindex.active, name:budgetName(_bindex.active), data:remoto }] };
+    }
     var ui = state.ui;                    // preserva a vista/mês/tema deste dispositivo
-    state = remoteState; state.ui = ui;
-    _idx = null;
-    _sync.baseRev = rev; save(); _sync.syncedSig = backupSig(); saveSyncCfg();
+    var antigos = _bindex.list.map(function(b){ return b.id; });
+    var lista = [];
+    for (var i=0;i<remoto.budgets.length;i++){
+      var b=remoto.budgets[i];
+      try { localStorage.setItem(budKey(b.id), JSON.stringify(b.data)); } catch(e){}
+      lista.push({ id:b.id, name:b.name });
+    }
+    // limpa os orçamentos que a nuvem já não tem
+    for (var j=0;j<antigos.length;j++){ if(!lista.some(function(x){return x.id===antigos[j];})){ try{ localStorage.removeItem(budKey(antigos[j])); localStorage.removeItem(SNAP_KEY+"::"+antigos[j]); }catch(e){} } }
+    var act = _bindex.active;
+    if (!lista.some(function(x){return x.id===act;})) act = remoto.active;
+    if (!lista.some(function(x){return x.id===act;})) act = lista[0].id;
+    _bindex = { active:act, list:lista }; saveIndex(_bindex);
+    state = loadBudgetRaw(act); state.ui = ui;
+    _idx = null; _payees = null;
+    _sync.baseRev = rev; save(); _sync.syncedSig = allSig(); saveSyncCfg();
     render();
   }
   async function syncNow(opts){
@@ -4079,8 +4245,9 @@
     if (aoConseguir) aoConseguir("download");
   }
   function exportJSON(silent) {
-    var nome = "orcamento-" + todayISO() + ".json";
-    guardarFicheiro(nome, JSON.stringify(state, null, 2), "application/json", function(via){
+    var nome = "orcamentos-" + todayISO() + ".json";
+    save();   // garante que o ativo está gravado antes de empacotar
+    guardarFicheiro(nome, JSON.stringify(syncContainer(), null, 2), "application/json", function(via){
       markBackupDone();
       save(); hideBackupBar(); renderSidebar();
       if(!silent) toast(via==="partilha" ? "Cópia de segurança guardada." : "Cópia de segurança exportada.");
@@ -4246,12 +4413,25 @@
     var reader = new FileReader();
     reader.onload = function(e){
       try {
-        var s = JSON.parse(e.target.result);
-        if (!s.accounts || !s.transactions) throw new Error("formato");
-        s.settings = s.settings || {locale:"pt-PT",currency:"EUR"};
-        s.collapsed = s.collapsed || {}; s.assignments = s.assignments || {};
-        s.ui = { view:"budget", month: nowMonthKey() };
-        state = s; _undo=[]; hideUndo(); save(); closeModal(); render(); toast("Cópia de segurança importada com sucesso.");
+        var obj = JSON.parse(e.target.result), qtd;
+        if (obj && obj.budgets && obj.budgets.length) {          // pacote com vários orçamentos
+          if(!confirm("Isto substitui TODOS os orçamentos deste aparelho pelos "+obj.budgets.length+" do ficheiro. Continuar?")) return;
+          var lista=[];
+          for (var i=0;i<obj.budgets.length;i++){ var b=obj.budgets[i];
+            if(!b.data||!b.data.accounts||!b.data.transactions) throw new Error("formato");
+            localStorage.setItem(budKey(b.id), JSON.stringify(b.data)); lista.push({id:b.id,name:b.name});
+          }
+          var act = obj.active && lista.some(function(x){return x.id===obj.active;}) ? obj.active : lista[0].id;
+          _bindex = { active:act, list:lista }; saveIndex(_bindex);
+          state = loadBudgetRaw(act); qtd = lista.length;
+        } else if (obj && obj.accounts && obj.transactions) {    // ficheiro antigo: um só orçamento
+          obj.settings = obj.settings || {locale:"pt-PT",currency:"EUR"};
+          obj.collapsed = obj.collapsed || {}; obj.assignments = obj.assignments || {};
+          obj.ui = { view:"budget", month: nowMonthKey() };
+          state = obj; qtd = 1;
+        } else throw new Error("formato");
+        _undo=[]; hideUndo(); _idx=null; _payees=null; save(); closeModal(); render();
+        toast(qtd>1 ? ("Importados "+qtd+" orçamentos.") : "Cópia de segurança importada com sucesso.");
       } catch(err){ toast("Ficheiro inválido."); }
     };
     reader.readAsText(file);
