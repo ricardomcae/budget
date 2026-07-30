@@ -2501,8 +2501,8 @@
           ? "Reserva sempre "+(div==="3"?"1/3":div==="6"?"1/6":"1/12")+" do total por mês, aconteça o que acontecer. Ideal para gastos que faz ao longo do "+cad+"."
           : "Junta até ter o total. Se gastar a meio, pede mais nos meses seguintes para na mesma chegar lá.";
       } else if (v==="byDate") {
-        el("catFundRefill").textContent = "Repor — ter o total INTEIRO na data; se gastar a meio, pede mais para compensar";
-        el("catFundSetAside").textContent = "Reservar — mensalidade fixa até à data; gaste à vontade, não compensa";
+        el("catFundRefill").textContent = "Repor — chegar ao total na data; se gastar a meio, pede mais para compensar";
+        el("catFundSetAside").textContent = "Reservar — mensalidade fixa até à data; gaste à vontade";
         el("catFundHint").textContent = fundV==="setAside"
           ? "Congela agora a mensalidade (o que falta ÷ meses até à data) e pede-a fixa até lá, aconteça o que acontecer. Se um dia ficar para trás, reabra e guarde para recalcular. Não garante o total pousado na data — para isso, escolha Repor."
           : "Reparte o que falta pelos meses até à data. Se gastar a meio, sobe a mensalidade para na mesma chegar ao total na data.";
