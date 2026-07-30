@@ -1155,6 +1155,26 @@
     state.groups.splice(di,0,src);
     return true;
   }
+  // Reordena contas dentro do MESMO tipo (orçamento com orçamento, cartões/acompanhamento
+  // entre si), que é como aparecem agrupadas no ecrã Contas e fazem sentido na barra lateral.
+  function accSiblings(id){ var a=accountById(id); if(!a) return []; var t=(a.type==="budget")?"b":"o";
+    return state.accounts.filter(function(x){ return !x.hidden && ((x.type==="budget")?"b":"o")===t; }); }
+  function moveAccount(id, dir){
+    var sib=accSiblings(id), pos=-1; for(var i=0;i<sib.length;i++) if(sib[i].id===id) pos=i;
+    var alvo=sib[pos+dir]; if(!alvo) return false;
+    var gi=-1,gj=-1; for(var k=0;k<state.accounts.length;k++){ if(state.accounts[k].id===id) gi=k; if(state.accounts[k].id===alvo.id) gj=k; }
+    if(gi<0||gj<0) return false;
+    var t=state.accounts[gi]; state.accounts[gi]=state.accounts[gj]; state.accounts[gj]=t; return true;
+  }
+  function dropAccount(srcId, dstId){
+    if(srcId===dstId) return false;
+    var src=accountById(srcId), dst=accountById(dstId);
+    if(!src||!dst) return false;
+    if(((src.type==="budget")?1:0)!==((dst.type==="budget")?1:0)) return false;   // não cruza tipos
+    var si=-1,di=-1; for(var i=0;i<state.accounts.length;i++){ if(state.accounts[i].id===srcId) si=i; if(state.accounts[i].id===dstId) di=i; }
+    if(si<0||di<0) return false;
+    state.accounts.splice(si,1); state.accounts.splice(di,0,src); return true;
+  }
   function moveCategory(id, dir){
     var cat=categoryById(id); if(!cat) return;
     var sib=categoriesOfGroup(cat.groupId), pos=-1; for(var i=0;i<sib.length;i++) if(sib[i].id===id) pos=i;
@@ -1606,7 +1626,7 @@
     else {
       wrap.innerHTML = accs.map(function (a) {
         var bal = accountBalance(a.id);
-        return '<button class="side-acc" data-action="open-account" data-id="' + a.id + '">' +
+        return '<button class="side-acc" data-action="open-account" data-id="' + a.id + '" draggable="true" data-drag="acc" data-drag-id="' + a.id + '">' +
           '<span class="nm">' + esc(a.name) + '</span>' +
           '<span class="bal ' + (bal < 0 ? "neg" : "") + '">' + fmt(bal) + '</span></button>';
       }).join("");
@@ -1838,7 +1858,7 @@
       if (!list.length) return "";
       var rows = list.map(function(a){
         var bal = accountBalance(a.id), cl = accountBalance(a.id, true);
-        return '<tr class="hoverable"><td><button class="btn ghost" data-action="open-account" data-id="'+a.id+'" style="font-weight:700;padding:2px 4px;">'+esc(a.name)+'</button>'+
+        return '<tr class="hoverable" draggable="true" data-drag="acc" data-drag-id="'+a.id+'"><td><button class="btn ghost" data-action="open-account" data-id="'+a.id+'" style="font-weight:700;padding:2px 4px;">'+esc(a.name)+'</button>'+
           (a.note?'<div class="tag">'+esc(a.note)+'</div>':'')+'</td>'+
           '<td><span class="pill '+(a.type==="budget"?"budget":(a.type==="credit"?"credit":"tracking"))+'">'+(a.type==="budget"?"Orçamento":(a.type==="credit"?"Cartão de crédito":"Acompanhamento"))+'</span></td>'+
           '<td class="num muted">'+fmt(cl)+'</td>'+
@@ -2239,6 +2259,12 @@
         (editing?'':'<div class="field"><label>Saldo inicial</label><input id="acStart" class="money" data-neg="1" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(acc.start)+'" placeholder="0,00"><div class="hint">Use valor negativo para dívidas (ex.: saldo de cartão de crédito).</div></div>')+
         '<div class="field"><label>Nota (opcional)</label><input id="acNote" maxlength="300" value="'+esc(acc.note||"")+'"></div>'+
         '<div class="field'+((acc.type==="credit"||acc.type==="tracking")?"":" hidden")+'" id="acPayFromField"><label>Conta de pagamento predefinida</label><select id="acPayFrom">'+payFromOpts+'</select><div class="hint">Ao pagar este cartão/dívida, o dinheiro sai por predefinição desta conta.</div></div>'+
+        (editing ? '<div class="field"><label>Ordem na lista</label>'+
+          '<div style="display:flex;gap:8px;">'+
+            '<button class="btn" data-action="move-acc-up" data-id="'+acc.id+'" style="flex:1;justify-content:center;">▲ Subir</button>'+
+            '<button class="btn" data-action="move-acc-down" data-id="'+acc.id+'" style="flex:1;justify-content:center;">▼ Descer</button>'+
+          '</div>'+
+          '<div class="hint">Muda a posição na barra lateral e no ecrã Contas. No computador também pode arrastar a conta.</div></div>' : '')+
         (editing?'<div class="field" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;">'+
           '<label>Deixar de usar esta conta</label>'+
           '<div style="display:flex;gap:8px;">'+
@@ -2842,7 +2868,7 @@
       sec("Organizar")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li><b>Filtros</b> no topo: estado (🟢🟡🔴) e prioridade (▲●▼) <b>cruzam-se</b> entre si.</li>'+
-        '<li><b>Reordenar:</b> arraste a linha no computador; no telemóvel use <b>▲▼</b> dentro do ✎.</li>'+
+        '<li><b>Reordenar</b> categorias, grupos e <b>contas</b>: arraste no computador; no telemóvel use <b>▲▼</b> dentro do ✎. As contas reordenam-se dentro do mesmo tipo (orçamento com orçamento, cartões entre si) e a ordem vale na barra lateral e no ecrã Contas.</li>'+
         '<li><b>🗄 Arquivar</b> esconde uma conta ou categoria sem perder o histórico.</li>'+
       '</ul>'+
 
@@ -3781,6 +3807,8 @@
       c.priority=PRIO_CICLO[(i+1)%PRIO_CICLO.length];
       save(); render(); toast("Prioridade "+PRIO_LABEL[c.priority].toLowerCase()+" — "+c.name);
     },
+    "move-acc-up": function(id){ if(moveAccount(id,-1)){ save(); render(); accountModal(accountById(id)); } },
+    "move-acc-down": function(id){ if(moveAccount(id, 1)){ save(); render(); accountModal(accountById(id)); } },
     "move-cat-up": function(id){ moveCategory(id,-1); save(); render(); },
     "move-cat-down": function(id){ moveCategory(id, 1); save(); render(); },
     "move-group-up": function(id){ moveGroup(id,-1); save(); render(); },
@@ -4674,7 +4702,7 @@
     if(r && r.getAttribute("data-drag")===_drag.type){
       e.preventDefault();
       var dstId=r.getAttribute("data-drag-id"), moved=false;
-      if(_drag.type==="cat") moved=dropCategory(_drag.id,dstId); else moved=dropGroup(_drag.id,dstId);
+      if(_drag.type==="cat") moved=dropCategory(_drag.id,dstId); else if(_drag.type==="grp") moved=dropGroup(_drag.id,dstId); else if(_drag.type==="acc") moved=dropAccount(_drag.id,dstId);
       if(moved){ save(); render(); }
     }
     _drag=null;
