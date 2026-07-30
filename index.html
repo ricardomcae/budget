@@ -190,7 +190,7 @@
   table.budget { width: 100%; border-collapse: collapse; }
   table.budget thead th { text-align: end; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; padding: 12px 18px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
   table.budget thead th.first { text-align: start; }
-  table.budget tr.tot-row td { text-align: end; font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums;
+  table.budget tr.tot-row td { text-align: end; font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap;
     padding: 6px 10px 9px; border-bottom: 2px solid var(--border); color: var(--text); background: var(--surface-2); }
   table.budget tr.tot-row td.first { text-align: start; font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: none; letter-spacing: 0; }
   table.budget tr.tot-row td.pos { color: var(--positive); }
@@ -426,6 +426,8 @@
 
     /* Orçamento compacto; ações sempre visíveis (não há hover no toque) */
     table.budget thead th, .grp-row td, tr.cat-row td { padding: 8px 6px; }
+    table.budget tr.tot-row td { font-size: 12.5px; padding: 6px 5px; }
+    table.budget tr.tot-row td.first { font-size: 11px; }
     .cat-actions, .grp-add { opacity: 1 !important; }
     .cat-name-cell { flex-wrap: wrap; gap: 6px; }
     .assign-input { width: 82px; padding: 6px; }
@@ -1210,8 +1212,8 @@
         label: needW>0 ? ("Faltam "+fmt(needW)+" — "+fmt(amt)+"/semana × "+weeks+" semanas = "+fmt(monthTarget))
                        : ("🎯 Alvo semanal cumprido ("+fmt(amt)+"/semana × "+weeks+" = "+fmt(monthTarget)+")") };
     }
-    if (type==="quarterly" || type==="yearly") {
-      var per = type==="quarterly"?3:12, cad = type==="quarterly"?"trimestre":"ano";
+    if (type==="quarterly" || type==="semiannual" || type==="yearly") {
+      var per = type==="quarterly"?3:(type==="semiannual"?6:12), cad = type==="quarterly"?"trimestre":(type==="semiannual"?"semestre":"ano");
       // Mês da despesa (opcional). Quando já passou, avança sozinho para o período seguinte,
       // para o alvo continuar a funcionar ano após ano sem ser preciso mexer nele.
       var dueEff = tg.due || null, gd = 0;
@@ -2407,9 +2409,10 @@
         '</select><div class="hint">Usada ao financiar alvos com «Repartir o que está por atribuir» e a estratégia por prioridade. No orçamento também pode carregar no ▲ ● ▼ à frente do nome para mudar sem abrir esta janela.</div></div>'+
         '<div class="field"><label>Tipo de alvo</label><select id="catTType">'+
           opt("none","— Sem alvo —")+
-          opt("monthly","Mensal — ter/reservar todos os meses")+
           opt("weekly","Semanal — valor por semana (× nº de semanas)")+
+          opt("monthly","Mensal — ter/reservar todos os meses")+
           opt("quarterly","Trimestral — dividir por 3 meses")+
+          opt("semiannual","Semestral — dividir por 6 meses")+
           opt("yearly","Anual — dividir por 12 meses")+
           opt("byDate","Até uma data — juntar um total")+
         '</select></div>'+
@@ -2443,15 +2446,17 @@
       el("catDateField").classList.toggle("hidden", v!=="byDate");
       el("catWeekdayField").classList.toggle("hidden", v!=="weekly");
       el("catFundField").classList.toggle("hidden", v!=="monthly");
-      var perio = (v==="quarterly"||v==="yearly");
+      var perio = (v==="quarterly"||v==="semiannual"||v==="yearly");
       el("catDueField").classList.toggle("hidden", !perio);
-      if (perio) el("catDueHint").textContent = v==="quarterly"
-        ? "Ex.: o mês em que paga o seguro trimestral. Indicando-o, a aplicação reparte o que ainda falta pelos meses até lá e avança sozinha para o trimestre seguinte. Em branco, reserva 1/3 por mês."
+      if (perio) el("catDueHint").textContent =
+          v==="quarterly" ? "Ex.: o mês em que paga o seguro trimestral. Indicando-o, a aplicação reparte o que ainda falta pelos meses até lá e avança sozinha para o trimestre seguinte. Em branco, reserva 1/3 por mês."
+        : v==="semiannual" ? "Ex.: o mês em que paga o seguro semestral. Indicando-o, a aplicação reparte o que ainda falta pelos meses até lá e avança sozinha para o semestre seguinte. Em branco, reserva 1/6 por mês."
         : "Ex.: o mês em que paga o IUC. Indicando-o, a aplicação reparte o que ainda falta pelos meses até lá e avança sozinha para o ano seguinte. Em branco, reserva 1/12 por mês.";
       var hints = { none:"Sem alvo — a categoria não mostra progresso.",
         monthly:"Quer ter este valor disponível todos os meses (ex.: renda, supermercado).",
         weekly:"Valor por semana. O total do mês = valor × nº desse dia da semana no mês (4 ou 5).",
         quarterly:"Total gasto a cada 3 meses (ex.: seguro trimestral). Deixa de pedir dinheiro assim que tiver o total juntado.",
+        semiannual:"Total gasto a cada 6 meses (ex.: seguro semestral). Deixa de pedir dinheiro assim que tiver o total juntado.",
         yearly:"Total gasto uma vez por ano (ex.: IUC, seguro anual). Deixa de pedir dinheiro assim que tiver o total juntado.",
         byDate:"Junta o valor total até ao mês indicado (ex.: férias, entrada de carro)." };
       el("catTargetHint").textContent = hints[v]||"";
@@ -2844,7 +2849,7 @@
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li>Definem-se no <b>✎</b> de cada categoria: mensal, semanal, trimestral, anual, ou até uma data.</li>'+
         '<li>No mensal, «<b>Repor até X</b>» acrescenta só o que falta para ter X disponível; «<b>Reservar X</b>» acrescenta sempre X, mesmo que já o tenha.</li>'+
-        '<li>Trimestral e anual <b>param de pedir</b> quando já tiver o total. Indicando o mês da despesa, repartem o que falta até lá.</li>'+
+        '<li>Trimestral, <b>semestral</b> e anual <b>param de pedir</b> quando já tiver o total. Indicando o mês da despesa, repartem o que falta até lá.</li>'+
       '</ul>'+
 
       sec("Distribuir o dinheiro")+
@@ -3665,7 +3670,7 @@
         if (tType==="byDate") target.date = el("catTargetDate").value || shiftMonth(state.ui.month,6);
         if (tType==="weekly") target.weekday = parseInt(el("catWeekday").value,10);
         if (tType==="monthly") target.fund = el("catFund").value;
-        if (tType==="quarterly" || tType==="yearly") { var dd=el("catTargetDue").value; if(dd) target.due=dd; }
+        if (tType==="quarterly" || tType==="semiannual" || tType==="yearly") { var dd=el("catTargetDue").value; if(dd) target.due=dd; }
       }
       var note=valLim("catNote", LIM_NOTA);
       var prio=el("catPrio")?el("catPrio").value:"normal";
@@ -4550,7 +4555,11 @@
   });
 
   // Clicar no fundo escurecido fecha a janela
-  el("modalOverlay").addEventListener("click", function(e){ if(e.target===el("modalOverlay")) closeModal(); });
+  // Só fecha se o gesto COMEÇOU no fundo escurecido. Arrastar uma seleção de dentro de um
+  // campo e largar cá fora já não fecha — o rato saiu, mas o clique nasceu dentro da janela.
+  var _downNoFundo = false;
+  el("modalOverlay").addEventListener("mousedown", function(e){ _downNoFundo = (e.target===el("modalOverlay")); });
+  el("modalOverlay").addEventListener("click", function(e){ if(e.target===el("modalOverlay") && _downNoFundo) closeModal(); _downNoFundo=false; });
   // Vai pondo as barras enquanto se escreve, mas só quando o cursor está no fim —
   // caso contrário corrigir um dígito no meio atirava o cursor para o fundo.
   document.addEventListener("input", function(e){
