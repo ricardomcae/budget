@@ -1185,7 +1185,16 @@
     if(gi<0||gj<0) return;
     var t=state.categories[gi]; state.categories[gi]=state.categories[gj]; state.categories[gj]=t;
   }
-  // Cadências de alvo: mensal | semanal | trimestral | anual | até uma data.
+  // Mensalidade fixa do "até uma data" no modo Reservar: o que ainda falta (total − o que já
+  // está reservado) repartido pelos meses até à data, incluindo o mês de partida. Congela-se no
+  // momento da edição e não volta a mudar — é isto que faz o pedido ser cego ao que se gasta.
+  function sliceAteData(amount, availNow, fromMonth, date){
+    var dm = monthsBetween(fromMonth, date), meses = dm>=0 ? dm+1 : 1;
+    var falta = round2(amount - availNow), sl = falta>0 ? round2(falta/meses) : 0;
+    if (falta>0.005 && sl<0.01) sl = 0.01;   // nunca congelar em zero quando ainda falta juntar
+    return sl;
+  }
+  // Cadências de alvo: mensal | semanal | trimestral | semestral | anual | até uma data.
   // Devolve {need, met, progress, label} ou null quando a categoria não tem alvo.
   function targetInfo(cat, m) {
     if (!cat.target || !(cat.target.amount>0)) return null;
@@ -1253,6 +1262,22 @@
     }
     if (type==="byDate") {
       var target = tg.date || m;
+      // RESERVAR: mensalidade FIXA, congelada quando a categoria foi editada (tg.slice). Não
+      // olha para o saldo — gastar a meio não muda o pedido. Pede-a até à data; depois pára.
+      // slice × nº de meses = o que faltava na altura, por isso quem não gasta acerta no total.
+      if ((tg.fund||"refill")==="setAside") {
+        var passou = monthsBetween(m, target) < 0;
+        var slFix = round2(tg.slice||0);
+        if (passou || slFix<=0.005) {
+          return { need:0, met:true, doMes:true, progress: Math.max(0,Math.min(1, amt>0?avail/amt:0)),
+            label: passou ? ("Prazo terminado ("+monthLabel(target)+")") : ("🎯 Nada a reservar até "+monthLabel(target)) };
+        }
+        var needSl = Math.max(0, round2(slFix - assignedThis));
+        return { need:needSl, met: assignedThis>=slFix-0.005, doMes: needSl<=0.005,
+          progress: Math.max(0,Math.min(1, amt>0?avail/amt:0)),
+          label: needSl>0 ? ("Reservar "+fmt(needSl)+" este mês — "+fmt(slFix)+"/mês até "+monthLabel(target)+" (gaste à vontade)")
+                          : ("✅ Reservado o deste mês — "+fmt(slFix)+"/mês até "+monthLabel(target)) };
+      }
       var diff = monthsBetween(m, target), left = diff>=0 ? diff+1 : 1;
       var remain = round2(amt - avail);
       // Descontar o que já foi atribuído ESTE mês, senão cada financiamento voltava a
@@ -1436,8 +1461,8 @@
     if (cat.cardId) return { teto: Math.max(0, round2(-accountBalanceUpto(cat.cardId, m))), tipo:"alvo" };
     if (!tg || !(tg.amount > 0)) return { teto:null, tipo:"sem" };
     var t = tg.type || "monthly";
-    // Reservar (mensal OU periódico) acumula sem teto: o dinheiro vai crescendo até à despesa.
-    if (tg.fund === "setAside" && (t === "monthly" || t === "quarterly" || t === "semiannual" || t === "yearly")) return { teto:null, tipo:"acumula" };
+    // Reservar (mensal, periódico OU até uma data) acumula sem teto: o dinheiro vai crescendo.
+    if (tg.fund === "setAside" && (t === "monthly" || t === "quarterly" || t === "semiannual" || t === "yearly" || t === "byDate")) return { teto:null, tipo:"acumula" };
     if (t === "weekly") return { teto: round2(tg.amount * weekdayCount(m, (tg.weekday==null?1:tg.weekday))), tipo:"alvo" };
     return { teto: round2(tg.amount), tipo:"alvo" };
   }
@@ -2459,9 +2484,9 @@
       el("catDateField").classList.toggle("hidden", v!=="byDate");
       el("catWeekdayField").classList.toggle("hidden", v!=="weekly");
       var perio = (v==="quarterly"||v==="semiannual"||v==="yearly");
-      // O Método (Repor/Reservar) aparece no mensal E nos periódicos. Os textos das duas opções
-      // mudam consoante o tipo, porque a diferença é a mesma ideia mas com palavras adequadas.
-      el("catFundField").classList.toggle("hidden", !(v==="monthly" || perio));
+      // O Método (Repor/Reservar) aparece no mensal, nos periódicos E no "até uma data". Os textos
+      // das duas opções mudam consoante o tipo — a mesma ideia, com as palavras adequadas a cada um.
+      el("catFundField").classList.toggle("hidden", !(v==="monthly" || perio || v==="byDate"));
       var fundV = el("catFund").value;
       if (v==="monthly") {
         el("catFundRefill").textContent = "Repor até este valor — acrescenta só o que falta";
@@ -2475,6 +2500,12 @@
         el("catFundHint").textContent = fundV==="setAside"
           ? "Reserva sempre "+(div==="3"?"1/3":div==="6"?"1/6":"1/12")+" do total por mês, aconteça o que acontecer. Ideal para gastos que faz ao longo do "+cad+"."
           : "Junta até ter o total. Se gastar a meio, pede mais nos meses seguintes para na mesma chegar lá.";
+      } else if (v==="byDate") {
+        el("catFundRefill").textContent = "Repor — ter o total INTEIRO na data; se gastar a meio, pede mais para compensar";
+        el("catFundSetAside").textContent = "Reservar — mensalidade fixa até à data; gaste à vontade, não compensa";
+        el("catFundHint").textContent = fundV==="setAside"
+          ? "Congela agora a mensalidade (o que falta ÷ meses até à data) e pede-a fixa até lá, aconteça o que acontecer. Se um dia ficar para trás, reabra e guarde para recalcular. Não garante o total pousado na data — para isso, escolha Repor."
+          : "Reparte o que falta pelos meses até à data. Se gastar a meio, sobe a mensalidade para na mesma chegar ao total na data.";
       }
       // O "mês da despesa" só faz sentido no modo Repor (é aí que reparte o que falta até lá).
       // No modo Reservar o valor é fixo, por isso escondemo-lo para não sugerir que muda a conta.
@@ -3699,7 +3730,16 @@
       var target=null;
       if (tType!=="none" && tv>0) {
         target={ type:tType, amount:tv };
-        if (tType==="byDate") target.date = el("catTargetDate").value || shiftMonth(state.ui.month,6);
+        if (tType==="byDate") {
+          target.date = el("catTargetDate").value || shiftMonth(state.ui.month,6);
+          target.fund = el("catFund").value;
+          if (target.fund==="setAside") {
+            // Congela a mensalidade AGORA e pede-a fixa até à data, gaste-se o que se gastar.
+            // Reabrir e guardar volta a congelar a partir do ponto onde estiver.
+            var availAg = id ? availableFor(id, state.ui.month) : 0;
+            target.slice = sliceAteData(tv, availAg, state.ui.month, target.date);
+          }
+        }
         if (tType==="weekly") target.weekday = parseInt(el("catWeekday").value,10);
         if (tType==="monthly") target.fund = el("catFund").value;
         if (tType==="quarterly" || tType==="semiannual" || tType==="yearly") {
