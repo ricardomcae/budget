@@ -1214,6 +1214,18 @@
     }
     if (type==="quarterly" || type==="semiannual" || type==="yearly") {
       var per = type==="quarterly"?3:(type==="semiannual"?6:12), cad = type==="quarterly"?"trimestre":(type==="semiannual"?"semestre":"ano");
+      // RESERVAR: mete um valor fixo (total ÷ período) todos os meses, aconteça o que acontecer.
+      // Ao contrário do Repor, NÃO olha para o saldo — gastar a meio não muda o que pede. É a
+      // opção de quem planeia gastar ao longo do período e não quer compensar o que já gastou.
+      if ((tg.fund||"refill")==="setAside") {
+        var fatiaFix = round2(amt/per);
+        if (fatiaFix < 0.01) fatiaFix = 0.01;
+        var needF = Math.max(0, round2(fatiaFix - assignedThis));
+        return { need:needF, met: assignedThis>=fatiaFix-0.005, doMes: needF<=0.005,
+          progress: Math.max(0,Math.min(1, fatiaFix>0?assignedThis/fatiaFix:0)),
+          label: needF>0 ? ("Reservar "+fmt(needF)+" este mês — "+fmt(fatiaFix)+"/mês (="+fmt(amt)+"/"+cad+", gaste à vontade)")
+                         : ("✅ Reservado o deste mês — "+fmt(fatiaFix)+"/mês (="+fmt(amt)+"/"+cad+")") };
+      }
       // Mês da despesa (opcional). Quando já passou, avança sozinho para o período seguinte,
       // para o alvo continuar a funcionar ano após ano sem ser preciso mexer nele.
       var dueEff = tg.due || null, gd = 0;
@@ -1424,7 +1436,8 @@
     if (cat.cardId) return { teto: Math.max(0, round2(-accountBalanceUpto(cat.cardId, m))), tipo:"alvo" };
     if (!tg || !(tg.amount > 0)) return { teto:null, tipo:"sem" };
     var t = tg.type || "monthly";
-    if (t === "monthly" && tg.fund === "setAside") return { teto:null, tipo:"acumula" };
+    // Reservar (mensal OU periódico) acumula sem teto: o dinheiro vai crescendo até à despesa.
+    if (tg.fund === "setAside" && (t === "monthly" || t === "quarterly" || t === "semiannual" || t === "yearly")) return { teto:null, tipo:"acumula" };
     if (t === "weekly") return { teto: round2(tg.amount * weekdayCount(m, (tg.weekday==null?1:tg.weekday))), tipo:"alvo" };
     return { teto: round2(tg.amount), tipo:"alvo" };
   }
@@ -2425,9 +2438,9 @@
           '<div class="hint" id="catDueHint"></div></div>'+
         '<div class="field hidden" id="catWeekdayField"><label>Dia da semana</label><select id="catWeekday">'+weekdayOpts+'</select></div>'+
         '<div class="field hidden" id="catFundField"><label>Método</label><select id="catFund">'+
-          '<option value="refill"'+(curFund==="refill"?" selected":"")+'>Repor até este valor — acrescenta só o que falta</option>'+
-          '<option value="setAside"'+(curFund==="setAside"?" selected":"")+'>Reservar este valor todos os meses — mesmo que já o tenha</option>'+
-        '</select></div>'+
+          '<option value="refill" id="catFundRefill"'+(curFund==="refill"?" selected":"")+'>Repor até este valor — acrescenta só o que falta</option>'+
+          '<option value="setAside" id="catFundSetAside"'+(curFund==="setAside"?" selected":"")+'>Reservar este valor todos os meses — mesmo que já o tenha</option>'+
+        '</select><div class="hint" id="catFundHint" style="margin-top:6px;"></div></div>'+
         '<div class="hint" id="catTargetHint" style="margin-top:-6px;"></div>'+
         (editing?'<div class="field" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;">'+
           '<label>Deixar de usar esta categoria</label>'+
@@ -2445,10 +2458,28 @@
       el("catAmtField").classList.toggle("hidden", v==="none");
       el("catDateField").classList.toggle("hidden", v!=="byDate");
       el("catWeekdayField").classList.toggle("hidden", v!=="weekly");
-      el("catFundField").classList.toggle("hidden", v!=="monthly");
       var perio = (v==="quarterly"||v==="semiannual"||v==="yearly");
-      el("catDueField").classList.toggle("hidden", !perio);
-      if (perio) el("catDueHint").textContent =
+      // O Método (Repor/Reservar) aparece no mensal E nos periódicos. Os textos das duas opções
+      // mudam consoante o tipo, porque a diferença é a mesma ideia mas com palavras adequadas.
+      el("catFundField").classList.toggle("hidden", !(v==="monthly" || perio));
+      var fundV = el("catFund").value;
+      if (v==="monthly") {
+        el("catFundRefill").textContent = "Repor até este valor — acrescenta só o que falta";
+        el("catFundSetAside").textContent = "Reservar este valor todos os meses — mesmo que já o tenha";
+        el("catFundHint").textContent = "";
+      } else if (perio) {
+        var cad = v==="quarterly"?"trimestre":(v==="semiannual"?"semestre":"ano");
+        var div = v==="quarterly"?"3":(v==="semiannual"?"6":"12");
+        el("catFundRefill").textContent = "Repor — chegar ao total até à data; se gastar a meio, pede mais para compensar";
+        el("catFundSetAside").textContent = "Reservar — o mesmo todos os meses (total ÷ "+div+"); gaste à vontade";
+        el("catFundHint").textContent = fundV==="setAside"
+          ? "Reserva sempre "+(div==="3"?"1/3":div==="6"?"1/6":"1/12")+" do total por mês, aconteça o que acontecer. Ideal para gastos que faz ao longo do "+cad+"."
+          : "Junta até ter o total. Se gastar a meio, pede mais nos meses seguintes para na mesma chegar lá.";
+      }
+      // O "mês da despesa" só faz sentido no modo Repor (é aí que reparte o que falta até lá).
+      // No modo Reservar o valor é fixo, por isso escondemo-lo para não sugerir que muda a conta.
+      el("catDueField").classList.toggle("hidden", !(perio && fundV!=="setAside"));
+      if (perio && fundV!=="setAside") el("catDueHint").textContent =
           v==="quarterly" ? "Ex.: o mês em que paga o seguro trimestral. Indicando-o, a aplicação reparte o que ainda falta pelos meses até lá e avança sozinha para o trimestre seguinte. Em branco, reserva 1/3 por mês."
         : v==="semiannual" ? "Ex.: o mês em que paga o seguro semestral. Indicando-o, a aplicação reparte o que ainda falta pelos meses até lá e avança sozinha para o semestre seguinte. Em branco, reserva 1/6 por mês."
         : "Ex.: o mês em que paga o IUC. Indicando-o, a aplicação reparte o que ainda falta pelos meses até lá e avança sozinha para o ano seguinte. Em branco, reserva 1/12 por mês.";
@@ -2463,6 +2494,7 @@
       el("catAmtLabel").textContent = v==="monthly" ? "Valor por mês" : (v==="weekly" ? "Valor por semana" : (v==="byDate" ? "Total a juntar" : "Valor total do período"));
     }
     sel.addEventListener("change", syncTargetUI);
+    var fundSel = el("catFund"); if (fundSel) fundSel.addEventListener("change", syncTargetUI);
     syncTargetUI();
   }
 
@@ -3670,7 +3702,12 @@
         if (tType==="byDate") target.date = el("catTargetDate").value || shiftMonth(state.ui.month,6);
         if (tType==="weekly") target.weekday = parseInt(el("catWeekday").value,10);
         if (tType==="monthly") target.fund = el("catFund").value;
-        if (tType==="quarterly" || tType==="semiannual" || tType==="yearly") { var dd=el("catTargetDue").value; if(dd) target.due=dd; }
+        if (tType==="quarterly" || tType==="semiannual" || tType==="yearly") {
+          target.fund = el("catFund").value;
+          // No modo Reservar o valor é fixo (total ÷ período), por isso o mês da despesa não
+          // entra na conta — não o guardamos para não deixar dados que baralham.
+          if (target.fund!=="setAside") { var dd=el("catTargetDue").value; if(dd) target.due=dd; }
+        }
       }
       var note=valLim("catNote", LIM_NOTA);
       var prio=el("catPrio")?el("catPrio").value:"normal";
