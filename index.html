@@ -177,6 +177,10 @@
 
   .btn { border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 9px 15px; border-radius: 9px; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; }
   .btn:hover { background: var(--surface-2); border-color: var(--primary); }
+  .btn:disabled { opacity: .38; cursor: default; }
+  .btn:disabled:hover { background: var(--surface); border-color: var(--border); }
+  .undo-redo { display: inline-flex; gap: 4px; }
+  .undo-redo .btn { padding: 6px 10px; font-size: 14px; line-height: 1; }
   .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
   .btn.primary:hover { background: var(--primary-dark); }
   .btn.danger { color: var(--negative); border-color: var(--negative-soft); }
@@ -271,6 +275,7 @@
   .btn.f-warn.active { background: var(--warning-soft); border-color: var(--warning); color: var(--warning); }
   .btn.f-neg.active  { background: var(--negative-soft); border-color: var(--negative); color: var(--negative); }
   .btn.f-ok.active   { background: var(--positive-soft); border-color: var(--positive); color: var(--positive); }
+  .btn.f-money.active { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
   .btn.f-alta.active   { background: var(--positive-soft); border-color: var(--positive); color: var(--positive); }
   .btn.f-normal.active { background: var(--neutral-soft); border-color: var(--text-muted); color: var(--text); }
   .btn.f-baixa.active  { background: var(--negative-soft); border-color: var(--negative); color: var(--negative); }
@@ -552,6 +557,10 @@
         <button class="btn sm" data-action="data-menu" aria-label="Dados e cópias de segurança">💾</button>
         <button class="btn sm" data-action="help" aria-label="Como funciona">❓</button>
       </div>
+      <div class="undo-redo">
+        <button class="btn sm" data-action="undo-do" id="btnUndo" title="Anular" aria-label="Anular">↩</button>
+        <button class="btn sm" data-action="redo-do" id="btnRedo" title="Refazer" aria-label="Refazer">↪</button>
+      </div>
       <button class="theme-toggle" data-action="toggle-theme" title="Alternar cor: verde / rosa" aria-label="Alternar cor da aplicação"></button>
     </div>
 
@@ -567,7 +576,7 @@
 
 <div class="toast" id="toast"></div>
 <div class="chart-tip" id="chartTip"></div>
-<div class="undo-bar" id="undoBar"><span id="undoText"></span><button class="btn sm" data-action="undo-delete">↩ Anular</button></div>
+<div class="undo-bar" id="undoBar"><span id="undoText"></span><button class="btn sm" data-action="undo-do">↩ Anular</button></div>
 <div class="undo-bar backup-bar" id="backupBar"><span>💾</span><span id="backupText"></span><button class="btn sm" data-action="backup-now">Guardar agora</button><button class="btn sm" data-action="backup-later">Mais tarde</button></div>
 
 <script>
@@ -685,6 +694,9 @@
   // Por isso isto não pode ser um aviso que desaparece em dois segundos.
   var _semEspaco = false;
   function save() {
+    // Qualquer gravação normal (não uma navegação no histórico) invalida o "Refazer":
+    // depois de uma ação nova, deixa de fazer sentido refazer o que se tinha anulado.
+    if (!_navHist) _redo = [];
     _idx = null; _payees = null;
     var guardou = true;
     try { localStorage.setItem(budKey(_bindex.active), JSON.stringify(state)); }
@@ -748,7 +760,7 @@
   var _idx = null;
   var _split = null; // estado de trabalho da transação dividida (não é guardado)
   var _rec = null;   // estado de trabalho da regra recorrente (não é guardado)
-  var _undo = [], _undoTimer = null, UNDO_MAX = 5; // histórico de anulação (até 5 passos)
+  var _undo = [], _redo = [], _navHist = false, _undoTimer = null, UNDO_MAX = 5; // histórico de anular/refazer (até 5 passos cada)
   var _csv = null;   // pré-visualização da importação de CSV
   var _drag = null;  // arrastar para reordenar
   var _searchTimer = null;  // atraso da caixa de procura (não é guardado)
@@ -1700,6 +1712,7 @@
     if (v === "transactions") renderTransactions();
     if (v === "recurring") renderRecurring();
     if (v === "reports") renderReports();
+    refreshUndoButtons();
   }
 
   function renderSidebar() {
@@ -1791,6 +1804,7 @@
     var fPrio   = !!(bp.alta || bp.normal || bp.baixa);
     if (fEstado && !bf[catStatus(c, m)]) return false;
     if (fPrio && (c.cardId || !bp[c.priority||"normal"])) return false;   // as do cartão não têm prioridade
+    if (bf.money && !(availableFor(c.id, m) > 0.005)) return false;        // só as que têm disponível > 0
     return true;
   }
 
@@ -1805,7 +1819,7 @@
     var upc = upcomingTotals(m).porCat;   // o que cada categoria ainda tem por sair este mês
     var bf = state.ui.budgetFilters || {};
     var bp = state.ui.prioFilters || {};
-    var filtering = !!(bf.warn || bf.neg || bf.ok || bp.alta || bp.normal || bp.baixa);
+    var filtering = !!(bf.warn || bf.neg || bf.ok || bf.money || bp.alta || bp.normal || bp.baixa);
     var nShown=0, nTotal=0;
     var rows = "";
     for (var g=0; g<state.groups.length; g++) {
@@ -1912,6 +1926,7 @@
         fBtn('f-ok','budget-filter','ok',bf.ok,'🟢','Alvo cumprido','Só as categorias com o alvo cumprido') +
         fBtn('f-warn','budget-filter','warn',bf.warn,'🟡','Abaixo do alvo','Só as categorias com o alvo por cumprir') +
         fBtn('f-neg','budget-filter','neg',bf.neg,'🔴','Excedido','Só as categorias que gastaram mais do que tinham') +
+        fBtn('f-money','budget-filter','money',bf.money,'💰','Com saldo','Só as categorias com dinheiro disponível') +
         '<span class="sep"></span>' +
         '<span class="muted hide-phone" style="font-size:12.5px;">Prioridade:</span>' +
         fBtn('f-alta','prio-filter','alta',bp.alta,'▲','Alta','Só as de prioridade alta') +
@@ -2709,6 +2724,7 @@
         '</div>'+
         '<div class="field"><button class="btn primary" data-action="export-json" style="width:100%;justify-content:center;">⬇ Guardar cópia de segurança (.json)</button></div>'+
         '<div class="field"><button class="btn" data-action="export-csv" style="width:100%;justify-content:center;">⬇ Exportar transações (.csv)</button></div>'+
+        '<div class="field"><button class="btn" data-action="export-budget-csv" style="width:100%;justify-content:center;">⬇ Exportar orçamento do mês (.csv)</button><div class="hint">A tabela do mês em vista: Atribuído, Atividade e Disponível por categoria.</div></div>'+
         '<div class="field"><label>Importar cópia de segurança (.json)</label><input id="importFile" type="file" accept="application/json,.json"><div class="hint">Substitui todos os dados atuais por este ficheiro.</div></div>'+
         '<div class="field"><button class="btn" data-action="import-csv" style="width:100%;justify-content:center;">📥 Importar transações do banco (.csv)</button><div class="hint">Acrescenta transações às existentes, sem substituir nada.</div></div>'+
         '<hr style="border:0;border-top:1px solid var(--border);margin:18px 0;">'+
@@ -3778,6 +3794,7 @@
         outflow: num("txOut"), inflow: num("txIn"), cleared: el("txClear").checked };
       if (data.outflow===0 && data.inflow===0) { toast("Indique um valor de saída ou entrada."); return; }
       if (data.outflow>0 && data.inflow>0) { toast("Preencha só a Saída OU a Entrada, não as duas."); return; }
+      pushUndo(id ? "Transação alterada." : "Transação criada.");
       if (id) { var t=txById(id); for(var k in data) t[k]=data[k]; }
       else { data.id=uid(); state.transactions.push(data); }
       closeModal(); save(); render(); toast("Transação guardada.");
@@ -3857,6 +3874,7 @@
     "edit-group": function(id){ groupModal(groupById(id)); },
     "save-group": function(id){
       var name=valLim("grpName", LIM_NOME); if(!name){ toast("Indique um nome."); return; }
+      pushUndo(id ? "Grupo alterado." : "Grupo criado.");
       if (id){ groupById(id).name=name; } else { state.groups.push({id:uid(), name:name}); }
       closeModal(); save(); render(); toast("Grupo guardado.");
     },
@@ -3910,6 +3928,7 @@
       }
       var note=valLim("catNote", LIM_NOTA);
       var prio=el("catPrio")?el("catPrio").value:"normal";
+      pushUndo(id ? "Categoria alterada." : "Categoria criada.");
       if (id){ var c=categoryById(id); c.name=name; c.groupId=groupId; c.target=target; c.note=note; c.priority=prio; }
       else { state.categories.push({id:uid(), name:name, groupId:groupId, target:target, note:note, priority:prio}); }
       closeModal(); save(); render(); toast("Categoria guardada.");
@@ -3928,6 +3947,7 @@
     "apply-clear": function(){
       var m=state.ui.month, plan=clearPlan(m);
       if(!plan.entries.length){ toast("Não há nada para devolver."); return; }
+      pushUndo("Atribuições limpas.");
       var snap=[];
       for(var i=0;i<plan.entries.length;i++){
         var k=plan.entries[i].id+"|"+m;
@@ -3944,6 +3964,7 @@
       if(!alvo||!sel){ return; }
       var tot=coverTotal(sel);
       if(tot<=0.005){ toast("Escolha de onde tirar o dinheiro."); return; }
+      pushUndo("Excesso coberto.");
       var snap=[], nFontes=0;
       function guarda(key){ snap.push({key:key, prev: state.assignments.hasOwnProperty(key)?state.assignments[key]:null}); }
       for(var id in sel){
@@ -3963,6 +3984,7 @@
     "fund-one": function(id){
       var m=state.ui.month; var c=categoryById(id); if(!c) return;
       var ti=targetInfo(c,m); if(!ti||!(ti.need>0)){ toast("Alvo já cumprido."); return; }
+      pushUndo("Alvo financiado.");
       var key=id+"|"+m;
       state.ui.lastFunding={month:m, entries:[{key:key, prev: state.assignments.hasOwnProperty(key)?state.assignments[key]:null}]};
       state.assignments[key]=round2((state.assignments[key]||0)+ti.need);
@@ -3975,6 +3997,7 @@
     "apply-surplus": function(){
       var m=state.ui.month, plan=surplusPlan(m, !!state.ui.surplusSemAlvo);
       if(!plan.entries.length){ toast("Não há nada a libertar."); return; }
+      pushUndo("Excedente libertado.");
       var snap=[];
       for(var i=0;i<plan.entries.length;i++){
         var e=plan.entries[i], key=e.catId+"|"+m;
@@ -3988,6 +4011,7 @@
     "apply-recover": function(){
       var m=state.ui.month, plan=recoverPlan(m, state.ui.recoverStrategy);
       if(!plan.entries.length){ toast("Não há de onde tirar."); return; }
+      pushUndo("Reposto a zero.");
       var snap=[];
       for(var i=0;i<plan.entries.length;i++){
         var e=plan.entries[i], key=e.catId+"|"+m;
@@ -4002,6 +4026,7 @@
       var m=state.ui.month, mode=state.ui._fundMode||"full";
       var plan=fundingPlan(mode,m,state.ui.fundStrategy);
       if(!plan.entries.length){ toast("Não há nada a financiar."); return; }
+      pushUndo("Alvos financiados.");
       var snap=[];
       for(var i=0;i<plan.entries.length;i++){
         var e=plan.entries[i], key=e.catId+"|"+m;
@@ -4019,14 +4044,8 @@
       state.ui.lastFunding=null;
       closeModal(); save(); render(); toast("Alteração revertida.");
     },
-    "undo-delete": function(){
-      if(!_undo.length) return;
-      var step=_undo.pop(), curUi=state.ui;
-      try{ state=JSON.parse(step.json); state.ui=curUi; }catch(e){ return; }
-      save(); render();
-      toast("Reposto: "+step.desc);
-      if(_undo.length) showUndo(); else hideUndo();
-    },
+    "undo-do": function(){ doUndo(); },
+    "redo-do": function(){ doRedo(); },
 
     "move-money": function(id){ moveModal(id); },
     "do-move": function(){
@@ -4034,6 +4053,7 @@
       var from=el("mvFrom").value, to=el("mvTo").value, amt=num("mvAmt");
       if(from===to){ toast("Escolha uma origem e um destino diferentes."); return; }
       if(amt<=0){ toast("Indique um valor a mover."); return; }
+      pushUndo("Dinheiro movido.");
       var snap=[];
       function adj(catId, delta){ var key=catId+"|"+m; snap.push({key:key, prev: state.assignments.hasOwnProperty(key)?state.assignments[key]:null}); var nv=round2((state.assignments[key]||0)+delta); if(Math.abs(nv)<0.005) delete state.assignments[key]; else state.assignments[key]=nv; }
       if(from!==RTA_ID) adj(from, -amt);
@@ -4081,6 +4101,7 @@
                   payee:d.payee||"", categoryId:d.categoryId||null, memo:d.memo||"",
                   outflow:d.outflow||0, inflow:d.inflow||0, active:!!d.active };
       }
+      pushUndo(d._id ? "Recorrente alterada." : "Recorrente criada.");
       if(d._id){ var r=recById(d._id); for(var k in dados) r[k]=dados[k]; }
       else { dados.id=uid(); state.recurring.push(dados); }
       _rec=null; closeModal(); save();
@@ -4148,6 +4169,7 @@
     },
     "export-json": function(){ exportJSON(); },
     "export-csv": exportCSV,
+    "export-budget-csv": exportBudgetCSV,
     "backup-now": function(){ exportJSON(); },
     "backup-later": function(){ _backupBarDismissed=true; hideBackupBar(); },
     "toggle-autobackup": function(){ state.settings.autoBackup = !(state.settings.autoBackup!==false); if(state.settings.autoBackup!==false){ try{ takeDailySnapshot(); }catch(e){} } save(); dataModal(); },
@@ -4594,6 +4616,25 @@
     var csv = rows.map(function(r){ return r.map(function(c){ var s=String(c); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";"); }).join("\n");
     guardarFicheiro("transacoes-" + todayISO() + ".csv", "﻿"+csv, "text/csv;charset=utf-8", function(){ toast("CSV exportado."); });
   }
+  // Exporta a TABELA do orçamento do mês em vista: por grupo/categoria, o Atribuído, a Atividade
+  // e o Disponível — mais a linha do «Pronto a atribuir» e o total do mês. Espelha o que se vê no
+  // separador Orçamento, ao contrário do exportCSV() que exporta as transações.
+  function exportBudgetCSV() {
+    var m = state.ui.month;
+    function n(x){ return round2(x||0).toFixed(2).replace(".", ","); }
+    var rows = [["Orçamento", monthLabel(m)], [], ["Pronto a atribuir", "", "", n(readyToAssign(m))], [],
+                ["Grupo","Categoria","Atribuído","Atividade","Disponível"]];
+    for (var g=0; g<state.groups.length; g++) {
+      var grp=state.groups[g], cats=categoriesOfGroup(grp.id);
+      for (var c=0;c<cats.length;c++){ var cat=cats[c];
+        rows.push([grp.name, cat.name, n(assignedFor(cat.id,m)), n(activityFor(cat.id,m)), n(availableFor(cat.id,m))]);
+      }
+    }
+    var tot=budgetTotals(m);
+    rows.push([], ["Total do mês (sem cartões de crédito)","", n(tot.assigned), n(tot.activity), n(tot.avail)]);
+    var csv = rows.map(function(r){ return r.map(function(c){ var s=String(c==null?"":c); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";"); }).join("\n");
+    guardarFicheiro("orcamento-"+m+".csv", "﻿"+csv, "text/csv;charset=utf-8", function(){ toast("Orçamento do mês exportado (CSV)."); });
+  }
   // ---------- Importação de CSV ----------
   function splitCSVLine(line, d){
     var out=[],cur="",q=false;
@@ -4826,7 +4867,41 @@
   // ---------- Avisos ----------
   var toastTimer;
   function toast(msg){ var t=el("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.classList.remove("show");},2200); }
+  // Guarda uma fotografia do estado ANTES de uma alteração. Chamado por eliminações E edições
+  // (categoria, transação, grupo, recorrente), por isso o Anular cobre tudo isso, não só apagar.
+  // A gravação que se segue invalida o Refazer (ver save()) — uma ação nova fecha o "futuro".
   function pushUndo(desc){ _undo.push({ desc:desc, json:JSON.stringify(state) }); if(_undo.length>UNDO_MAX) _undo.shift(); }
+  // Aplica um estado já lido, preservando a vista/mês deste aparelho. _navHist evita que o save()
+  // interno limpe a pilha oposta a meio da navegação.
+  function aplicarEstado(obj){
+    var ui = state.ui;
+    state = obj; state.ui = ui; _idx = null; _payees = null;
+    _navHist = true; try { save(); render(); } finally { _navHist = false; }
+  }
+  function doUndo(){
+    if(!_undo.length){ toast("Nada para anular."); return; }
+    var atual = JSON.stringify(state), step = _undo[_undo.length-1], snap;
+    try { snap = JSON.parse(step.json); } catch(e){ toast("Esse passo está inválido."); return; }
+    _undo.pop();                                                    // pilhas atualizadas ANTES do render,
+    _redo.push({ desc:step.desc, json:atual }); if(_redo.length>UNDO_MAX) _redo.shift();  // p/ os botões acertarem
+    aplicarEstado(snap);
+    toast("Anulado: "+step.desc);
+  }
+  function doRedo(){
+    if(!_redo.length){ toast("Nada para refazer."); return; }
+    var atual = JSON.stringify(state), step = _redo[_redo.length-1], snap;
+    try { snap = JSON.parse(step.json); } catch(e){ toast("Esse passo está inválido."); return; }
+    _redo.pop();
+    _undo.push({ desc:step.desc, json:atual }); if(_undo.length>UNDO_MAX) _undo.shift();
+    aplicarEstado(snap);
+    toast("Refeito: "+step.desc);
+  }
+  // Estado dos botões fixos Anular/Refazer, atualizado a cada render.
+  function refreshUndoButtons(){
+    var bu=el("btnUndo"), br=el("btnRedo");
+    if(bu){ bu.disabled=!_undo.length; bu.title=_undo.length?("Anular: "+_undo[_undo.length-1].desc):"Nada para anular"; }
+    if(br){ br.disabled=!_redo.length; br.title=_redo.length?("Refazer: "+_redo[_redo.length-1].desc):"Nada para refazer"; }
+  }
   function hideUndo(){ var b=el("undoBar"); if(b) b.classList.remove("show"); clearTimeout(_undoTimer); }
   function showUndo(){
     if(!_undo.length) return; var b=el("undoBar"); if(!b) return;
@@ -4947,6 +5022,8 @@
       var v = parseAmount(inp.value); v = isNaN(v)?0:round2(v);
       var key = cid + "|" + state.ui.month;
       var antes = state.assignments.hasOwnProperty(key) ? state.assignments[key] : null;
+      if ((antes==null?0:antes) === v) return;   // sem mudança real: não sujar o histórico
+      pushUndo("Atribuição alterada.");
       if (v===0) delete state.assignments[key]; else state.assignments[key]=v;
       // Guardar o valor anterior para o «↩ Anular» da faixa também servir as edições à mão.
       state.ui.lastFunding = { month: state.ui.month, entries:[{ key:key, prev:antes }] };
