@@ -1268,7 +1268,9 @@
       // aproveita o que sobrou (por isso a conta variável que fica abaixo do previsto pede menos).
       var fundedM = round2(avail - activityFor(cat.id, m));   // transitado + atribuído este mês (antes do gasto)
       var needM = Math.max(0, round2(amt - fundedM));
-      return { need:needM, met: fundedM>=amt-0.005, progress: Math.max(0,Math.min(1, amt>0?fundedM/amt:0)),
+      // COR pelo financiamento (verde fica verde depois de gastar); LARGURA pelo que RESTA
+      // disponível — assim a barra encolhe à medida que se gasta, sem mudar de cor.
+      return { need:needM, met: fundedM>=amt-0.005, progress: Math.max(0,Math.min(1, amt>0?avail/amt:0)),
         label: needM>0 ? ("Faltam "+fmt(needM)+" para financiar "+fmt(amt)+" este mês") : ("🎯 Financiado "+fmt(amt)+" este mês") };
     }
     if (type==="weekly") {
@@ -1279,7 +1281,8 @@
       // total semanal (semanas × valor), e mantém-se cumprido depois de gastar.
       var fundedW = round2(avail - activityFor(cat.id, m));
       var needW = Math.max(0, round2(monthTarget - fundedW));
-      return { need:needW, met: fundedW>=monthTarget-0.005, progress: Math.max(0,Math.min(1, monthTarget>0?fundedW/monthTarget:0)),
+      // COR pelo financiamento; LARGURA pelo que resta (encolhe ao gastar) — igual ao mensal.
+      return { need:needW, met: fundedW>=monthTarget-0.005, progress: Math.max(0,Math.min(1, monthTarget>0?avail/monthTarget:0)),
         label: needW>0 ? ("Faltam "+fmt(needW)+" — "+fmt(amt)+"/semana × "+weeks+" semanas = "+fmt(monthTarget))
                        : ("🎯 Financiado "+fmt(amt)+"/semana × "+weeks+" = "+fmt(monthTarget)+" este mês") };
     }
