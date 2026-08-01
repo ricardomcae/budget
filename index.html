@@ -1748,7 +1748,7 @@
     var temAtribuido = clearPlan(state.ui.month).entries.length > 0;
     var cls = rta > 0.005 ? "" : (rta < -0.005 ? "over" : "zero");
     var msg = rta > 0.005 ? "Pronto a atribuir" : (rta < -0.005 ? "Atribuiu mais do que tinha" : "Tudo atribuído — cada euro tem uma função 🎉");
-    var undoBtn = (state.ui.lastFunding && state.ui.lastFunding.month===state.ui.month) ? '<button data-action="undo-funding" title="Reverter a última alteração">↩ Anular</button>' : '';
+    var undoBtn = '';   // o anular/refazer é agora só pelos botões ↩ ↪ do topo (sistema único)
     var dv = integrityDelta(state.ui.month);
     var aviso = "";
     if (Math.abs(dv) >= 0.005) {
@@ -3166,7 +3166,7 @@
     }).join("");
     else if (anyNeed && mode==="cap") rows = '<div class="muted" style="padding:14px 0;text-align:center;">Não tem nada por atribuir. Liberte o excedente de alguma categoria, ou registe rendimento.</div>';
     else rows = '<div class="muted" style="padding:14px 0;text-align:center;">Todos os alvos deste mês já estão cumpridos. 🎉</div>';
-    var undoBtn = (state.ui.lastFunding && state.ui.lastFunding.month===m) ? '<button class="btn" data-action="undo-funding">↩ Reverter último</button>' : '<span></span>';
+    var undoBtn = '<span></span>';   // anular/refazer pelos botões ↩ ↪ do topo
     openModal(
       '<div class="modal-head"><h2>🎯 Financiar alvos — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
@@ -3214,7 +3214,7 @@
     }).join("");
     else rows = '<div class="muted" style="padding:14px 0;text-align:center;">Nenhuma categoria tem dinheiro parado para devolver. Só registando mais rendimento.</div>';
 
-    var undoBtn = (state.ui.lastFunding && state.ui.lastFunding.month===m) ? '<button class="btn" data-action="undo-funding">↩ Reverter último</button>' : '<span></span>';
+    var undoBtn = '<span></span>';   // anular/refazer pelos botões ↩ ↪ do topo
     openModal(
       '<div class="modal-head"><h2>↩ Repor a zero — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
@@ -4044,13 +4044,6 @@
       state.ui.lastFunding={month:m, entries:snap};
       closeModal(); save(); render();
       toast("Financiado "+fmt(plan.total)+" em "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
-    },
-    "undo-funding": function(){
-      var lf=state.ui.lastFunding;
-      if(!lf||!lf.entries){ toast("Nada para reverter."); return; }
-      for(var i=0;i<lf.entries.length;i++){ var e=lf.entries[i]; if(e.prev==null) delete state.assignments[e.key]; else state.assignments[e.key]=e.prev; }
-      state.ui.lastFunding=null;
-      closeModal(); save(); render(); toast("Alteração revertida.");
     },
     "undo-do": function(){ doUndo(); },
     "redo-do": function(){ doRedo(); },
