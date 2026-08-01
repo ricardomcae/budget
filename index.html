@@ -163,6 +163,11 @@
   .upcoming-bar b { color: var(--text); font-variant-numeric: tabular-nums; }
   .upcoming-bar button { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 12.5px; white-space: nowrap; }
   .upcoming-bar button:hover { border-color: var(--primary); color: var(--primary); }
+  .overspent-bar { display: flex; align-items: center; gap: 12px; margin: 10px 26px 0; padding: 11px 16px; border-radius: 12px; background: var(--negative-soft); border: 1px solid var(--negative); color: var(--negative); font-size: 13px; font-weight: 600; flex-wrap: wrap; }
+  .overspent-bar .grow { flex: 1; min-width: 170px; }
+  .overspent-bar b { font-variant-numeric: tabular-nums; }
+  .overspent-bar button { background: var(--surface); border: 1px solid var(--negative); color: var(--negative); padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 12.5px; white-space: nowrap; }
+  .overspent-bar button:hover { background: var(--negative); color: #fff; }
   .int-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
   .int-row .who { min-width: 0; }
   .int-row .who b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -227,9 +232,11 @@
   .date-field { position: relative; display: inline-flex; align-items: center; width: 100%; }
   .date-txt { width: 100%; padding-inline-end: 34px !important; font-variant-numeric: tabular-nums; }
   .date-txt.erro { border-color: var(--negative); }
-  .date-nat { position: absolute; inset-inline-end: 4px; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; }
-  .date-btn { position: absolute; inset-inline-end: 3px; background: none; border: 0; cursor: pointer; font-size: 15px; line-height: 1; padding: 4px 5px; border-radius: 6px; }
-  .date-btn:hover { background: var(--surface-2); }
+  /* O <input type="date"> nativo fica por cima da zona do 📅, transparente mas a receber toques:
+     assim um toque no telemóvel abre o calendário nativo com gesto real (o caminho fiável no iOS),
+     e a parte esquerda do campo continua livre para escrever a data à mão em dd/mm/aaaa. */
+  .date-nat { position: absolute; inset-inline-end: 0; top: 0; width: 42px; height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; z-index: 2; -webkit-appearance: none; appearance: none; }
+  .date-btn { position: absolute; inset-inline-end: 3px; background: none; border: 0; font-size: 15px; line-height: 1; padding: 4px 5px; border-radius: 6px; pointer-events: none; z-index: 1; color: var(--text-muted); }
   .toolbar .date-field { width: auto; }
   .toolbar .date-txt { width: 128px; }
   .op-intro { margin: 0 0 12px; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
@@ -363,6 +370,22 @@
   .field label { display: block; font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .4px; }
   .field input, .field select, .field textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); }
   .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  /* Autocomplete de beneficiários — dropdown próprio (o <datalist> não funciona no Safari iOS). */
+  .ac-wrap { position: relative; }
+  .ac-list { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-lg); max-height: 244px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .ac-item { padding: 10px 12px; font-size: 13.5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
+  .ac-item:last-child { border-bottom: 0; }
+  .ac-item.active, .ac-item:hover { background: var(--primary-soft); }
+  .ac-item .ac-cat { font-size: 11.5px; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+  .ac-item.ac-new { color: var(--primary); font-weight: 600; }
+  /* Seleção temporária de transações (só visual): checkbox por linha + barra de somatório. */
+  .tx-selcell { display: inline-flex; align-items: center; margin-inline-end: 8px; vertical-align: middle; cursor: pointer; }
+  .tx-sel { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); margin: 0; }
+  .tx-sel-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 90; display: none; align-items: center; gap: 8px 14px; flex-wrap: wrap; justify-content: center; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg); border-radius: 12px; padding: 10px 16px; font-size: 13px; max-width: calc(100% - 24px); }
+  .tx-sel-bar.show { display: flex; }
+  .tx-sel-bar b { font-variant-numeric: tabular-nums; }
+  .tx-sel-bar .txsel-clear { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+  .tx-sel-bar .txsel-clear:hover { border-color: var(--primary); color: var(--primary); }
   .field .hint { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; font-weight: 500; text-transform: none; letter-spacing: 0; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .split-line select, .split-line input { width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); }
@@ -417,7 +440,7 @@
     /* Conteúdo com espaço para a barra inferior + área segura do iPhone */
     .content { padding: 16px calc(13px + env(safe-area-inset-right)) calc(88px + env(safe-area-inset-bottom)) calc(13px + env(safe-area-inset-left)); }
     .rta-banner { margin: 14px 13px 0; padding: 14px 16px; }
-    .integrity-bar, .upcoming-bar { margin: 10px 13px 0; }
+    .integrity-bar, .upcoming-bar, .overspent-bar { margin: 10px 13px 0; }
     .rta-amount { font-size: 22px; }
 
     /* Safari faz zoom ao focar qualquer campo com menos de 16px.
@@ -1185,14 +1208,33 @@
     if(gi<0||gj<0) return;
     var t=state.categories[gi]; state.categories[gi]=state.categories[gj]; state.categories[gj]=t;
   }
-  // Mensalidade fixa do "até uma data" no modo Reservar: o que ainda falta (total − o que já
-  // está reservado) repartido pelos meses até à data, incluindo o mês de partida. Congela-se no
-  // momento da edição e não volta a mudar — é isto que faz o pedido ser cego ao que se gasta.
-  function sliceAteData(amount, availNow, fromMonth, date){
-    var dm = monthsBetween(fromMonth, date), meses = dm>=0 ? dm+1 : 1;
-    var falta = round2(amount - availNow), sl = falta>0 ? round2(falta/meses) : 0;
-    if (falta>0.005 && sl<0.01) sl = 0.01;   // nunca congelar em zero quando ainda falta juntar
-    return sl;
+  // Mensalidade fixa do "até uma data" no modo Reservar. Congela-se no momento da edição e não
+  // volta a mudar — é isto que faz o pedido ser cego ao que se gasta. O cálculo tem de saber, além
+  // do saldo (availNow), quanto já foi ATRIBUÍDO este mês (assignedThis), porque disso depende se o
+  // mês corrente ainda vai ser reforçado até à fatia (e por isso conta para o divisor) ou se já tem
+  // o que precisa e fica de fora — senão perde-se uma mensalidade (bug das "Prendas de Natal").
+  function sliceAteData(amount, availNow, assignedThis, fromMonth, date){
+    var dm = monthsBetween(fromMonth, date);
+    var nTotal  = dm>=0 ? dm+1 : 1;   // meses até à data, mês corrente incluído
+    var nFuture = dm>=0 ? dm   : 0;   // só os meses a seguir ao corrente
+    var have = availNow>0 ? availNow : 0;
+    var a    = assignedThis>0 ? assignedThis : 0;
+    var carry = round2(have - a); if (carry<0) carry = 0;   // saldo transitado de meses anteriores
+    if (amount - have <= 0.005) return 0;                   // objetivo já atingido: nada a congelar
+    // Fatia se o mês corrente também for reforçado (o que já cá está, tirando o transitado, conta).
+    var limiar = round2((amount - carry) / nTotal);
+    var sl;
+    if (nFuture>0 && a >= limiar) {
+      // Já foi atribuída, este mês, pelo menos uma fatia: o mês corrente fica como está e o que
+      // falta reparte-se SÓ pelos meses seguintes — assim não se perde a mensalidade deste mês.
+      sl = round2((amount - have) / nFuture);
+    } else {
+      // O mês corrente ainda vai ser reforçado até à fatia: reparte-se por TODOS os meses.
+      sl = limiar;
+    }
+    if (amount - have > 0.005 && sl < 0.01) sl = 0.01;      // nunca congelar em zero havendo falta
+    if (sl < 0) sl = 0;
+    return round2(sl);
   }
   // Cadências de alvo: mensal | semanal | trimestral | semestral | anual | até uma data.
   // Devolve {need, met, progress, label} ou null quando a categoria não tem alvo.
@@ -1510,8 +1552,8 @@
     return '<div class="date-field">'+
       '<input id="'+id+'" class="date-txt" type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" '+
         'value="'+esc(isoParaPt(iso))+'" '+(extra||"")+'>'+
-      '<input id="'+id+'__nat" class="date-nat" type="date" value="'+esc(iso||"")+'" tabindex="-1" aria-hidden="true">'+
-      '<button type="button" class="date-btn" data-cal="'+id+'" title="Escolher no calendário" aria-label="Escolher no calendário">📅</button>'+
+      '<span class="date-btn" aria-hidden="true">📅</span>'+
+      '<input id="'+id+'__nat" class="date-nat" type="date" value="'+esc(iso||"")+'" aria-label="Escolher a data no calendário">'+
     '</div>';
   }
 
@@ -1635,6 +1677,8 @@
   // ---------- Desenho do ecrã ----------
   function applyTheme(){ if (document.body) document.body.classList.toggle("theme-rose", !!(state.settings && state.settings.theme==="rose")); }
   function render() {
+    _txSel = {};   // a seleção temporária de transações não sobrevive a mudanças de página
+    var _sb = document.getElementById("txSelBar"); if (_sb) _sb.classList.remove("show");
     applyTheme();
     pinSystemGroups();
     // Guardar ANTES de indexar: o save() invalida o índice, e assim ele fica válido
@@ -1692,6 +1736,16 @@
                 : ('Há <b>'+fmt(dv)+'</b> nas contas de orçamento que ainda não passaram por nenhuma categoria.')) +
         '</span><button data-action="integrity">Ver porquê</button></div>';
     }
+    // Aviso de categorias excedidas (disponível negativo). Só visual + atalho para as filtrar.
+    var excedidas = 0;
+    for (var oc=0; oc<state.categories.length; oc++) if (catStatus(state.categories[oc], state.ui.month) === "neg") excedidas++;
+    var over = "";
+    if (excedidas > 0) {
+      over = '<div class="overspent-bar"><span>🔴</span><span class="grow"><b>'+excedidas+'</b> '+
+        (excedidas===1 ? 'categoria excedida' : 'categorias excedidas')+
+        ' — gastou mais do que tinha disponível.</span>'+
+        '<button data-action="show-overspent">Ver quais</button></div>';
+    }
     var up = upcomingTotals(state.ui.month);
     var futuro = "";
     if (up.lista.length) {
@@ -1712,7 +1766,7 @@
           (temAtribuido ? '<button data-action="clear-preview" title="Devolver tudo o que atribuiu neste mês">🧽 Limpar atribuições…</button>' : '') +
           undoBtn +
         '</div>' +
-      '</div>' + aviso + futuro;
+      '</div>' + over + aviso + futuro;
   }
 
   // Estado de uma categoria no mês: "neg" (excesso), "warn" (abaixo do alvo), "ok" (cumprido), "none" (sem alvo)
@@ -1959,7 +2013,7 @@
     var accCell = "";
     if (withAccount) { var a=lkAcc(t.accountId); accCell = '<td class="tag" style="white-space:nowrap;">'+esc(a?a.name:"—")+'</td>'; }
     return '<tr class="hoverable" data-action="edit-tx" data-id="'+t.id+'" style="cursor:pointer;">'+
-      '<td class="muted" style="white-space:nowrap;">'+fmtDate(t.date)+'</td>'+
+      '<td class="muted" style="white-space:nowrap;"><label class="tx-selcell" title="Selecionar (só para somar)"><input type="checkbox" class="tx-sel" data-id="'+t.id+'"'+(_txSel[t.id]?" checked":"")+'></label>'+fmtDate(t.date)+'</td>'+
       accCell +
       '<td style="font-weight:600;">'+esc(t.payee||"")+(t.split?' <span class="tag" title="Transação dividida">🔗</span>':'')+'</td>'+
       '<td>'+catName+'</td>'+
@@ -1971,6 +2025,39 @@
       '<td class="row-actions">'+
         '<button data-action="duplicate-tx" data-id="'+t.id+'" title="Duplicar">⧉</button>'+
         '<button data-action="delete-tx" data-id="'+t.id+'" title="Eliminar">🗑</button></td></tr>';
+  }
+
+  // ---------- Seleção temporária de transações (apenas visual) ----------
+  // Guardada só em memória e limpa a cada render (mudar de página desfaz), como pedido. Nada é
+  // gravado nem sofre qualquer ação — serve só para ver um somatório "na hora".
+  var _txSel = {};
+  function txSelBar(){
+    var b = document.getElementById("txSelBar");
+    if(!b){
+      b = document.createElement("div"); b.id="txSelBar"; b.className="tx-sel-bar";
+      b.innerHTML = '<span class="txsel-info"></span><button type="button" class="txsel-clear">Limpar seleção</button>';
+      document.body.appendChild(b);
+      b.querySelector(".txsel-clear").addEventListener("click", function(){
+        _txSel = {};
+        var boxes=document.querySelectorAll(".tx-sel"); for(var i=0;i<boxes.length;i++) boxes[i].checked=false;
+        renderTxSelBar();
+      });
+    }
+    return b;
+  }
+  function renderTxSelBar(){
+    var out=0, inf=0, n=0;
+    for(var i=0;i<state.transactions.length;i++){ var t=state.transactions[i];
+      if(_txSel[t.id]){ n++; out=round2(out+(t.outflow||0)); inf=round2(inf+(t.inflow||0)); } }
+    var b = txSelBar();
+    if(!n){ b.classList.remove("show"); return; }
+    var net = round2(inf-out);
+    b.querySelector(".txsel-info").innerHTML =
+      '<b>'+n+'</b> selecionada'+(n===1?'':'s')+
+      ' &nbsp;·&nbsp; Saídas <b>'+fmt(out)+'</b>'+
+      ' &nbsp;·&nbsp; Entradas <b>'+fmt(inf)+'</b>'+
+      ' &nbsp;·&nbsp; Líquido <b style="color:'+(net<0?'var(--negative)':'var(--positive)')+'">'+fmt(net)+'</b>';
+    b.classList.add("show");
   }
 
   // Períodos prontos, para não ser preciso andar a escolher datas à mão no dia a dia.
@@ -2357,8 +2444,7 @@
           '<div class="field"><label>Data</label>'+dateField("txDate", tx.date)+'</div>'+
           '<div class="field"><label>Conta</label><select id="txAcc">'+accOpts+'</select></div>'+
         '</div>'+
-        '<div class="field"><label>Beneficiário</label><input id="txPayee" maxlength="100" list="payeeList" autocomplete="off" value="'+esc(tx.payee||"")+'" placeholder="Ex.: Continente, Salário, EDP…">'+
-          '<datalist id="payeeList">'+payeeListHTML()+'</datalist></div>'+
+        '<div class="field"><label>Beneficiário</label><div class="ac-wrap"><input id="txPayee" maxlength="100" autocomplete="off" value="'+esc(tx.payee||"")+'" placeholder="Ex.: Continente, Salário, EDP…"></div></div>'+
         '<div class="field"><label>Categoria</label><select id="txCat">'+catOpts+'</select>'+
           '<div class="hint hidden" id="txCatSug">💡 Categoria preenchida a partir da última vez que usou este beneficiário.</div>'+
           '<div class="hint hidden" id="txCatWarn">⚠️ Sem categoria, este movimento muda o saldo da conta mas fica de fora do orçamento — as contas deixam de bater certo.</div></div>'+
@@ -2398,7 +2484,71 @@
     el("txPayee").addEventListener("change", sugerirCategoria);
     el("txPayee").addEventListener("blur", sugerirCategoria);
     el("txCat").addEventListener("change", function(){ el("txCatSug").classList.add("hidden"); });
+    wirePayeeAutocomplete(el("txPayee"));
     txWarn();
+  }
+
+  // Autocomplete próprio dos beneficiários: filtra à medida que se escreve, sugere a categoria
+  // habitual ao lado, e deixa criar um novo (é só usar o texto escrito — os beneficiários nascem
+  // das transações). Feito à mão porque o <datalist> nativo não aparece no Safari do iPhone.
+  function wirePayeeAutocomplete(input){
+    if(!input) return;
+    var wrap = input.parentNode, box = null, items = [], active = -1;
+    function close(){ if(box && box.parentNode) box.parentNode.removeChild(box); box=null; items=[]; active=-1; }
+    function catName(catId){ if(!catId) return ""; if(catId===INCOME) return "Rendimento"; var c=lkCat(catId); return c?c.name:""; }
+    function build(q){
+      var idx = payeeIndex(), arr=[], qk = payeeKey(q);
+      for(var k in idx){ if(!idx.hasOwnProperty(k)) continue; var e=idx[k];
+        if(qk && payeeKey(e.name).indexOf(qk)<0) continue;
+        arr.push(e);
+      }
+      arr.sort(function(a,b){
+        var as = payeeKey(a.name).indexOf(qk)===0?0:1, bs = payeeKey(b.name).indexOf(qk)===0?0:1;
+        return as-bs || b.count-a.count || (a.name<b.name?-1:1);   // começa-por primeiro, depois mais usados
+      });
+      return arr.slice(0,8);
+    }
+    function render(){
+      var q = input.value.trim();
+      var arr = build(q), exact = q && payeeIndex()[payeeKey(q)];
+      items = arr.map(function(e){ return { name:e.name, cat:e.cat }; });
+      if(q && !exact) items.push({ name:q, isNew:true });
+      if(!items.length){ close(); return; }
+      if(!box){ box=document.createElement("div"); box.className="ac-list"; wrap.appendChild(box); }
+      active = -1;
+      box.innerHTML = items.map(function(it,i){
+        if(it.isNew) return '<div class="ac-item ac-new" data-i="'+i+'">➕ Usar «'+esc(it.name)+'» (novo)</div>';
+        var cn = catName(it.cat);
+        return '<div class="ac-item" data-i="'+i+'"><span>'+esc(it.name)+'</span>'+(cn?'<span class="ac-cat">'+esc(cn)+'</span>':'')+'</div>';
+      }).join("");
+    }
+    function highlight(){
+      if(!box) return; var nodes=box.querySelectorAll(".ac-item");
+      for(var i=0;i<nodes.length;i++) nodes[i].classList.toggle("active", i===active);
+      if(active>=0 && nodes[active]) nodes[active].scrollIntoView({block:"nearest"});
+    }
+    function pick(i){
+      var it=items[i]; if(!it) return;
+      input.value = it.name; close();
+      var ev; try{ ev=new Event("change"); }catch(e){ ev=document.createEvent("Event"); ev.initEvent("change",true,true); }
+      input.dispatchEvent(ev);   // dispara a sugestão de categoria e os avisos
+      input.focus();
+    }
+    input.addEventListener("input", render);
+    input.addEventListener("focus", render);
+    input.addEventListener("keydown", function(e){
+      if(!box) return;
+      if(e.key==="ArrowDown"){ e.preventDefault(); active=Math.min(items.length-1, active+1); highlight(); }
+      else if(e.key==="ArrowUp"){ e.preventDefault(); active=Math.max(0, active-1); highlight(); }
+      else if(e.key==="Enter"){ if(active>=0){ e.preventDefault(); e.stopPropagation(); pick(active); } }
+      else if(e.key==="Escape"){ e.stopPropagation(); close(); }
+    });
+    // mousedown (não click) para escolher antes de o campo perder o foco; preventDefault mantém o foco.
+    wrap.addEventListener("mousedown", function(e){
+      var it = e.target.closest && e.target.closest(".ac-item");
+      if(it){ e.preventDefault(); pick(+it.getAttribute("data-i")); }
+    });
+    input.addEventListener("blur", function(){ setTimeout(close, 150); });
   }
 
   function groupModal(grp) {
@@ -2600,9 +2750,15 @@
     } else {
       body = '<p class="muted" style="margin-top:0;">Guarda uma cópia <b>cifrada</b> do seu orçamento num <b>gist privado</b> do GitHub. Assim, o telemóvel e o PC partilham os mesmos dados. O GitHub <b>nunca</b> vê nada em claro.</p>'+
         '<div class="field"><label>1 · Token de acesso do GitHub</label><input id="syncToken" maxlength="255" type="password" placeholder="github_pat_… ou ghp_…" value="'+esc(_sync.token||"")+'">'+
-          '<div class="hint">GitHub → Settings → Developer settings → <b>Personal access tokens</b>, com permissão <b>Gists</b>.</div></div>'+
+          '<div class="hint">GitHub → Settings → Developer settings → <b>Personal access tokens</b>, com permissão <b>Gists</b>. '+
+          'Prefira um token <b>fine-grained</b> só com <b>Gists</b>: se algum dia lhe for parar às mãos erradas, não dá acesso a mais nada da sua conta.</div></div>'+
         '<div class="field"><label>2 · Palavra-passe de cifra</label><input id="syncPass" maxlength="255" type="password" placeholder="uma frase forte só sua">'+
           '<div class="hint">⚠️ Guarde-a bem: se a esquecer, a cópia na nuvem fica <b>irrecuperável</b>. Use a <b>mesma</b> em todos os dispositivos.</div></div>'+
+        '<div class="hint" style="border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin:-2px 0 14px;background:var(--surface);">'+
+          '<b>🔐 O que fica guardado neste aparelho</b><br>'+
+          'Para não ter de escrever tudo outra vez a cada arranque, o token <b>e</b> a palavra-passe ficam gravados <b>neste</b> navegador, em texto simples — é assim que a aplicação consegue sincronizar sozinha.<br><br>'+
+          'Na nuvem nada disto muda: o gist leva só texto cifrado e o GitHub nunca vê os seus dados. Mas <b>quem tiver acesso a este aparelho desbloqueado</b> tem as duas peças, e com as duas chega-se ao orçamento.<br><br>'+
+          'Na prática: proteja o aparelho com código/biometria, e num computador <b>partilhado ou de outra pessoa</b> use antes <b>Desligar sincronização</b> ao terminar — apaga daqui o token e a palavra-passe, sem tocar nos dados nem no gist.</div>'+
         '<div class="field"><label>3 · ID de um gist existente <span class="muted">(opcional)</span></label><input id="syncGist" maxlength="100" placeholder="deixe vazio para criar um novo" value="'+esc(_sync.gistId||"")+'">'+
           '<div class="hint">No <b>1.º</b> dispositivo deixe vazio (cria um novo). No <b>2.º</b>, cole aqui o ID que apareceu no 1.º.</div></div>';
     }
@@ -3221,8 +3377,7 @@
         '<div class="field"><label>'+(ehTransf?"De (sai desta conta)":"Conta")+'</label><select id="rcAcc">'+opts(s.accountId)+'</select></div>'+
         (ehTransf
           ? '<div class="field"><label>Para (entra nesta conta)</label><select id="rcTo">'+opts(s.toAccountId)+'</select></div>'
-          : '<div class="field"><label>Beneficiário</label><input id="rcPayee" maxlength="100" list="payeeList" autocomplete="off" value="'+esc(s.payee||"")+'" placeholder="Ex.: Senhorio, Salário, Netflix…">'+
-            '<datalist id="payeeList">'+payeeListHTML()+'</datalist></div>')+
+          : '<div class="field"><label>Beneficiário</label><div class="ac-wrap"><input id="rcPayee" maxlength="100" autocomplete="off" value="'+esc(s.payee||"")+'" placeholder="Ex.: Senhorio, Salário, Netflix…"></div></div>')+
         '<div class="field'+(ehTransf?" hidden":"")+'" id="rcCatField"><label id="rcCatLabel">Categoria</label><select id="rcCat">'+catOptionsHTML(s.categoryId)+'</select>'+
           '<div class="hint" id="rcCatHint"></div></div>'+
         (ehTransf
@@ -3263,6 +3418,7 @@
       };
       el("rcPayee").addEventListener("change", sugerir);
       el("rcPayee").addEventListener("blur", sugerir);
+      wirePayeeAutocomplete(el("rcPayee"));
     }
   }
   // Guarda no objeto de trabalho o que já está escrito, para não se perder ao trocar de tipo.
@@ -3412,8 +3568,7 @@
           '<div class="field"><label>Data</label>'+dateField("spDate", s.date)+'</div>'+
           '<div class="field"><label>Conta</label><select id="spAcc">'+accOpts+'</select></div>'+
         '</div>'+
-        '<div class="field"><label>Beneficiário</label><input id="spPayee" maxlength="100" list="payeeList" autocomplete="off" value="'+esc(s.payee)+'" placeholder="Ex.: Continente">'+
-          '<datalist id="payeeList">'+payeeListHTML()+'</datalist></div>'+
+        '<div class="field"><label>Beneficiário</label><div class="ac-wrap"><input id="spPayee" maxlength="100" autocomplete="off" value="'+esc(s.payee)+'" placeholder="Ex.: Continente"></div></div>'+
         '<div class="field"><label>Tipo</label><div class="seg" id="spDir">'+
           '<button data-action="split-dir" data-id="out" class="'+(s.dir==="out"?"active":"")+'">Saída (despesa)</button>'+
           '<button data-action="split-dir" data-id="in" class="'+(s.dir==="in"?"active":"")+'">Entrada (receita)</button></div></div>'+
@@ -3427,6 +3582,7 @@
       '<div class="modal-foot">'+
         (editando?'<button class="btn danger" data-action="delete-tx" data-id="'+s.anyId+'">Eliminar</button>':'<span></span>')+
         '<span><button class="btn" data-action="close">Cancelar</button> <button class="btn primary" data-action="save-split">Guardar</button></span></div>');
+    wirePayeeAutocomplete(el("spPayee"));
   }
 
   // ---------- Ações ----------
@@ -3720,6 +3876,8 @@
     "budget-filter": function(id){ var f=state.ui.budgetFilters||{}; if(f[id]) delete f[id]; else f[id]=true; state.ui.budgetFilters=f; save(); render(); },
     "prio-filter": function(id){ var f=state.ui.prioFilters||{}; if(f[id]) delete f[id]; else f[id]=true; state.ui.prioFilters=f; save(); render(); },
     "budget-filter-clear": function(){ state.ui.budgetFilters={}; state.ui.prioFilters={}; save(); render(); },
+    // Atalho do aviso de excedidas: mostra só as categorias no vermelho (equivalente ao "Cover" do YNAB).
+    "show-overspent": function(){ state.ui.budgetFilters={neg:true}; state.ui.prioFilters={}; save(); render(); },
 
     "add-category": function(id){ categoryModal(null, id); },
     "edit-category": function(id){ var c=categoryById(id); if(c&&c.cardId){ toast("Categoria de pagamento de cartão (automática)."); return; } categoryModal(c); },
@@ -3737,7 +3895,8 @@
             // Congela a mensalidade AGORA e pede-a fixa até à data, gaste-se o que se gastar.
             // Reabrir e guardar volta a congelar a partir do ponto onde estiver.
             var availAg = id ? availableFor(id, state.ui.month) : 0;
-            target.slice = sliceAteData(tv, availAg, state.ui.month, target.date);
+            var assignAg = id ? assignedFor(id, state.ui.month) : 0;
+            target.slice = sliceAteData(tv, availAg, assignAg, state.ui.month, target.date);
           }
         }
         if (tType==="weekly") target.weekday = parseInt(el("catWeekday").value,10);
@@ -4045,21 +4204,36 @@
 
   // ---------- Importar / Exportar ----------
   // ---------- Estado da cópia de segurança em ficheiro ----------
-  // Assinatura barata dos dados: contagens + somas. Deteta acrescentos, remoções e alterações de valores.
-  function sigOf(st){
-    var s2=0; for(var i=0;i<st.transactions.length;i++){ var t=st.transactions[i]; s2+=(t.inflow||0)-(t.outflow||0); }
-    var sa=0, ka=0; for(var k in st.assignments){ if(st.assignments.hasOwnProperty(k)){ sa+=st.assignments[k]; ka++; } }
-    return [st.accounts.length, st.groups.length, st.categories.length, st.transactions.length,
-            ka, (st.recurring||[]).length, round2(s2), round2(sa)].join("/");
-  }
-  function backupSig(){
-    if (_idx && typeof _idx.sumAll === "number") {   // reaproveita o varrimento do render, para o ativo
-      var sa=0, ka=0; for(var k in state.assignments){ if(state.assignments.hasOwnProperty(k)){ sa+=state.assignments[k]; ka++; } }
-      return [state.accounts.length, state.groups.length, state.categories.length, state.transactions.length,
-              ka, (state.recurring||[]).length, round2(_idx.sumAll), round2(sa)].join("/");
+  // Assinatura do CONTEÚDO — hash FNV-1a de 32 bits sobre os dados que interessam.
+  //
+  // A versão anterior era barata (contagens + somas) mas cega a tudo o que não mexesse
+  // num total: recategorizar uma transação, mover dinheiro de uma categoria para outra,
+  // mudar uma data, confirmar no banco ou corrigir um beneficiário passavam despercebidos.
+  // Como só se envia à nuvem quando a assinatura muda, essas edições nunca subiam — e se
+  // outro aparelho publicasse entretanto, eram apagadas em silêncio ao receber. Mover
+  // dinheiro entre categorias é a operação mais frequente do método, por isso a cegueira
+  // acertava justamente onde mais dói.
+  //
+  // 'ui', 'collapsed' e 'backup' ficam de fora DE PROPÓSITO: mudar de mês ou de separador
+  // também chama save(), e isso não é dado novo para levar à rede.
+  function hash32(s){
+    var h = 0x811c9dc5;                                   // FNV-1a, base
+    for (var i=0;i<s.length;i++){
+      h ^= s.charCodeAt(i);
+      h = (h + ((h<<1) + (h<<4) + (h<<7) + (h<<8) + (h<<24))) >>> 0;   // × 16777619
     }
-    return sigOf(state);
+    return h.toString(36);
   }
+  function sigOf(st){
+    try {
+      var s = JSON.stringify([st.settings, st.accounts, st.groups, st.categories,
+                              st.assignments, st.transactions, st.recurring||[]]);
+      return hash32(s) + "/" + s.length;                  // o comprimento afasta colisões
+    } catch(e){
+      return "x/" + ((st && st.transactions) ? st.transactions.length : 0);
+    }
+  }
+  function backupSig(){ return sigOf(state); }
   // Assinatura de TODOS os orçamentos, para a sincronização perceber que algum mudou.
   function allSig(){
     var partes = [_bindex.active];
@@ -4138,6 +4312,10 @@
       if(!obj.accounts || !obj.transactions) throw new Error("formato");
       obj.settings = obj.settings || {locale:"pt-PT",currency:"EUR"};
       obj.collapsed = obj.collapsed || {}; obj.assignments = obj.assignments || {};
+      // Mesma normalização do loadBudgetRaw: um snapshot de uma versão antiga pode não ter estes
+      // campos, e depois state.recurring.push()/state.backup.at rebentavam ao usá-los.
+      obj.recurring = obj.recurring || []; obj.backup = obj.backup || { at:null, sig:null, autoDay:null };
+      obj.groups = obj.groups || []; obj.categories = obj.categories || [];
       obj.ui = { view:"budget", month: nowMonthKey() };
       state = obj; _undo=[]; hideUndo(); _idx=null; save(); closeModal(); render();
       toast("Voltou ao orçamento de "+fmtDate(s.day)+". Se sincroniza, envie para atualizar os outros aparelhos.");
@@ -4238,15 +4416,42 @@
 
   // ---- Máquina de sincronização (deteção de conflitos, sem perda silenciosa) ----
   function localChangedSinceSync(){ return _sync.syncedSig === undefined || allSig() !== _sync.syncedSig; }
+  // Escrita com compare-and-swap. A API dos gists não tem escrita condicional (não aceita
+  // If-Match), por isso entre ler e escrever há uma janela em que outro aparelho pode
+  // publicar — e o último a escrever apagava o outro sem ninguém dar por isso.
+  // Fecha-se por verificação dupla: relê MESMO antes de escrever para confirmar que a
+  // revisão remota ainda é a que esperávamos, e relê DEPOIS para confirmar que foi a
+  // nossa que ficou lá. Se em qualquer dos dois momentos aparecer outra, aborta-se com
+  // "corrida" e o syncNow() recomeça do princípio, onde o conflito é tratado como deve ser.
   async function pushLocal(rev){
+    // Assinatura do que VAI ser enviado, capturada AGORA (antes das idas à rede). Se a gravássemos
+    // no fim, a partir do estado atual, uma edição feita durante a sincronização ficaria marcada
+    // como "já sincronizada" — e podia perder-se quando este aparelho adotasse a nuvem mais tarde.
+    var sigPushed = allSig();
     var outer = { v:2, rev:rev, updatedAt:new Date().toISOString(), device:_sync.device, enc: await encEnvelope(syncContainer(), _sync.pass) };
-    if (_sync.gistId) await gistWrite(outer); else _sync.gistId = await gistCreate(outer);
-    _sync.baseRev = rev; _sync.syncedSig = allSig(); saveSyncCfg();
+    if (!_sync.gistId) {
+      _sync.gistId = await gistCreate(outer);
+    } else {
+      var antes = await gistRead();
+      if ((antes.rev||0) >= rev) throw new Error("corrida");
+      await gistWrite(outer);
+      var depois = await gistRead();
+      if ((depois.rev||0) !== rev || depois.device !== _sync.device) throw new Error("corrida");
+    }
+    _sync.baseRev = rev; _sync.syncedSig = sigPushed; saveSyncCfg();
   }
   function adoptRemote(remoto, rev){
     // Compatibilidade: a nuvem pode ainda ter o formato antigo (um só orçamento).
     if (remoto && remoto.accounts && !remoto.budgets) {
       remoto = { v:2, active:_bindex.active, budgets:[{ id:_bindex.active, name:budgetName(_bindex.active), data:remoto }] };
+    }
+    // Nuvem vazia ou corrompida: NÃO adotar. Sem esta guarda, a limpeza abaixo apagava todos os
+    // orçamentos locais e depois lista[0].id rebentava — ou seja, perda de dados a partir de um
+    // pacote inválido. Mais vale deixar o local como está e avisar.
+    if (!remoto || !remoto.budgets || !remoto.budgets.length) {
+      setSyncStatus("Nuvem vazia ⚠️");
+      toast("A cópia na nuvem está vazia ou corrompida — nada foi alterado neste aparelho.");
+      return;
     }
     var ui = state.ui;                    // preserva a vista/mês/tema deste dispositivo
     var antigos = _bindex.list.map(function(b){ return b.id; });
@@ -4304,6 +4509,21 @@
       if (/\(401\)|\(403\)/.test(e.message)) {
         setSyncStatus("Token recusado ⚠️");
         toast("O GitHub recusou o token — pode ter expirado ou sido revogado.");
+        _syncing = false; return;
+      }
+      // Outro aparelho publicou entre a nossa leitura e a nossa escrita. Nada se perdeu:
+      // recomeça-se do princípio, e aí a revisão remota já é maior do que a nossa base —
+      // ou seja, entra pelo caminho normal (adotar, ou perguntar em caso de conflito).
+      // Uma tentativa só; duas corridas seguidas é sinal de outra coisa qualquer.
+      if (/corrida/.test(e.message) && !opts.reentrada) {
+        setSyncStatus("Outro aparelho escreveu ao mesmo tempo — a repetir…");
+        _syncing = false;
+        opts.reentrada = true;
+        return syncNow(opts);
+      }
+      if (/corrida/.test(e.message)) {
+        setSyncStatus("Sincronização adiada ⚠️");
+        if (!opts.silent) toast("Outro aparelho está a sincronizar agora. Tente daqui a pouco.");
         _syncing = false; return;
       }
       setSyncStatus("Erro: "+e.message); toast("Sincronização falhou: "+e.message);
@@ -4631,6 +4851,19 @@
     actions[action](id, ds);
   });
 
+  // Seleção temporária: a checkbox não deve abrir a edição da linha (por isso paramos o clique
+  // antes de chegar à delegação acima) e, ao mudar, atualiza só o somatório — sem re-render.
+  el("content").addEventListener("click", function(e){
+    if (e.target.closest && e.target.closest(".tx-selcell")) e.stopPropagation();
+  });
+  el("content").addEventListener("change", function(e){
+    var cb = e.target.closest && e.target.closest(".tx-sel");
+    if(!cb) return;
+    var id = cb.getAttribute("data-id");
+    if(cb.checked) _txSel[id]=true; else delete _txSel[id];
+    renderTxSelBar();
+  });
+
   // Clicar no fundo escurecido fecha a janela
   // Só fecha se o gesto COMEÇOU no fundo escurecido. Arrastar uma seleção de dentro de um
   // campo e largar cá fora já não fecha — o rato saiu, mas o clique nasceu dentro da janela.
@@ -4651,13 +4884,13 @@
     var nat = el(t.id + "__nat"); if (nat) nat.value = ptParaIso(t.value);
     t.classList.toggle("erro", t.value.length > 0 && !ptParaIso(t.value));
   });
-  // O calendário nativo continua lá, só que agora é ele que serve o campo de texto.
+  // Tocar na zona do 📅 é tocar no próprio <input type="date"> (invisível, por cima): no telemóvel
+  // isso basta para abrir o calendário nativo. No computador forçamos com showPicker(). O valor
+  // escolhido volta ao campo de texto no "change" logo abaixo.
   document.addEventListener("click", function(e){
-    var b = e.target.closest && e.target.closest("[data-cal]");
-    if (!b) return;
-    var nat = el(b.getAttribute("data-cal") + "__nat"); if (!nat) return;
-    if (nat.showPicker) { try { nat.showPicker(); return; } catch(err){} }
-    nat.focus(); nat.click();
+    var t = e.target;
+    if (!t || !t.classList || !t.classList.contains("date-nat")) return;
+    if (t.showPicker) { try { t.showPicker(); } catch(err){} }
   });
   document.addEventListener("change", function(e){
     var t = e.target;
@@ -4811,6 +5044,33 @@
   document.addEventListener("click", function(e){ var pt=e.target.closest && e.target.closest(".evo-pt"); if(pt) toast(pt.getAttribute("data-tip")); });
   var _rzT; window.addEventListener("resize", function(){ clearTimeout(_rzT); _rzT=setTimeout(function(){ if(state.ui.view==="reports") render(); }, 200); });
 
+  // ---------- Auto-diagnóstico da invariante ----------
+  // Confirma a regra de base-zero (Pronto a atribuir + Σ Disponível = contas de orçamento) em
+  // TODOS os orçamentos, não só no ativo — é nos outros que uma sincronização ou reposição
+  // estragada passaria despercebida até lá voltar. Reutiliza integrityDelta (a mesma conta da
+  // barra de integridade), pelo que não duplica lógica. É só leitura: troca o estado global,
+  // reconstrói o índice desse orçamento e repõe tudo no fim (try/finally) — nada é alterado.
+  function invarianteDe(st, m){
+    var sState=state, sIdx=_idx, sLookup=_lookup;
+    try { state=st; buildIndex(m); return integrityDelta(m); }
+    finally { state=sState; _idx=sIdx; _lookup=sLookup; }
+  }
+  function autoDiagnostico(){
+    try {
+      var m=nowMonthKey(), maus=[];
+      for (var i=0;i<_bindex.list.length;i++){
+        var b=_bindex.list[i];
+        var st=(b.id===_bindex.active)?state:loadBudgetRaw(b.id);
+        if (Math.abs(invarianteDe(st, m))>=0.005) maus.push(b.name);
+      }
+      if (!maus.length) return;
+      if (maus.length===1)
+        toast("⚠️ «"+maus[0]+"» não está a bater certo. Abra o separador Orçamento e veja «Ver porquê».");
+      else
+        toast("⚠️ "+maus.length+" orçamentos não batem certo ("+maus.join(", ")+"). Veja «Ver porquê» em cada um.");
+    } catch(e){}
+  }
+
   // ---------- Arranque ----------
   if (!state.ui.month) state.ui.month = nowMonthKey();
   state.recurring = state.recurring || [];
@@ -4818,6 +5078,7 @@
   var _posted = processRecurring();
   render();
   if (_posted > 0) toast("Foram lançadas " + _posted + " transações recorrentes.");
+  setTimeout(autoDiagnostico, 2600);   // depois dos avisos de recorrentes/cópia, para não os tapar
 
   // Instantâneo diário DENTRO da aplicação (últimos 5 dias) — sem transferir ficheiros,
   // por isso funciona igual no iPhone e no PC. A exportação para ficheiro é manual.
