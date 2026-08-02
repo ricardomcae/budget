@@ -5039,9 +5039,12 @@
   function _kpApply(a,op,b){ return op==="+" ? round2(a+b) : round2(a-b); }
   function calcDigit(s, d){
     var e = s.fresh ? "" : s.entry;
+    // Ao substituir o valor de partida/resultado (fresh), a base antiga deixa de contar — senão
+    // apagar o dígito recém-escrito faria o valor original "ressuscitar". (fresh só ocorre com op=null.)
+    var acc = s.fresh ? 0 : s.acc;
     if (d==="," || d==="."){ d="."; if (e.indexOf(".")>=0) return s; if (e===""||e==="-") e = e+"0"; }
     if (e.replace(/[^0-9]/g,"").length >= 11) return s;   // trava de comprimento
-    return { acc:s.acc, op:s.op, entry:e+d, fresh:false };
+    return { acc:acc, op:s.op, entry:e+d, fresh:false };
   }
   function calcOp(s, op){
     var acc = s.acc;
@@ -5059,6 +5062,13 @@
   function calcBack(s){
     if (s.entry!==""){ return { acc:s.acc, op:s.op, entry:s.entry.slice(0,-1), fresh:false }; }
     if (s.op){ return { acc:s.acc, op:null, entry:"", fresh:false }; }   // apaga o operador pendente
+    if (s.fresh){
+      // Ainda a mostrar o valor de partida: apagar dígito a dígito (materializa acc em entry),
+      // em vez de limpar tudo de uma vez. Ex.: 250 → 25 → 2 → (vazio).
+      var str = String(s.acc);
+      if (str==="0" || str==="") return { acc:0, op:null, entry:"", fresh:false };
+      return { acc:0, op:null, entry:str.slice(0,-1), fresh:false };
+    }
     return { acc:0, op:null, entry:"", fresh:false };
   }
   function calcValue(s){ return round2(calcEq(s).acc); }              // valor final ao confirmar
