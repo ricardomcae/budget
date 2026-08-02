@@ -5014,6 +5014,20 @@
     b.classList.add("show"); clearTimeout(_undoTimer); _undoTimer=setTimeout(function(){ b.classList.remove("show"); },8000);
   }
 
+  // Aplica um valor à atribuição de uma categoria no mês em vista. Único ponto por onde passam
+  // TODAS as atribuições (teclado de cálculo E edição à mão) — garante Anular, registo e gravação.
+  function applyAssign(cid, v){
+    v = isNaN(v) ? 0 : round2(v);
+    var key = cid + "|" + state.ui.month;
+    var antes = state.assignments.hasOwnProperty(key) ? state.assignments[key] : null;
+    if ((antes==null?0:antes) === v) return;      // sem mudança real: não mexe em nada
+    pushUndo("Atribuição alterada.");
+    if (v===0) delete state.assignments[key]; else state.assignments[key]=v;
+    state.ui.lastFunding = { month: state.ui.month, entries:[{ key:key, prev:antes }] };
+    logMove("✏️ Atribuiu a «"+((categoryById(cid)||{name:"?"}).name)+"»", round2(v-(antes==null?0:antes)));
+    save(); render();
+  }
+
   // ================= Mini-teclado de cálculo (campo "Atribuído") =================
   // Reducer PURO da calculadora — sem DOM, para poder ser testado à parte. Estado:
   //   { acc, op, entry, fresh }  →  o valor mostrado é dado por calcDisplay().
@@ -5035,92 +5049,101 @@
     return { acc:acc, op:op, entry:"", fresh:false };
   }
   function calcEq(s){
-    var acc = s.acc;
-    if (s.op){ var b = s.entry!=="" ? _kpNum(s.entry) : s.acc; acc = _kpApply(s.acc, s.op, b); }
-    else if (s.entry!==""){ acc = _kpNum(s.entry); }
-    return { acc:acc, op:null, entry:"", fresh:true };
+    if (s.op){
+      // Operador pendente SEM 2.º valor (ex.: "100 +" e =): não duplica — mantém a base.
+      var b = s.entry!=="" ? _kpNum(s.entry) : null;
+      return { acc: b===null ? s.acc : _kpApply(s.acc, s.op, b), op:null, entry:"", fresh:true };
+    }
+    return { acc: s.entry!=="" ? _kpNum(s.entry) : s.acc, op:null, entry:"", fresh:true };
   }
   function calcBack(s){
     if (s.entry!==""){ return { acc:s.acc, op:s.op, entry:s.entry.slice(0,-1), fresh:false }; }
-    return { acc:0, op:s.op, entry:"", fresh:false };   // sem entrada: limpa para 0
+    if (s.op){ return { acc:s.acc, op:null, entry:"", fresh:false }; }   // apaga o operador pendente
+    return { acc:0, op:null, entry:"", fresh:false };
   }
   function calcValue(s){ return round2(calcEq(s).acc); }              // valor final ao confirmar
-  function calcDisplayNum(s){ return s.entry!=="" ? _kpNum(s.entry) : s.acc; }
-  function calcDisplayText(s){ return s.entry!=="" ? s.entry.replace(".",",") : amtStr(s.acc) || "0"; }
+  function _kpSign(op){ return op==="+" ? "+" : "−"; }
+  // Visor do teclado — MOSTRA o operador pendente, para se ver que o + / − foi registado.
+  function calcDisplayText(s){
+    var atual = s.entry!=="" ? s.entry.replace(".",",") : (amtStr(s.acc) || "0");
+    if (s.op){
+      var base = amtStr(s.acc) || "0";
+      return s.entry!=="" ? (base+" "+_kpSign(s.op)+" "+atual) : (base+" "+_kpSign(s.op));
+    }
+    return atual;
+  }
 
   // ---- Camada DOM do teclado ----
-  var _kpEl = null, _kp = null;
-  function kpOpen(input){
-    if (_kpEl === input) return;                 // já aberto neste campo
-    if (_kpEl){                                  // vinha de outro campo: confirma-o (isto re-renderiza
-      var novoId = input.getAttribute("data-assign");         // e destrói os inputs), depois reabre o novo
-      kpCommit();
-      var fresh = novoId ? document.querySelector('.assign-input[data-assign="'+novoId+'"]') : null;
-      if (fresh) fresh.focus();                  // dispara focusin → kpOpen limpo no campo recriado
-      return;
-    }
-    _kpEl = input;
-    _kp = calcInit(parseAmount(input.value)||0);
-    input.classList.add("kp-active");
-    var pad = el("calcPad"); pad.classList.add("show"); pad.setAttribute("aria-hidden","false");
-    kpPaint();
+  // NÃO escreve no campo enquanto se digita — o visor do pad (#calcDisp) é o que mostra o que se
+  // está a fazer. O campo só muda quando se CONFIRMA (✓). Assim, cancelar (×) mantém o valor antigo.
+  var _kpEl = null, _kp = null, _kpSuppress = 0;
+  function _kpShow(){ var p=el("calcPad"); p.classList.add("show"); p.setAttribute("aria-hidden","false"); }
+  function _kpHide(){ var p=el("calcPad"); p.classList.remove("show"); p.setAttribute("aria-hidden","true"); }
+  function kpPaint(){ if(_kp) el("calcDisp").textContent = calcDisplayText(_kp); }
+  function openPad(input){
+    _kpEl = input; _kp = calcInit(parseAmount(input.value)||0);
+    input.classList.add("kp-active"); _kpShow(); kpPaint();
   }
-  function kpPaint(){
-    if (!_kp) return;
-    el("calcDisp").textContent = calcDisplayText(_kp);
-    if (_kpEl) _kpEl.value = amtStr(calcDisplayNum(_kp));   // reflete no campo em tempo real
+  function kpDeactivate(){ if(_kpEl) _kpEl.classList.remove("kp-active"); _kpEl=null; _kp=null; }
+  // Aplica o valor calculado à atribuição da categoria (o MESMO caminho da edição à mão, via
+  // applyAssign → guarda para o Anular, regista o movimento, grava e re-desenha).
+  function kpApplyToField(){ if(_kpEl && _kp) applyAssign(_kpEl.getAttribute("data-assign"), calcValue(_kp)); }
+  function kpDone(){                              // ✓ ou tocar fora: aplica e fecha
+    kpApplyToField(); _kpHide(); kpDeactivate();
+    _kpSuppress = Date.now()+400;                 // o toque/foco que sobra após o re-desenho não reabre o pad
   }
-  function kpClose(){
-    var pad = el("calcPad"); pad.classList.remove("show"); pad.setAttribute("aria-hidden","true");
-    if (_kpEl) _kpEl.classList.remove("kp-active");
-    _kpEl = null; _kp = null;
-  }
-  function kpCommit(){
-    if (!_kpEl || !_kp) { kpClose(); return; }
-    var input = _kpEl, v = calcValue(_kp);
-    input.value = amtStr(v);
-    kpClose();
-    var ev; try{ ev=new Event("change"); }catch(e){ ev=document.createEvent("Event"); ev.initEvent("change",true,true); }
-    input.dispatchEvent(ev);                      // dispara a lógica de atribuição (undo + logMove + render)
-  }
+  function kpCancel(){ _kpHide(); kpDeactivate(); }   // ×: fecha SEM aplicar (mantém o valor antigo)
   function kpKey(k){
     if (!_kp) return;
-    if (k==="ok"){ kpCommit(); return; }
-    if (k==="cancel"){ kpClose(); return; }
+    if (k==="ok"){ kpDone(); return; }
+    if (k==="cancel"){ kpCancel(); return; }
     if (k==="back") _kp = calcBack(_kp);
     else if (k==="+"||k==="-") _kp = calcOp(_kp, k);
     else if (k==="=") _kp = calcEq(_kp);
     else _kp = calcDigit(_kp, k);
     kpPaint();
   }
+  function kpOpen(input){
+    if (Date.now() < _kpSuppress){ try{ input.blur(); }catch(e){} return; }   // ignora a reabertura logo após ✓
+    if (_kpEl === input) return;
+    if (_kpEl){                                    // troca de campo: aplica o anterior e abre o novo (recriado)
+      var novoId = input.getAttribute("data-assign");
+      kpApplyToField(); kpDeactivate();
+      var fresh = novoId ? document.querySelector('.assign-input[data-assign="'+novoId+'"]') : null;
+      if (fresh) openPad(fresh); else _kpHide();
+      return;
+    }
+    openPad(input);
+  }
   // Abrir ao focar/tocar num campo de atribuição (o inputmode="none" evita o teclado nativo).
   document.addEventListener("focusin", function(e){
     var inp = e.target.closest && e.target.closest(".assign-input");
     if (inp) kpOpen(inp);
   });
-  // Botões do teclado — mousedown com preventDefault para NÃO tirar o foco ao campo.
+  // Botões do teclado — mousedown + preventDefault para NÃO tirar o foco ao campo.
   el("calcPad").addEventListener("mousedown", function(e){
     var b = e.target.closest && e.target.closest("[data-calc]");
     if (b){ e.preventDefault(); kpKey(b.getAttribute("data-calc")); }
   });
   // Teclado físico (no computador) enquanto o pad está aberto: dígitos, + - = Enter Backspace Esc.
+  // preventDefault impede a entrada nativa em duplicado no próprio campo.
   document.addEventListener("keydown", function(e){
     if (!_kp) return;
     var k = e.key;
     if (/^[0-9]$/.test(k)) kpKey(k);
     else if (k==="," || k===".") kpKey(",");
     else if (k==="+" || k==="-") kpKey(k);
-    else if (k==="Enter" || k==="=") { e.preventDefault(); kpKey("ok"); }
-    else if (k==="Backspace") { e.preventDefault(); kpKey("back"); }
-    else if (k==="Escape") { e.preventDefault(); kpKey("cancel"); }
+    else if (k==="Enter" || k==="=") kpKey("ok");
+    else if (k==="Backspace") kpKey("back");
+    else if (k==="Escape") kpKey("cancel");
     else return;
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
   }, true);
-  // Tocar fora do teclado e fora de um campo de atribuição confirma e fecha.
+  // Tocar fora do teclado e fora de um campo de atribuição = confirmar e fechar.
   document.addEventListener("mousedown", function(e){
     if (!_kpEl) return;
     if (e.target.closest && (e.target.closest("#calcPad") || e.target.closest(".assign-input"))) return;
-    kpCommit();
+    kpDone();
   });
 
   // ---------- Global event wiring (delegation, no inline handlers) ----------
@@ -5252,19 +5275,7 @@
   // Edição do valor atribuído na própria linha
   document.addEventListener("change", function(e){
     var inp = e.target.closest("[data-assign]");
-    if (inp) {
-      var cid = inp.getAttribute("data-assign");
-      var v = parseAmount(inp.value); v = isNaN(v)?0:round2(v);
-      var key = cid + "|" + state.ui.month;
-      var antes = state.assignments.hasOwnProperty(key) ? state.assignments[key] : null;
-      if ((antes==null?0:antes) === v) return;   // sem mudança real: não sujar o histórico
-      pushUndo("Atribuição alterada.");
-      if (v===0) delete state.assignments[key]; else state.assignments[key]=v;
-      // Guardar o valor anterior para o «↩ Anular» da faixa também servir as edições à mão.
-      state.ui.lastFunding = { month: state.ui.month, entries:[{ key:key, prev:antes }] };
-      logMove("✏️ Atribuiu a «"+((categoryById(cid)||{name:"?"}).name)+"»", round2(v-(antes==null?0:antes)));
-      save(); render(); return;
-    }
+    if (inp) { applyAssign(inp.getAttribute("data-assign"), parseAmount(inp.value)); return; }
     if (e.target.id==="txFilterAcc"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.account=e.target.value||null; render(); }
     if (e.target.id==="txFilterCat"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.category=e.target.value||null; render(); }
     if (e.target.id==="txFilterFrom"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.from=ptParaIso(e.target.value)||null; render(); }
