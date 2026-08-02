@@ -163,6 +163,19 @@
   .upcoming-bar b { color: var(--text); font-variant-numeric: tabular-nums; }
   .upcoming-bar button { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 12.5px; white-space: nowrap; }
   .upcoming-bar button:hover { border-color: var(--primary); color: var(--primary); }
+  /* Painel "Movimentos recentes" (só desta sessão, informativo). */
+  .moves-bar { margin: 10px 26px 0; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); overflow: hidden; }
+  .moves-head { display: flex; align-items: center; gap: 10px; padding: 9px 14px; cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--text-muted); user-select: none; }
+  .moves-head .grow { flex: 1; }
+  .moves-head .caret { transition: transform .18s; font-size: 11px; }
+  .moves-head .txsel-clear { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); padding: 4px 9px; border-radius: 7px; font-weight: 700; font-size: 11.5px; cursor: pointer; }
+  .moves-head .txsel-clear:hover { border-color: var(--primary); color: var(--primary); }
+  .moves-list { border-top: 1px solid var(--border); max-height: 240px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .move-row { display: flex; align-items: center; gap: 10px; padding: 8px 14px; font-size: 12.5px; border-bottom: 1px solid var(--border); }
+  .move-row:last-child { border-bottom: 0; }
+  .move-row .m-desc { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .move-row .m-amt { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+  .move-row .m-time { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
   .overspent-bar { display: flex; align-items: center; gap: 12px; margin: 10px 26px 0; padding: 11px 16px; border-radius: 12px; background: var(--negative-soft); border: 1px solid var(--negative); color: var(--negative); font-size: 13px; font-weight: 600; flex-wrap: wrap; }
   .overspent-bar .grow { flex: 1; min-width: 170px; }
   .overspent-bar b { font-variant-numeric: tabular-nums; }
@@ -290,6 +303,19 @@
   .assign-input { width: 108px; text-align: end; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
   .assign-input:hover { border-color: var(--primary); background: var(--surface); }
   .assign-input:focus { border-color: var(--primary); background: var(--surface); outline: none; box-shadow: 0 0 0 3px var(--primary-soft); }
+  .assign-input.kp-active { border-color: var(--primary); background: var(--surface); box-shadow: 0 0 0 3px var(--primary-soft); }
+  /* Mini-teclado de cálculo próprio */
+  .calcpad { position: fixed; left: 50%; bottom: 0; transform: translateX(-50%) translateY(110%); width: 100%; max-width: 420px; background: var(--surface); border: 1px solid var(--border); border-bottom: 0; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.22); z-index: 250; transition: transform .2s ease; padding: 10px 10px calc(12px + env(safe-area-inset-bottom)); }
+  .calcpad.show { transform: translateX(-50%) translateY(0); }
+  .calc-head { display: flex; align-items: center; gap: 10px; padding: 4px 6px 10px; }
+  .calc-disp { flex: 1; text-align: end; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .calc-close { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); width: 34px; height: 34px; border-radius: 9px; font-size: 20px; line-height: 1; cursor: pointer; }
+  .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .calc-key { padding: 15px 0; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-2); color: var(--text); font-size: 19px; font-weight: 700; cursor: pointer; user-select: none; -webkit-user-select: none; }
+  .calc-key:active { background: var(--primary-soft); border-color: var(--primary); }
+  .calc-key.op { background: var(--surface); color: var(--primary); }
+  .calc-key.ok { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .calc-key.ok:active { opacity: .85; }
   .activity-cell { color: var(--text-muted); }
   .avail-pill { display: inline-block; padding: 4px 11px; border-radius: 20px; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 12.5px; }
   .avail-pill.pos { background: var(--positive-soft); color: var(--positive); }
@@ -579,6 +605,18 @@
 <div class="undo-bar" id="undoBar"><span id="undoText"></span><button class="btn sm" data-action="undo-do">↩ Anular</button></div>
 <div class="undo-bar backup-bar" id="backupBar"><span>💾</span><span id="backupText"></span><button class="btn sm" data-action="backup-now">Guardar agora</button><button class="btn sm" data-action="backup-later">Mais tarde</button></div>
 
+<!-- Mini-teclado de cálculo próprio para o campo "Atribuído": sem teclado nativo (logo sem letras),
+     com aritmética simples (+ − =). Aparece ao tocar num campo de atribuição. -->
+<div class="calcpad" id="calcPad" aria-hidden="true">
+  <div class="calc-head"><span class="calc-disp" id="calcDisp">0</span><button class="calc-close" data-calc="cancel" aria-label="Fechar sem guardar">×</button></div>
+  <div class="calc-grid">
+    <button class="calc-key" data-calc="7">7</button><button class="calc-key" data-calc="8">8</button><button class="calc-key" data-calc="9">9</button><button class="calc-key op" data-calc="+">+</button>
+    <button class="calc-key" data-calc="4">4</button><button class="calc-key" data-calc="5">5</button><button class="calc-key" data-calc="6">6</button><button class="calc-key op" data-calc="-">−</button>
+    <button class="calc-key" data-calc="1">1</button><button class="calc-key" data-calc="2">2</button><button class="calc-key" data-calc="3">3</button><button class="calc-key op" data-calc="=">=</button>
+    <button class="calc-key" data-calc=",">,</button><button class="calc-key" data-calc="0">0</button><button class="calc-key" data-calc="back">⌫</button><button class="calc-key ok" data-calc="ok">✓</button>
+  </div>
+</div>
+
 <script>
 "use strict";
 (function () {
@@ -761,6 +799,10 @@
   var _split = null; // estado de trabalho da transação dividida (não é guardado)
   var _rec = null;   // estado de trabalho da regra recorrente (não é guardado)
   var _undo = [], _redo = [], _navHist = false, _undoTimer = null, UNDO_MAX = 5; // histórico de anular/refazer (até 5 passos cada)
+  // Registo leve das últimas movimentações de dinheiro do orçamento (só desta sessão, não é
+  // gravado nem sincronizado) — alimenta o painel "Movimentos recentes" no topo, à YNAB.
+  var _moves = [], MOVES_MAX = 20;
+  function logMove(desc, delta){ _moves.unshift({ desc:desc, delta:(delta==null?null:round2(delta)), t:Date.now(), m:state.ui.month }); if(_moves.length>MOVES_MAX) _moves.pop(); }
   var _csv = null;   // pré-visualização da importação de CSV
   var _drag = null;  // arrastar para reordenar
   var _searchTimer = null;  // atraso da caixa de procura (não é guardado)
@@ -1780,6 +1822,7 @@
         ' ('+up.lista.length+' lançamento'+(up.lista.length===1?'':'s')+' recorrente'+(up.lista.length===1?'':'s')+')</span>'+
         '<button data-action="upcoming">Ver</button></div>';
     }
+    var moves = renderMovesBar();
     el("rtaWrap").innerHTML =
       '<div class="rta-banner ' + cls + '">' +
         '<div><div class="rta-amount">' + fmt(rta) + '</div><div class="rta-label">' + msg + '</div></div>' +
@@ -1790,7 +1833,39 @@
           (temAtribuido ? '<button data-action="clear-preview" title="Devolver tudo o que atribuiu neste mês">🧽 Limpar atribuições…</button>' : '') +
           undoBtn +
         '</div>' +
-      '</div>' + over + aviso + futuro;
+      '</div>' + over + aviso + futuro + moves;
+  }
+
+  // Tempo relativo curto ("agora", "há 5 min", "há 2 h") para o painel de movimentos.
+  function tempoRel(t){
+    var s = Math.floor((Date.now()-t)/1000);
+    if (s < 45) return "agora";
+    if (s < 3600) return "há "+Math.max(1,Math.round(s/60))+" min";
+    if (s < 86400) return "há "+Math.round(s/3600)+" h";
+    return "há "+Math.round(s/86400)+" d";
+  }
+  // Painel recolhível "Movimentos recentes" — só desta sessão, meramente informativo (à YNAB).
+  function renderMovesBar(){
+    if (!_moves.length) return "";
+    var aberto = state.ui.showMoves !== false;   // aberto por predefinição
+    var linhas = "";
+    if (aberto) {
+      for (var i=0;i<_moves.length;i++){ var mv=_moves[i];
+        var sinal = mv.delta==null ? "" : (mv.delta>0?"+":(mv.delta<0?"−":""));
+        var cor = mv.delta==null ? "var(--text-muted)" : (mv.delta>0?"var(--positive)":(mv.delta<0?"var(--negative)":"var(--text-muted)"));
+        var val = mv.delta==null ? "" : (sinal+fmt(Math.abs(mv.delta)));
+        linhas += '<div class="move-row"><span class="m-desc">'+esc(mv.desc)+'</span>'+
+          (val?'<span class="m-amt" style="color:'+cor+'">'+val+'</span>':'')+
+          '<span class="m-time">'+tempoRel(mv.t)+'</span></div>';
+      }
+    }
+    return '<div class="moves-bar">'+
+      '<div class="moves-head" data-action="toggle-moves"><span class="caret" style="transform:rotate('+(aberto?"0":"-90")+'deg)">▾</span>'+
+        '<span class="grow">🕑 Movimentos recentes ('+_moves.length+')</span>'+
+        (aberto?'<button class="txsel-clear" data-action="clear-moves">Limpar</button>':'')+
+      '</div>'+
+      (aberto?'<div class="moves-list">'+linhas+'</div>':'')+
+    '</div>';
   }
 
   // Estado de uma categoria no mês: "neg" (excesso), "warn" (abaixo do alvo), "ok" (cumprido), "none" (sem alvo)
@@ -1875,7 +1950,7 @@
             '</div>' +
             '<div class="target-bar"><span class="'+barClsP+'" style="width:'+barP+'%"></span></div>' +
             '<div class="target-note">'+pnote+'</div></td>' +
-            '<td class="num"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="decimal" data-assign="'+cat.id+'" value="'+amtStr(assigned)+'" placeholder="0,00"></td>' +
+            '<td class="num"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="none" data-assign="'+cat.id+'" value="'+amtStr(assigned)+'" placeholder="0,00"></td>' +
             '<td class="num activity-cell">'+fmt(activity)+'</td>' +
             '<td class="num"><span class="avail-pill '+pillCls+'">'+fmt(avail)+'</span></td></tr>';
           continue;
@@ -1908,7 +1983,7 @@
           '</span></div>' + (cat.note?'<div class="tag" style="margin-top:3px;">📝 '+esc(cat.note)+'</div>':'') + targetHtml +
           (upc[cat.id] ? '<div class="target-note">📅 Ainda por sair este mês: '+fmt(upc[cat.id])+
             (avail < upc[cat.id]-0.005 ? ' <b style="color:var(--warning)">— faltam '+fmt(round2(upc[cat.id]-avail))+'</b>' : '')+'</div>' : '') + '</td>' +
-          '<td class="num"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="decimal" data-assign="'+cat.id+'" value="'+amtStr(assigned)+'" placeholder="0,00"></td>' +
+          '<td class="num"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="none" data-assign="'+cat.id+'" value="'+amtStr(assigned)+'" placeholder="0,00"></td>' +
           '<td class="num activity-cell"><button class="btn ghost sm" data-action="cat-activity" data-id="'+cat.id+'" style="font-variant-numeric:tabular-nums;">'+fmt(activity)+'</button></td>' +
           '<td class="num"><span class="avail-pill '+pillCls+'">'+fmt(avail)+'</span></td></tr>';
       }
@@ -2882,9 +2957,12 @@
     if (!arr.length) {
       corpo = '<div class="muted" style="text-align:center;padding:20px 0;">Ainda não há beneficiários — aparecem aqui à medida que for registando transações.</div>';
     } else {
-      corpo = '<div style="max-height:340px;overflow:auto;">' + arr.map(function(x){
+      corpo = '<div class="ac-wrap" style="margin-bottom:10px;"><input id="pyFilter" class="search" autocomplete="off" placeholder="Filtrar beneficiários…" style="width:100%;padding-inline-end:34px;">'+
+        '<button type="button" class="date-btn" data-action="py-filter-clear" style="pointer-events:auto;cursor:pointer;color:var(--text-muted);" title="Limpar filtro" aria-label="Limpar filtro">✕</button></div>'+
+        '<div id="pyEmpty" class="muted hidden" style="text-align:center;padding:16px 0;">Nenhum beneficiário corresponde.</div>'+
+        '<div id="pyList" style="max-height:340px;overflow:auto;">' + arr.map(function(x){
         var c = x.e.cat===INCOME ? "Rendimento" : (x.e.cat ? ((lkCat(x.e.cat)||{name:"(apagada)"}).name) : "sem categoria");
-        return '<div class="int-row"><span class="who"><b>'+esc(x.e.name)+'</b>'+
+        return '<div class="int-row" data-pk="'+esc(payeeKey(x.e.name))+'"><span class="who"><b>'+esc(x.e.name)+'</b>'+
           '<span class="tag">'+x.e.count+' transaç'+(x.e.count===1?'ão':'ões')+' · última em '+fmtDate(x.e.lastDate)+' · '+esc(c)+'</span></span>'+
           '<span></span>'+
           '<button class="btn sm" data-action="rename-payee" data-id="'+x.k+'">✎ Mudar nome</button></div>';
@@ -3966,6 +4044,7 @@
         delete state.assignments[k];
       }
       state.ui.lastFunding={month:m, entries:snap};
+      logMove("🧽 Limpou atribuições de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias"), plan.total);
       closeModal(); save(); render();
       toast("Devolvido "+fmt(plan.total)+" de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
     },
@@ -3988,6 +4067,7 @@
       var ka=alvo+"|"+m; guarda(ka); state.assignments[ka]=round2((state.assignments[ka]||0)+tot);
       state.ui.lastFunding={month:m, entries:snap};
       var nome=(categoryById(alvo)||{}).name||"";
+      logMove("⚠️ Cobriu «"+nome+"»", tot);
       _covSel=null; _covAlvo=null; _covFontes=null;
       closeModal(); save(); render();
       toast("Coberto "+fmt(tot)+" em «"+nome+"» — pode anular no topo.");
@@ -3999,6 +4079,7 @@
       var key=id+"|"+m;
       state.ui.lastFunding={month:m, entries:[{key:key, prev: state.assignments.hasOwnProperty(key)?state.assignments[key]:null}]};
       state.assignments[key]=round2((state.assignments[key]||0)+ti.need);
+      logMove("🎯 Financiou «"+c.name+"»", ti.need);
       save(); render(); toast("Alvo financiado — pode anular no topo.");
     },
     "fund-preview": function(){ if(!state.categories.length){ toast("Crie categorias com alvos primeiro."); return; } state.ui._fundMode="full"; fundModal(); },
@@ -4016,6 +4097,7 @@
         state.assignments[key]=round2((state.assignments[key]||0)+e.add);
       }
       state.ui.lastFunding={month:m, entries:snap};
+      logMove("🧹 Libertou excedente de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias"), plan.total);
       closeModal(); save(); render();
       toast("Libertado "+fmt(-plan.total)+" de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
     },
@@ -4030,6 +4112,7 @@
         state.assignments[key]=round2((state.assignments[key]||0)+e.add);
       }
       state.ui.lastFunding={month:m, entries:snap};
+      logMove("↩ Repôs a zero ("+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+")", plan.total);
       closeModal(); save(); render();
       toast("Reposto "+fmt(-plan.total)+" a partir de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
     },
@@ -4045,11 +4128,15 @@
         state.assignments[key]=round2((state.assignments[key]||0)+e.add);
       }
       state.ui.lastFunding={month:m, entries:snap};
+      logMove("🎯 Financiou alvos ("+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+")", plan.total);
       closeModal(); save(); render();
       toast("Financiado "+fmt(plan.total)+" em "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
     },
     "undo-do": function(){ doUndo(); },
     "redo-do": function(){ doRedo(); },
+    "toggle-moves": function(){ state.ui.showMoves = (state.ui.showMoves===false); save(); render(); },
+    "clear-moves": function(){ _moves=[]; render(); },
+    "py-filter-clear": function(){ var i=el("pyFilter"); if(i){ i.value=""; pyFiltrar(); i.focus(); } },
 
     "move-money": function(id){ moveModal(id); },
     "do-move": function(){
@@ -4063,6 +4150,9 @@
       if(from!==RTA_ID) adj(from, -amt);
       if(to!==RTA_ID) adj(to, amt);
       state.ui.lastFunding={month:m, entries:snap};
+      var nmFrom = from===RTA_ID ? "Pronto a atribuir" : (categoryById(from)||{name:"?"}).name;
+      var nmTo   = to===RTA_ID   ? "Pronto a atribuir" : (categoryById(to)||{name:"?"}).name;
+      logMove("↔ "+nmFrom+" → "+nmTo, amt);
       closeModal(); save(); render(); toast("Movido "+fmt(amt)+" — pode anular no topo.");
     },
 
@@ -4915,10 +5005,128 @@
     b.classList.add("show"); clearTimeout(_undoTimer); _undoTimer=setTimeout(function(){ b.classList.remove("show"); },8000);
   }
 
+  // ================= Mini-teclado de cálculo (campo "Atribuído") =================
+  // Reducer PURO da calculadora — sem DOM, para poder ser testado à parte. Estado:
+  //   { acc, op, entry, fresh }  →  o valor mostrado é dado por calcDisplay().
+  // "fresh" = o valor mostrado é o original (ou um resultado): o próximo dígito substitui-o.
+  // É isto que dá o comportamento pedido: tocar e escrever por cima (útil no iPhone), mas também
+  // "somar ao que já lá está" tocando primeiro num operador.
+  function calcInit(existing){ existing = round2(existing||0); return { acc:existing, op:null, entry:"", fresh:true }; }
+  function _kpNum(entry){ if(entry===""||entry==="."||entry==="-"||entry==="-.") return 0; return parseFloat(entry.replace(",",".")); }
+  function _kpApply(a,op,b){ return op==="+" ? round2(a+b) : round2(a-b); }
+  function calcDigit(s, d){
+    var e = s.fresh ? "" : s.entry;
+    if (d==="," || d==="."){ d="."; if (e.indexOf(".")>=0) return s; if (e===""||e==="-") e = e+"0"; }
+    if (e.replace(/[^0-9]/g,"").length >= 11) return s;   // trava de comprimento
+    return { acc:s.acc, op:s.op, entry:e+d, fresh:false };
+  }
+  function calcOp(s, op){
+    var acc = s.acc;
+    if (s.entry!==""){ acc = s.op ? _kpApply(s.acc, s.op, _kpNum(s.entry)) : _kpNum(s.entry); }
+    return { acc:acc, op:op, entry:"", fresh:false };
+  }
+  function calcEq(s){
+    var acc = s.acc;
+    if (s.op){ var b = s.entry!=="" ? _kpNum(s.entry) : s.acc; acc = _kpApply(s.acc, s.op, b); }
+    else if (s.entry!==""){ acc = _kpNum(s.entry); }
+    return { acc:acc, op:null, entry:"", fresh:true };
+  }
+  function calcBack(s){
+    if (s.entry!==""){ return { acc:s.acc, op:s.op, entry:s.entry.slice(0,-1), fresh:false }; }
+    return { acc:0, op:s.op, entry:"", fresh:false };   // sem entrada: limpa para 0
+  }
+  function calcValue(s){ return round2(calcEq(s).acc); }              // valor final ao confirmar
+  function calcDisplayNum(s){ return s.entry!=="" ? _kpNum(s.entry) : s.acc; }
+  function calcDisplayText(s){ return s.entry!=="" ? s.entry.replace(".",",") : amtStr(s.acc) || "0"; }
+
+  // ---- Camada DOM do teclado ----
+  var _kpEl = null, _kp = null;
+  function kpOpen(input){
+    if (_kpEl === input) return;                 // já aberto neste campo
+    if (_kpEl){                                  // vinha de outro campo: confirma-o (isto re-renderiza
+      var novoId = input.getAttribute("data-assign");         // e destrói os inputs), depois reabre o novo
+      kpCommit();
+      var fresh = novoId ? document.querySelector('.assign-input[data-assign="'+novoId+'"]') : null;
+      if (fresh) fresh.focus();                  // dispara focusin → kpOpen limpo no campo recriado
+      return;
+    }
+    _kpEl = input;
+    _kp = calcInit(parseAmount(input.value)||0);
+    input.classList.add("kp-active");
+    var pad = el("calcPad"); pad.classList.add("show"); pad.setAttribute("aria-hidden","false");
+    kpPaint();
+  }
+  function kpPaint(){
+    if (!_kp) return;
+    el("calcDisp").textContent = calcDisplayText(_kp);
+    if (_kpEl) _kpEl.value = amtStr(calcDisplayNum(_kp));   // reflete no campo em tempo real
+  }
+  function kpClose(){
+    var pad = el("calcPad"); pad.classList.remove("show"); pad.setAttribute("aria-hidden","true");
+    if (_kpEl) _kpEl.classList.remove("kp-active");
+    _kpEl = null; _kp = null;
+  }
+  function kpCommit(){
+    if (!_kpEl || !_kp) { kpClose(); return; }
+    var input = _kpEl, v = calcValue(_kp);
+    input.value = amtStr(v);
+    kpClose();
+    var ev; try{ ev=new Event("change"); }catch(e){ ev=document.createEvent("Event"); ev.initEvent("change",true,true); }
+    input.dispatchEvent(ev);                      // dispara a lógica de atribuição (undo + logMove + render)
+  }
+  function kpKey(k){
+    if (!_kp) return;
+    if (k==="ok"){ kpCommit(); return; }
+    if (k==="cancel"){ kpClose(); return; }
+    if (k==="back") _kp = calcBack(_kp);
+    else if (k==="+"||k==="-") _kp = calcOp(_kp, k);
+    else if (k==="=") _kp = calcEq(_kp);
+    else _kp = calcDigit(_kp, k);
+    kpPaint();
+  }
+  // Abrir ao focar/tocar num campo de atribuição (o inputmode="none" evita o teclado nativo).
+  document.addEventListener("focusin", function(e){
+    var inp = e.target.closest && e.target.closest(".assign-input");
+    if (inp) kpOpen(inp);
+  });
+  // Botões do teclado — mousedown com preventDefault para NÃO tirar o foco ao campo.
+  el("calcPad").addEventListener("mousedown", function(e){
+    var b = e.target.closest && e.target.closest("[data-calc]");
+    if (b){ e.preventDefault(); kpKey(b.getAttribute("data-calc")); }
+  });
+  // Teclado físico (no computador) enquanto o pad está aberto: dígitos, + - = Enter Backspace Esc.
+  document.addEventListener("keydown", function(e){
+    if (!_kp) return;
+    var k = e.key;
+    if (/^[0-9]$/.test(k)) kpKey(k);
+    else if (k==="," || k===".") kpKey(",");
+    else if (k==="+" || k==="-") kpKey(k);
+    else if (k==="Enter" || k==="=") { e.preventDefault(); kpKey("ok"); }
+    else if (k==="Backspace") { e.preventDefault(); kpKey("back"); }
+    else if (k==="Escape") { e.preventDefault(); kpKey("cancel"); }
+    else return;
+    e.stopPropagation();
+  }, true);
+  // Tocar fora do teclado e fora de um campo de atribuição confirma e fecha.
+  document.addEventListener("mousedown", function(e){
+    if (!_kpEl) return;
+    if (e.target.closest && (e.target.closest("#calcPad") || e.target.closest(".assign-input"))) return;
+    kpCommit();
+  });
+
   // ---------- Global event wiring (delegation, no inline handlers) ----------
   document.addEventListener("click", function(e){
     var nav = e.target.closest("[data-view]");
-    if (nav) { state.ui.view = nav.getAttribute("data-view"); if(state.ui.view!=="accounts") state.ui.openAccount=null; if(state.ui.view!=="transactions") state.ui.txFilter=null; render(); return; }
+    if (nav) {
+      var novaView = nav.getAttribute("data-view");
+      // Clicar em "Orçamento" aterra sempre no mês atual (as setas continuam a navegar entre meses).
+      if (novaView==="budget") state.ui.month = nowMonthKey();
+      state.ui.view = novaView;
+      // "Contas" volta SEMPRE à lista de contas (fecha a conta aberta), mesmo já estando no separador.
+      state.ui.openAccount = null;
+      if(state.ui.view!=="transactions") state.ui.txFilter=null;
+      render(); return;
+    }
     var a = e.target.closest("[data-action]");
     if (!a) return;
     var action = a.getAttribute("data-action");
@@ -4963,6 +5171,20 @@
     var nat = el(t.id + "__nat"); if (nat) nat.value = ptParaIso(t.value);
     t.classList.toggle("erro", t.value.length > 0 && !ptParaIso(t.value));
   });
+  // Filtro do ecrã de Beneficiários: esconde/mostra as linhas conforme o texto, sem re-render
+  // (para o campo não perder o foco). Compara pela chave normalizada, tal como as sugestões.
+  function pyFiltrar(){
+    var inp = el("pyFilter"); if(!inp) return;
+    var qk = payeeKey(inp.value), lista = el("pyList"); if(!lista) return;
+    var linhas = lista.querySelectorAll(".int-row"), visiveis = 0;
+    for (var i=0;i<linhas.length;i++){
+      var mostra = !qk || (linhas[i].getAttribute("data-pk")||"").indexOf(qk) >= 0;
+      linhas[i].style.display = mostra ? "" : "none";
+      if (mostra) visiveis++;
+    }
+    var vazio = el("pyEmpty"); if(vazio) vazio.classList.toggle("hidden", visiveis>0);
+  }
+  document.addEventListener("input", function(e){ if(e.target && e.target.id==="pyFilter") pyFiltrar(); });
   // Tocar na zona do 📅 é tocar no próprio <input type="date"> (invisível, por cima): no telemóvel
   // isso basta para abrir o calendário nativo. No computador forçamos com showPicker(). O valor
   // escolhido volta ao campo de texto no "change" logo abaixo.
@@ -5031,6 +5253,7 @@
       if (v===0) delete state.assignments[key]; else state.assignments[key]=v;
       // Guardar o valor anterior para o «↩ Anular» da faixa também servir as edições à mão.
       state.ui.lastFunding = { month: state.ui.month, entries:[{ key:key, prev:antes }] };
+      logMove("✏️ Atribuiu a «"+((categoryById(cid)||{name:"?"}).name)+"»", round2(v-(antes==null?0:antes)));
       save(); render(); return;
     }
     if (e.target.id==="txFilterAcc"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.account=e.target.value||null; render(); }
