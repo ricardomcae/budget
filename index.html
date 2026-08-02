@@ -648,6 +648,11 @@
   function budgetName(id){ for(var i=0;i<_bindex.list.length;i++) if(_bindex.list[i].id===id) return _bindex.list[i].name; return ""; }
   function activeId(){ return _bindex.active; }
   var INCOME = "__income__"; // identificador da categoria especial do «Pronto a atribuir»
+  // Transação de "Saldo inicial": é gerada pela app ao criar uma conta com saldo. Continua a
+  // financiar o orçamento e a contar no património, mas — como as transferências — não é uma
+  // despesa/receita real nem um beneficiário reutilizável, por isso fica de FORA dos relatórios
+  // e da lista de beneficiários. As novas levam a etiqueta opening; as antigas reconhecem-se pelo nome.
+  function isOpening(t){ return !!(t && (t.opening || t.payee==="Saldo inicial")); }
 
   var PAGINA = 50;   // linhas por página nas listas de transações
   var MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
@@ -865,6 +870,7 @@
     for(var i=0;i<state.transactions.length;i++){
       var t=state.transactions[i];
       if(t.transfer) continue;                       // "↔ Conta" é gerado pela app, não interessa sugerir
+      if(isOpening(t)) continue;                      // "Saldo inicial" também é automático, não é beneficiário
       var p=(t.payee||"").trim(); if(!p) continue;
       var k=payeeKey(p); if(!k) continue;
       var e=m[k] || (m[k]={ name:p, count:0, lastDate:"", cat:null, grafias:{} });
@@ -2323,6 +2329,7 @@
       var t = state.transactions[i], mm = monthOf(t.date);
       if (!noPeriodo[mm]) continue;
       if (t.transfer && !t.categoryId) continue;          // transferência interna não é despesa nem receita
+      if (isOpening(t)) continue;                          // saldo inicial não é receita/despesa real
       if (t.categoryId === INCOME) { totalIn += (t.inflow||0); porMes[mm].inc += (t.inflow||0); continue; }
       if (t.outflow) {
         var nome = t.categoryId ? ((lkCat(t.categoryId)||{name:"(apagada)"}).name) : "Sem categoria";
@@ -3828,7 +3835,7 @@
         if (type==="credit") ensurePaymentCategory(acc);
         var start = num("acStart");
         if (start !== 0) {
-          state.transactions.push({ id:uid(), date: todayISO(), accountId: acc.id,
+          state.transactions.push({ id:uid(), date: todayISO(), accountId: acc.id, opening:true,
             payee:"Saldo inicial", categoryId: (type==="budget" && start>0)?INCOME:null,
             memo:"", outflow: start<0?Math.abs(start):0, inflow: start>0?start:0, cleared:true });
         }
@@ -4978,6 +4985,7 @@
     try { snap = JSON.parse(step.json); } catch(e){ toast("Esse passo está inválido."); return; }
     _undo.pop();                                                    // pilhas atualizadas ANTES do render,
     _redo.push({ desc:step.desc, json:atual }); if(_redo.length>UNDO_MAX) _redo.shift();  // p/ os botões acertarem
+    logMove("↩ Anulou: "+step.desc, null);       // a timeline dos movimentos fica verdadeira
     aplicarEstado(snap);
     toast("Anulado: "+step.desc);
   }
@@ -4987,6 +4995,7 @@
     try { snap = JSON.parse(step.json); } catch(e){ toast("Esse passo está inválido."); return; }
     _redo.pop();
     _undo.push({ desc:step.desc, json:atual }); if(_undo.length>UNDO_MAX) _undo.shift();
+    logMove("↪ Refez: "+step.desc, null);
     aplicarEstado(snap);
     toast("Refeito: "+step.desc);
   }
