@@ -2818,6 +2818,7 @@
         '<div class="field"><button class="btn primary" data-action="export-json" style="width:100%;justify-content:center;">⬇ Guardar cópia de segurança (.json)</button></div>'+
         '<div class="field"><button class="btn" data-action="export-csv" style="width:100%;justify-content:center;">⬇ Exportar transações (.csv)</button></div>'+
         '<div class="field"><button class="btn" data-action="export-budget-csv" style="width:100%;justify-content:center;">⬇ Exportar orçamento do mês (.csv)</button><div class="hint">A tabela do mês em vista: Atribuído, Atividade e Disponível por categoria.</div></div>'+
+        '<div class="field"><button class="btn" data-action="export-config-csv" style="width:100%;justify-content:center;">⬇ Exportar configuração do orçamento (.csv)</button><div class="hint">A «planta» de cada categoria: tipo de alvo, método (Repor/Reservar) e valor.</div></div>'+
         '<div class="field"><label>Importar cópia de segurança (.json)</label><input id="importFile" type="file" accept="application/json,.json"><div class="hint">Substitui todos os dados atuais por este ficheiro.</div></div>'+
         '<div class="field"><button class="btn" data-action="import-csv" style="width:100%;justify-content:center;">📥 Importar transações do banco (.csv)</button><div class="hint">Acrescenta transações às existentes, sem substituir nada.</div></div>'+
         '<hr style="border:0;border-top:1px solid var(--border);margin:18px 0;">'+
@@ -4271,6 +4272,7 @@
     "export-json": function(){ exportJSON(); },
     "export-csv": exportCSV,
     "export-budget-csv": exportBudgetCSV,
+    "export-config-csv": exportBudgetConfigCSV,
     "backup-now": function(){ exportJSON(); },
     "backup-later": function(){ _backupBarDismissed=true; hideBackupBar(); },
     "toggle-autobackup": function(){ state.settings.autoBackup = !(state.settings.autoBackup!==false); if(state.settings.autoBackup!==false){ try{ takeDailySnapshot(); }catch(e){} } save(); dataModal(); },
@@ -4735,6 +4737,41 @@
     rows.push([], ["Total do mês (sem cartões de crédito)","", n(tot.assigned), n(tot.activity), n(tot.avail)]);
     var csv = rows.map(function(r){ return r.map(function(c){ var s=String(c==null?"":c); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";"); }).join("\n");
     guardarFicheiro("orcamento-"+m+".csv", "﻿"+csv, "text/csv;charset=utf-8", function(){ toast("Orçamento do mês exportado (CSV)."); });
+  }
+  // Exporta a "planta" da configuração: cada categoria com o seu tipo de alvo, método (Repor/
+  // Reservar) e valor — a estrutura do orçamento, não os montantes de um mês. Todas as categorias
+  // (inclusive as sem alvo). Legível em português; abre no Excel/Sheets.
+  function exportBudgetConfigCSV() {
+    var TIPOS = { monthly:"Mensal", weekly:"Semanal", quarterly:"Trimestral", semiannual:"Semestral", yearly:"Anual", byDate:"Até uma data" };
+    var WDAYS = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
+    var PRIOS = { alta:"Alta", normal:"Normal", baixa:"Baixa" };
+    function n(x){ return round2(x||0).toFixed(2).replace(".", ","); }
+    var rows = [["Configuração do orçamento", budgetName(_bindex.active)||""], [],
+                ["Grupo","Categoria","Prioridade","Tipo de alvo","Método","Valor do alvo","Detalhe","Nota"]];
+    for (var g=0; g<state.groups.length; g++) {
+      var grp=state.groups[g], cats=categoriesOfGroup(grp.id);
+      for (var c=0;c<cats.length;c++){ var cat=cats[c], tg=cat.target;
+        var prio = PRIOS[cat.priority||"normal"] || "Normal";
+        if (cat.cardId){                                   // categoria de pagamento de cartão (automática)
+          rows.push([grp.name, cat.name, "—", "Pagamento de cartão (automático)", "—", "", "", cat.note||""]);
+          continue;
+        }
+        if (!tg || !(tg.amount>0)){                         // sem alvo definido
+          rows.push([grp.name, cat.name, prio, "Sem alvo", "—", "", "", cat.note||""]);
+          continue;
+        }
+        var tipo = TIPOS[tg.type||"monthly"] || (tg.type||"");
+        var metodo = (tg.type==="weekly") ? "Repor" : ((tg.fund==="setAside") ? "Reservar" : "Repor");
+        var detalhe = "";
+        if (tg.type==="weekly") detalhe = "Por " + (WDAYS[(tg.weekday==null?1:tg.weekday)] || "");
+        else if (tg.type==="byDate") detalhe = "Até " + (tg.date ? monthLabel(tg.date) : "");
+        else if ((tg.type==="quarterly"||tg.type==="semiannual"||tg.type==="yearly") && tg.fund!=="setAside" && tg.due)
+          detalhe = "Mês da despesa: " + monthLabel(tg.due);
+        rows.push([grp.name, cat.name, prio, tipo, metodo, n(tg.amount), detalhe, cat.note||""]);
+      }
+    }
+    var csv = rows.map(function(r){ return r.map(function(c){ var s=String(c==null?"":c); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";"); }).join("\n");
+    guardarFicheiro("orcamento-configuracao.csv", "﻿"+csv, "text/csv;charset=utf-8", function(){ toast("Configuração do orçamento exportada (CSV)."); });
   }
   // ---------- Importação de CSV ----------
   function splitCSVLine(line, d){
