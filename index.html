@@ -3204,14 +3204,17 @@
         '<li><b>⚠️ Cobrir</b> — <i>outras categorias → uma categoria.</i> Aparece na linha de uma categoria que ficou <b>negativa</b>, por ter gasto nela mais do que lá tinha. Mostra o que falta e quem tem dinheiro parado, cada um com um cursor. Escolha de onde tirar: <b>primeiro das prioridades mais baixas</b> (sai de onde faz menos falta), <b>primeiro de quem tem mais folga</b>, ou <b>manual</b>. O que ainda não está atribuído é sempre gasto primeiro. Ao cartão de crédito só se tira a folga, nunca o que é preciso para o liquidar.</li>'+
         '<li><b>🧽 Limpar atribuições</b> — <i>categorias → Pronto a atribuir.</i> Devolve <b>tudo</b> o que atribuiu neste mês, para recomeçar do zero. Só mexe no mês que está a ver: o que transitou de meses anteriores fica onde está, e as transações não são tocadas. Se já gastou numa categoria mais do que o que transitou, ela fica negativa — a janela avisa quantas, antes de confirmar.</li>'+
                 '<li>As cinco <b>mostram o que ia acontecer antes de mexer em alguma coisa</b>, nenhuma tira dinheiro das contas — só muda a função que ele tem — e todas se desfazem com o <b>↩ Anular</b> que fica no topo.</li>'+
+        '<li><b>Prioridade</b> ▲ ● ▼ à frente de cada categoria, muda com um clique. É ela que comanda o «por prioridade» das operações acima; entre iguais, manda a <b>ordem da lista</b>.</li>'+
+        '<li><b>↔ Mover</b> passa dinheiro <b>do orçamento</b> entre categorias (ou de/para o «Pronto a atribuir»), sem tocar no rendimento — é diferente do <b>↔ Transferir</b> das contas, que move dinheiro <b>real</b> de uma conta para outra.</li>'+
+      '</ul>'+
+
+      sec("No ecrã e no teclado")+
+      '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li><b>O ✓ e o «Por confirmar»:</b> o ✓ marca que o banco já processou a transação. Mexe no <b>Confirmado</b>, não no <b>Saldo</b> — um café pago ontem está pago, tenha o banco lançado ou não, e o orçamento tem de contar com isso. A diferença entre os dois é o <b>Por confirmar</b>, que aparece no cabeçalho da conta e no ecrã das transações: quando chega a zero, a app bate certo com o extrato.</li>'+
         '<li><b>Total do mês:</b> por cima das colunas, a soma do <b>Atribuído</b>, da <b>Atividade</b> e do <b>Disponível</b>. As categorias de <b>pagamento de cartão</b> ficam de fora das três: a atividade delas é o espelho positivo do que se gastou — 50 € de mercearia no cartão dão −50 na Mercearia e +50 no cartão — e somá-las daria zero, como se não se tivesse gasto nada. Os valores do cartão continuam na linha do grupo dele.</li>'+
         '<li><b>Vários orçamentos</b> (📚, no cabeçalho): pode ter um <b>Pessoal</b> e um <b>Família</b>, por exemplo. Cada um é <b>completamente separado</b> — contas, categorias e transações próprias — e troca-se com um toque. Se sincroniza, vão <b>todos no mesmo gist</b>; só há uma coisa a saber: se editar orçamentos <b>diferentes</b> em aparelhos diferentes antes de sincronizar, a aplicação pergunta qual manter, como faria com qualquer conflito.</li>'+
         '<li><b>Datas e teclado:</b> as datas escrevem-se sempre em <b>dd/mm/aaaa</b>, mesmo que tenha o browser noutro idioma — pode escrever só os números, que as barras aparecem sozinhas, ou usar o 📅 para as escolher no calendário. Dentro de qualquer janela, o <b>Enter</b> vale por carregar no botão principal.</li>'+
         '<li><b>Esc</b> dentro de um campo desfaz o que estava a escrever e larga o campo, sem gravar. Dentro de uma janela, é preciso carregar duas vezes: a primeira sai do campo, a segunda fecha a janela.</li>'+
-        '<li>O <b>↩ Anular</b> da faixa reverte a última alteração aos valores atribuídos — tanto as operações em bloco como um valor que tenha mudado à mão numa linha.</li>'+
-        '<li><b>Prioridade</b> ▲ ● ▼ à frente de cada categoria, muda com um clique. Ao financiar por prioridade serve as <b>Altas</b> primeiro; entre iguais, manda a <b>ordem da lista</b>.</li>'+
-        '<li><b>↔</b> move dinheiro entre categorias (ou de/para o «Pronto a atribuir») sem mexer no rendimento.</li>'+
       '</ul>'+
 
       sec("Organizar")+
@@ -3237,7 +3240,7 @@
       sec("Se algo não bater certo")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li>Um <b>⚠️</b> por baixo do «Pronto a atribuir» quer dizer que o dinheiro nas contas não bate com o orçamento. Carregue em <b>Ver porquê</b> — mostra os movimentos em causa e corrige-os.</li>'+
-        '<li><b>↩ Anular</b> repõe as últimas <b>5</b> ações.</li>'+
+        '<li><b>↩ Anular</b> repõe as últimas <b>5</b> ações — tanto as operações em bloco como um valor que tenha mudado à mão numa linha.</li>'+
       '</ul>'+
 
       sec("Os seus dados")+
