@@ -1724,17 +1724,25 @@
     return out;
   }
 
-  // Sugestão automática. "prio" tira primeiro de quem tem prioridade mais baixa,
-  // "folga" de quem tem mais dinheiro parado, "manual" não sugere nada.
-  function coverAuto(fontes, falta, modo) {
-    var sel = {};
-    if (modo === "manual") return sel;
+  // Ordena as fontes conforme o modo escolhido — usada tanto na sugestão automática
+  // como na lista visível: "prio" mostra primeiro as prioridades mais baixas, "folga"
+  // quem tem mais dinheiro parado, "manual" mantém a ordem do ecrã Orçamento.
+  function coverOrder(fontes, modo) {
     var ord = fontes.slice();
+    if (modo === "manual") return ord;
     ord.sort(function(a,b){
       if (a.rta !== b.rta) return a.rta ? -1 : 1;
       if (modo === "folga") return b.max - a.max;
       return (PRIO_RANK[b.prio] - PRIO_RANK[a.prio]) || (b.max - a.max);
     });
+    return ord;
+  }
+  // Sugestão automática. "prio" tira primeiro de quem tem prioridade mais baixa,
+  // "folga" de quem tem mais dinheiro parado, "manual" não sugere nada.
+  function coverAuto(fontes, falta, modo) {
+    var sel = {};
+    if (modo === "manual") return sel;
+    var ord = coverOrder(fontes, modo);
     var resta = falta;
     for (var i=0;i<ord.length && resta > 0.005;i++){
       var t = Math.min(ord[i].max, resta);
@@ -2181,7 +2189,11 @@
   }
   function renderTransactions() {
     var f = state.ui.txFilter || {};
-    var list = state.transactions.slice().sort(function(a,b){ return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+    // Mesma data: a última transação adicionada aparece primeiro (desempate por ordem de criação).
+    var list = state.transactions.map(function(t,i){ return [t,i]; }).sort(function(a,b){
+      if (a[0].date !== b[0].date) return a[0].date < b[0].date ? 1 : -1;
+      return b[1] - a[1];
+    }).map(function(p){ return p[0]; });
     var jan = (f.per && f.per!=="custom") ? periodoDatas(f.per) : null;
     var de = jan ? jan.from : f.from, ate = jan ? jan.to : f.to;
     if (f.account) list = list.filter(function(t){return t.accountId===f.account;});
@@ -3361,7 +3373,7 @@
 
   var _covSel = null, _covAlvo = null, _covFalta = 0, _covFontes = null;
 
-  function coverModal(alvoId) {
+  function coverModal(alvoId, keepSel) {
     var m = state.ui.month, cat = categoryById(alvoId);
     if (!cat) return;
     var falta = round2(-availableFor(alvoId, m));
@@ -3369,7 +3381,7 @@
     var modo = state.ui.coverMode || "prio";
     var fontes = coverSources(alvoId, m);
     _covAlvo = alvoId; _covFalta = falta; _covFontes = fontes;
-    _covSel = coverAuto(fontes, falta, modo);
+    if (!(keepSel && _covSel)) _covSel = coverAuto(fontes, falta, modo);
 
     if (!fontes.length) {
       openModal(
@@ -3382,7 +3394,7 @@
       return;
     }
 
-    var linhas = fontes.map(function(f){
+    var linhas = coverOrder(fontes, modo).map(function(f){
       var v = _covSel[f.id] || 0;
       return '<div class="cov-row">'+
         '<div class="cov-nome">'+(f.rta ? '💵 ' : '<span class="prio-dot p-'+f.prio+'">'+PRIO_ICON[f.prio]+'</span> ')+esc(f.name)+
@@ -3406,7 +3418,7 @@
         '<div class="cov-list">'+linhas+'</div>'+
       '</div>'+
       '<div class="modal-foot"><span></span><span><button class="btn" data-action="close">Cancelar</button> '+
-        '<button class="btn primary" id="covOk" data-action="apply-cover">Cobrir '+fmt(coverTotal(_covSel))+'</button></span></div>');
+        '<button class="btn primary" id="covOk" data-action="preview-cover">Cobrir '+fmt(coverTotal(_covSel))+'</button></span></div>');
 
     function pinta(){
       var tot = coverTotal(_covSel), resta = round2(_covFalta - tot), fica = round2(tot - _covFalta);
@@ -3908,19 +3920,23 @@
     "toggle-clear": function(id){ var t=txById(id); if(t){ t.cleared=!t.cleared; save(); render(); } },
     "duplicate-tx": function(id){
       var t=txById(id); if(!t) return;
-      function copyOf(src, extra){ var c=JSON.parse(JSON.stringify(src)); c.id=uid(); c.cleared=false; if(extra) for(var k in extra) c[k]=extra[k]; return c; }
+      // O duplicado fica com a data de hoje (por confirmar) — copia tudo o resto tal e qual.
+      function copyOf(src, extra){ var c=JSON.parse(JSON.stringify(src)); c.id=uid(); c.cleared=false; c.date=todayISO(); if(extra) for(var k in extra) c[k]=extra[k]; return c; }
       pushUndo("Transação duplicada.");
       var msg="Transação duplicada (por confirmar).";
       if (t.transfer) {
         var np=uid(), halves=state.transactions.filter(function(x){return x.transfer===t.transfer;});
         halves.forEach(function(h){ state.transactions.push(copyOf(h,{transfer:np})); });
         msg="Transferência duplicada (por confirmar).";
+        logMove("⧉ Duplicou transferência", null);
       } else if (t.split) {
         var ns=uid(), parts=state.transactions.filter(function(x){return x.split===t.split;});
         parts.forEach(function(p){ state.transactions.push(copyOf(p,{split:ns})); });
         msg="Transação dividida duplicada ("+parts.length+" partes, por confirmar).";
+        logMove("⧉ Duplicou transação dividida ("+parts.length+" partes)", null);
       } else {
         state.transactions.push(copyOf(t));
+        logMove("⧉ Duplicou: "+(t.payee||t.memo||"transação"), round2((t.inflow||0)-(t.outflow||0)));
       }
       save(); render(); toast(msg); showUndo();
     },
@@ -4057,6 +4073,34 @@
       toast("Devolvido "+fmt(plan.total)+" de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
     },
     "cover-overspend": function(id){ coverModal(id); },
+    // Antes de cobrir, mostra um resumo só com as origens escolhidas (item pedido: "visão-resumo").
+    "preview-cover": function(){
+      var alvo=_covAlvo, sel=_covSel, fontes=_covFontes||[];
+      if(!alvo||!sel) return;
+      var tot=coverTotal(sel);
+      if(tot<=0.005){ toast("Escolha de onde tirar o dinheiro."); return; }
+      var cat=categoryById(alvo)||{name:""};
+      var byId={}; for(var i=0;i<fontes.length;i++) byId[fontes[i].id]=fontes[i];
+      var linhas="";
+      for(var id in sel){ if(!sel.hasOwnProperty(id)) continue; var v=sel[id]; if(v<=0.005) continue;
+        var f=byId[id]||{name:id, rta:(id===RTA_ID)};
+        linhas += '<div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid rgba(128,128,128,.22);">'+
+          '<span>'+(f.rta?'💵 ':'')+esc(f.name)+'</span><b>− '+fmt(v)+'</b></div>';
+      }
+      var resta=round2(_covFalta - tot), fica=round2(tot - _covFalta);
+      var nota = resta>0.005
+        ? '<p class="muted" style="margin:.5rem 0 0;">Cobre '+fmt(tot)+' dos '+fmt(_covFalta)+' em falta — ainda ficam '+fmt(resta)+' por tapar.</p>'
+        : '<p class="pos" style="margin:.5rem 0 0;">✅ Tapa o excesso por completo'+(fica>0.005?(' (sobram '+fmt(fica)+' na categoria)'):'')+'.</p>';
+      openModal(
+        '<div class="modal-head"><h2>Confirmar — cobrir «'+esc(cat.name)+'»</h2><button class="x" data-action="close">×</button></div>'+
+        '<div class="modal-body">'+
+          '<p class="muted" style="margin:0 0 .3rem;">Vai tirar <b>'+fmt(tot)+'</b> destas origens para «'+esc(cat.name)+'»:</p>'+
+          '<div>'+linhas+'</div>'+ nota +
+        '</div>'+
+        '<div class="modal-foot"><span></span><span><button class="btn" data-action="back-cover">‹ Voltar</button> '+
+          '<button class="btn primary" data-action="apply-cover">Confirmar — cobrir '+fmt(tot)+'</button></span></div>');
+    },
+    "back-cover": function(){ if(_covAlvo) coverModal(_covAlvo, true); },
     "apply-cover": function(){
       var m=state.ui.month, alvo=_covAlvo, sel=_covSel;
       if(!alvo||!sel){ return; }
