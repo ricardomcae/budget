@@ -2876,6 +2876,10 @@
           '<input type="checkbox" data-action="sync-toggle-auto" '+(_sync.auto?"checked":"")+' style="width:auto;"> Sincronizar automaticamente ao guardar</label>'+
           '<div class="hint" style="margin-top:4px;">Também sincroniza sempre que abre a aplicação.</div></div>'+
         '<div class="field"><button class="btn primary" data-action="sync-now" style="width:100%;justify-content:center;">🔄 Sincronizar agora</button></div>'+
+        '<div class="field"><label>Token novo <span class="muted">(se expirou ou foi revogado)</span></label>'+
+          '<input id="syncNewToken" maxlength="255" type="password" placeholder="cole aqui o token novo do GitHub">'+
+          '<button class="btn" data-action="sync-update-token" style="width:100%;justify-content:center;margin-top:8px;">🔑 Atualizar token</button>'+
+          '<div class="hint">Mantém o mesmo gist e a mesma palavra-passe — só troca a chave de acesso ao GitHub. Não pede para escolher versão.</div></div>'+
         '<div class="field"><button class="btn danger" data-action="sync-disconnect" style="width:100%;justify-content:center;">Desligar neste dispositivo</button>'+
           '<div class="hint">Apaga o token e a palavra-passe deste aparelho. Os seus dados locais e o gist ficam intactos.</div></div>';
     } else {
@@ -4337,6 +4341,16 @@
     "open-sync": function(){ syncModal(); },
     "sync-now": function(){ syncNow(); },
     "sync-toggle-auto": function(){ _sync.auto = !_sync.auto; saveSyncCfg(); },
+    // Troca APENAS o token (ex.: expirou ou foi revogado). Preserva o gist, a palavra-passe e o
+    // estado de sincronização (baseRev/syncedSig), por isso NÃO dispara o fluxo de conflito nem
+    // obriga a recolar o ID do gist — ao contrário de desligar e voltar a ligar.
+    "sync-update-token": function(){
+      var tok = el("syncNewToken") ? el("syncNewToken").value.trim() : "";
+      if(!tok){ toast("Cole o token novo."); return; }
+      _sync.token = tok; saveSyncCfg();
+      if(el("syncNewToken")) el("syncNewToken").value = "";
+      toast("Token atualizado — a sincronizar…"); syncNow();
+    },
     "sync-connect": function(){
       var tok = el("syncToken") ? el("syncToken").value.trim() : "";
       var pass = el("syncPass") ? el("syncPass").value : "";
