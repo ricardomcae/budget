@@ -37,6 +37,8 @@
     --negative-soft: #fee2e2;
     --warning: #b45309;
     --warning-soft: #fef3c7;
+    --info: #1d4ed8;
+    --info-soft: #dbeafe;
     --neutral-soft: #e2e8f0;
     --group-row: #e8edf4;
     --shadow: 0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.04);
@@ -66,6 +68,8 @@
       --negative-soft: #3b1414;
       --warning: #fbbf24;
       --warning-soft: #3a2c07;
+      --info: #60a5fa;
+      --info-soft: #17233f;
       --neutral-soft: #1f2a3c;
       --group-row: #172232;
       --shadow: 0 1px 3px rgba(0,0,0,.4);
@@ -289,6 +293,7 @@
   .btn.f-neg.active  { background: var(--negative-soft); border-color: var(--negative); color: var(--negative); }
   .btn.f-ok.active   { background: var(--positive-soft); border-color: var(--positive); color: var(--positive); }
   .btn.f-money.active { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
+  .btn.f-over.active  { background: var(--info-soft); border-color: var(--info); color: var(--info); }
   .btn.f-alta.active   { background: var(--positive-soft); border-color: var(--positive); color: var(--positive); }
   .btn.f-normal.active { background: var(--neutral-soft); border-color: var(--text-muted); color: var(--text); }
   .btn.f-baixa.active  { background: var(--negative-soft); border-color: var(--negative); color: var(--negative); }
@@ -2042,11 +2047,11 @@
         '<button class="btn primary hide-phone" data-action="add-tx">➕ Nova transação</button>' +
         '<button class="btn" data-action="add-group">+ Grupo</button>' +
         '<span class="muted hide-phone" style="font-size:12.5px;margin-inline-start:6px;">Mostrar:</span>' +
+        fBtn('f-over','budget-filter','over',bf.over,'🔵','Com excedente','Só as categorias com mais do que o alvo pede') +
         fBtn('f-ok','budget-filter','ok',bf.ok,'🟢','Alvo cumprido','Só as categorias com o alvo cumprido') +
         fBtn('f-warn','budget-filter','warn',bf.warn,'🟡','Abaixo do alvo','Só as categorias com o alvo por cumprir') +
         fBtn('f-neg','budget-filter','neg',bf.neg,'🔴','Excedido','Só as categorias que gastaram mais do que tinham') +
         fBtn('f-money','budget-filter','money',bf.money,'💰','Com saldo','Só as categorias com dinheiro disponível') +
-        fBtn('f-over','budget-filter','over',bf.over,'🔵','Com excedente','Só as categorias com mais do que o alvo pede') +
         '<span class="sep"></span>' +
         '<span class="muted hide-phone" style="font-size:12.5px;">Prioridade:</span>' +
         fBtn('f-alta','prio-filter','alta',bp.alta,'▲','Alta','Só as de prioridade alta') +
@@ -3245,7 +3250,7 @@
 
       sec("Organizar")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
-        '<li><b>Filtros</b> no topo do orçamento, para mostrar só as categorias que interessam: por <b>estado</b> (🟢 alvo cumprido, 🟡 abaixo do alvo, 🔴 excedido), <b>💰 com saldo</b> (têm dinheiro disponível), <b>🔵 com excedente</b> (têm <b>mais</b> do que o alvo pede — as candidatas a «🧹 Libertar excedente») e por <b>prioridade</b> (▲ ● ▼).</li>'+
+        '<li><b>Filtros</b> no topo do orçamento, para mostrar só as categorias que interessam. Pelo <b>alvo</b>, do mais folgado ao mais apertado: <b>🔵 com excedente</b> (têm <b>mais</b> do que o alvo pede — as candidatas a «🧹 Libertar excedente»), <b>🟢 alvo cumprido</b>, <b>🟡 abaixo do alvo</b> e <b>🔴 excedido</b>. Há ainda <b>💰 com saldo</b> (têm dinheiro disponível) e a <b>prioridade</b> (▲ ● ▼).</li>'+
         '<li>Dentro do mesmo grupo os filtros somam-se («<b>ou</b>»: 🟡 <i>ou</i> 🔴); entre grupos cruzam-se («<b>e</b>»: 🟡 abaixo do alvo <b>e</b> ▲ alta). O 🔵 é um refinamento do 🟢 — uma categoria cumprida pode ter excedente por cima. O botão <b>Limpar</b> tira todos de uma vez.</li>'+
         '<li><b>Reordenar</b> categorias, grupos e <b>contas</b>: arraste no computador; no telemóvel use <b>▲▼</b> dentro do ✎. As contas reordenam-se dentro do mesmo tipo (orçamento com orçamento, cartões entre si) e a ordem vale na barra lateral e no ecrã Contas.</li>'+
         '<li><b>🗄 Arquivar</b> esconde uma conta ou categoria sem perder o histórico.</li>'+
