@@ -1605,6 +1605,17 @@
     return { entries:entries, total:total, rtaBefore:rta, rtaAfter:round2(rta - total) };
   }
 
+  // Tem mais do que o alvo pede? Mesma regra do surplusPlan, por categoria (para o filtro «Com
+  // excedente»). Sem alvo NÃO conta (não há alvo a exceder); «reservar» também não (acumula de
+  // propósito). No cartão, o teto é o que falta liquidar — a folga acima disso é excedente.
+  function temExcedente(c, m){
+    var tem = availableFor(c.id, m);
+    if (tem <= 0.005) return false;
+    var t = tetoDaCategoria(c, m);
+    if (t.tipo !== "alvo") return false;              // "acumula" e "sem" não têm excedente
+    return round2(tem - t.teto) > 0.005;
+  }
+
   // ---------- Datas em dd/mm/aaaa ----------
   // O <input type="date"> nativo mostra a data no idioma do *browser*, não no da página:
   // quem tem o Chrome em inglês vê mm/dd/aaaa por muito lang="pt-PT" que aqui esteja.
@@ -1911,6 +1922,7 @@
     if (fEstado && !bf[catStatus(c, m)]) return false;
     if (fPrio && (c.cardId || !bp[c.priority||"normal"])) return false;   // as do cartão não têm prioridade
     if (bf.money && !(availableFor(c.id, m) > 0.005)) return false;        // só as que têm disponível > 0
+    if (bf.over && !temExcedente(c, m)) return false;                      // só as que têm mais do que o alvo pede
     return true;
   }
 
@@ -1925,7 +1937,7 @@
     var upc = upcomingTotals(m).porCat;   // o que cada categoria ainda tem por sair este mês
     var bf = state.ui.budgetFilters || {};
     var bp = state.ui.prioFilters || {};
-    var filtering = !!(bf.warn || bf.neg || bf.ok || bf.money || bp.alta || bp.normal || bp.baixa);
+    var filtering = !!(bf.warn || bf.neg || bf.ok || bf.money || bf.over || bp.alta || bp.normal || bp.baixa);
     var nShown=0, nTotal=0;
     var rows = "";
     for (var g=0; g<state.groups.length; g++) {
@@ -2034,6 +2046,7 @@
         fBtn('f-warn','budget-filter','warn',bf.warn,'🟡','Abaixo do alvo','Só as categorias com o alvo por cumprir') +
         fBtn('f-neg','budget-filter','neg',bf.neg,'🔴','Excedido','Só as categorias que gastaram mais do que tinham') +
         fBtn('f-money','budget-filter','money',bf.money,'💰','Com saldo','Só as categorias com dinheiro disponível') +
+        fBtn('f-over','budget-filter','over',bf.over,'🔵','Com excedente','Só as categorias com mais do que o alvo pede') +
         '<span class="sep"></span>' +
         '<span class="muted hide-phone" style="font-size:12.5px;">Prioridade:</span>' +
         fBtn('f-alta','prio-filter','alta',bp.alta,'▲','Alta','Só as de prioridade alta') +
@@ -3204,7 +3217,7 @@
 
       sec("Alvos")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
-        '<li>Definem-se no <b>✎</b> de cada categoria: mensal, semanal, trimestral, anual, ou até uma data.</li>'+
+        '<li>Definem-se no <b>✎</b> de cada categoria: mensal, semanal, trimestral, semestral, anual, ou até uma data.</li>'+
         '<li>No mensal, «<b>Repor até X</b>» acrescenta só o que falta para ter X disponível; «<b>Reservar X</b>» acrescenta sempre X, mesmo que já o tenha.</li>'+
         '<li>Trimestral, <b>semestral</b> e anual <b>param de pedir</b> quando já tiver o total. Indicando o mês da despesa, repartem o que falta até lá.</li>'+
       '</ul>'+
@@ -3232,7 +3245,8 @@
 
       sec("Organizar")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
-        '<li><b>Filtros</b> no topo: estado (🟢🟡🔴) e prioridade (▲●▼) <b>cruzam-se</b> entre si.</li>'+
+        '<li><b>Filtros</b> no topo do orçamento, para mostrar só as categorias que interessam: por <b>estado</b> (🟢 alvo cumprido, 🟡 abaixo do alvo, 🔴 excedido), <b>💰 com saldo</b> (têm dinheiro disponível), <b>🔵 com excedente</b> (têm <b>mais</b> do que o alvo pede — as candidatas a «🧹 Libertar excedente») e por <b>prioridade</b> (▲ ● ▼).</li>'+
+        '<li>Dentro do mesmo grupo os filtros somam-se («<b>ou</b>»: 🟡 <i>ou</i> 🔴); entre grupos cruzam-se («<b>e</b>»: 🟡 abaixo do alvo <b>e</b> ▲ alta). O 🔵 é um refinamento do 🟢 — uma categoria cumprida pode ter excedente por cima. O botão <b>Limpar</b> tira todos de uma vez.</li>'+
         '<li><b>Reordenar</b> categorias, grupos e <b>contas</b>: arraste no computador; no telemóvel use <b>▲▼</b> dentro do ✎. As contas reordenam-se dentro do mesmo tipo (orçamento com orçamento, cartões entre si) e a ordem vale na barra lateral e no ecrã Contas.</li>'+
         '<li><b>🗄 Arquivar</b> esconde uma conta ou categoria sem perder o histórico.</li>'+
       '</ul>'+
