@@ -713,7 +713,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.8";
+  var APP_VERSION = "1.9";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -2993,9 +2993,20 @@
   }
 
   function conflictModal(){
+    var pc = _pendingConflict || {};
+    var dNuvem = pc.remoteAt ? fmtDateTime(pc.remoteAt) : "";
+    var dLocal = _sync.lastSyncAt ? fmtDateTime(_sync.lastSyncAt) : "";
+    var linhaDatas = (dNuvem || dLocal)
+      ? ('<div class="hint" style="margin-top:6px;">'+
+          (dNuvem ? 'Nuvem atualizada a <b>'+esc(dNuvem)+'</b>' : '')+
+          (dNuvem && dLocal ? ' · ' : '')+
+          (dLocal ? 'última sincronização deste aparelho a <b>'+esc(dLocal)+'</b>' : '')+
+          '.</div>')
+      : '';
     openModal(
       '<div class="modal-head"><h2>⚠️ Conflito de sincronização</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body"><p>Este dispositivo tem alterações <b>e</b> a versão na nuvem também mudou desde a última sincronização.</p>'+
+        linhaDatas+
         '<div class="hint">Não é possível juntar as duas automaticamente sem risco de perder dados. Escolha qual manter — a outra é substituída.</div></div>'+
       '<div class="modal-foot" style="gap:8px;">'+
         '<button class="btn" data-action="sync-use-remote" style="flex:1;flex-direction:column;line-height:1.3;">Usar a versão da nuvem<span class="muted" style="font-size:11px;">descarta as deste aparelho</span></button>'+
@@ -3340,6 +3351,11 @@
       '<div class="modal-head"><h2>📋 Novidades</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
+
+      ver("1.9", "agosto 2026", [
+        '<b>Correção:</b> ao guardar a cópia de segurança (.json), o aviso de «alterações por guardar» passa a desaparecer em <b>todos</b> os orçamentos — antes reaparecia no outro orçamento apesar de já ter sido guardado (o ficheiro sempre incluiu todos).',
+        '<b>Conflito de sincronização mais claro:</b> mostra agora a <b>data e hora</b> da versão na nuvem e da última sincronização deste aparelho, para ajudar a escolher qual manter.'
+      ])+
 
       ver("1.8", "agosto 2026", [
         '<b>Aviso de gravar mais claro:</b> o botão 💾 «Dados e cópias» mostra agora <b>o número</b> de alterações por guardar (ex.: «2»), igual ao que aparece na secção «Cópia de segurança em ficheiro». Também no telemóvel.'
@@ -4630,10 +4646,22 @@
     return Math.floor(diff);
   }
   function markBackupDone(){
-    state.backup = state.backup || {};
-    state.backup.at = new Date().toISOString();
-    state.backup.sig = backupSig();
-    state.backup.pend = 0;   // acabou de guardar: zera o contador de alterações desde a última cópia
+    // A cópia .json inclui TODOS os orçamentos (syncContainer), por isso marcamos TODOS como
+    // guardados — não só o ativo. Senão, ao trocar de orçamento, os outros mostravam «por guardar»
+    // (com o (x) de alterações) apesar de já terem sido gravados no mesmo ficheiro.
+    var agora = new Date().toISOString();
+    for (var i=0;i<_bindex.list.length;i++){
+      var id=_bindex.list[i].id;
+      if (id===_bindex.active){
+        state.backup = state.backup || {};
+        state.backup.at = agora; state.backup.sig = sigOf(state); state.backup.pend = 0;
+      } else {
+        var st = loadBudgetRaw(id);
+        st.backup = st.backup || {};
+        st.backup.at = agora; st.backup.sig = sigOf(st); st.backup.pend = 0;
+        try { localStorage.setItem(budKey(id), JSON.stringify(st)); } catch(e){}
+      }
+    }
   }
   var _backupBarDismissed=false;
   function maybeShowBackupReminder(){
@@ -4855,7 +4883,7 @@
           adoptRemote(await decEnvelope(outer.enc, _sync.pass), remoteRev);
           setSyncStatus("Atualizado da nuvem ✓"); toast("Sincronizado — dados atualizados da nuvem.");
         } else {
-          _pendingConflict = { remoteRev:remoteRev, enc:outer.enc };
+          _pendingConflict = { remoteRev:remoteRev, enc:outer.enc, remoteAt:outer.updatedAt };
           setSyncStatus("Conflito ⚠️"); _syncing = false; conflictModal(); return;
         }
       } else if (changed || !outer || remoteRev < base) {
