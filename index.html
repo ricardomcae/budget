@@ -286,6 +286,7 @@
   .target-bar > span.ok   { background: var(--positive); }
   .target-bar > span.warn { background: var(--warning); }    /* abaixo do alvo */
   .target-bar > span.neg  { background: var(--negative); }   /* excesso (negativo) */
+  .target-bar > span.snoozed { background: var(--text-muted); opacity: .5; }   /* adiado este mês */
   tr[data-drag] { cursor: grab; }
   tr[data-drag]:active { cursor: grabbing; }
   tr.drag-over td { box-shadow: inset 0 2px 0 var(--primary); background: var(--primary-soft); }
@@ -717,6 +718,7 @@
     groups: [],
     categories: [],
     assignments: {},   // "idCategoria|AAAA-MM": valor
+    snooze: {},        // "idCategoria|AAAA-MM": true — alvo adiado nesse mês (não pede dinheiro)
     transactions: [],
     recurring: [],     // regras recorrentes
     backup: { at:null, sig:null, autoDay:null },  // controlo da cópia de segurança em ficheiro
@@ -997,6 +999,9 @@
     return round2(s);
   }
   function netWorth() { var s=0; for (var i=0;i<state.accounts.length;i++) s += accountBalance(state.accounts[i].id); return round2(s); }
+  // Há algo no orçamento? Serve para esconder o «carregar dados de exemplo» assim que houver dados
+  // (reaparece só se apagar tudo — dados de exemplo editados contam na mesma como dados).
+  function temDados(){ return !!(state.accounts.length || state.categories.length || state.groups.length || state.transactions.length || (state.recurring && state.recurring.length)); }
 
   // ---------- Integridade do orçamento ----------
   // Num orçamento base-zero tem de ser sempre verdade que:
@@ -1309,11 +1314,21 @@
   }
   // Cadências de alvo: mensal | semanal | trimestral | semestral | anual | até uma data.
   // Devolve {need, met, progress, label} ou null quando a categoria não tem alvo.
+  // Alvo adiado neste mês: o utilizador disse "não me chateies agora" (😴). Existe por categoria E
+  // por mês, por isso expira sozinho — no mês seguinte volta a pedir sem ser preciso fazer nada.
+  function isSnoozed(catId, m){ return !!(state.snooze && state.snooze[catId+"|"+m]); }
+
   function targetInfo(cat, m) {
     if (!cat.target || !(cat.target.amount>0)) return null;
     var tg = cat.target, type = tg.type || "monthly", amt = tg.amount;
     var avail = availableFor(cat.id, m);
     var assignedThis = assignedFor(cat.id, m);
+    // Adiado: não pede nada este mês (need 0) nem conta como abaixo do alvo — estado próprio "adiado".
+    if (isSnoozed(cat.id, m)) {
+      return { need:0, met:true, doMes:true, snoozed:true,
+        progress: Math.max(0, Math.min(1, amt>0 ? avail/amt : 0)),
+        label: "😴 Adiado este mês — não pede dinheiro" };
+    }
     if (type==="monthly") {
       var fund = tg.fund || "refill";
       if (fund==="setAside") {
@@ -1482,7 +1497,7 @@
       if (!raw) return JSON.parse(JSON.stringify(DEFAULT_STATE));
       var o = JSON.parse(raw);
       o.settings = o.settings || { locale:"pt-PT", currency:"EUR" };
-      o.collapsed = o.collapsed || {}; o.assignments = o.assignments || {};
+      o.collapsed = o.collapsed || {}; o.assignments = o.assignments || {}; o.snooze = o.snooze || {};
       o.recurring = o.recurring || []; o.ui = o.ui || { view:"budget", month:nowMonthKey() };
       o.backup = o.backup || { at:null, sig:null, autoDay:null };
       return o;
@@ -1915,6 +1930,7 @@
     }
     var ti = targetInfo(cat, m);
     if (!ti) return "none";
+    if (ti.snoozed) return "snoozed";
     return (ti.doMes!=null ? ti.doMes : ti.met) ? "ok" : "warn";
   }
 
@@ -1999,7 +2015,7 @@
         if (ti) {
           var okMes = (ti.doMes!=null ? ti.doMes : ti.met);
           if (!okMes && pillCls === "pos") pillCls = "warn";
-          var barCls = cstat==="neg" ? "neg" : (ti.met ? "full" : (okMes ? "ok" : "warn"));
+          var barCls = cstat==="neg" ? "neg" : (ti.snoozed ? "snoozed" : (ti.met ? "full" : (okMes ? "ok" : "warn")));
           var barW = cstat==="neg" ? 100 : ti.progress*100;
           targetHtml = '<div class="target-bar"><span class="'+barCls+'" style="width:'+barW+'%"></span></div>' +
             '<div class="target-note">' + ti.label + '</div>';
@@ -2017,6 +2033,8 @@
             '<button data-action="move-money" data-id="'+cat.id+'" title="Mover dinheiro">↔</button>' +
             '<button data-action="edit-category" data-id="'+cat.id+'" title="Editar / alvo">✎</button>' +
             (ti && ti.need>0 ? '<button data-action="fund-one" data-id="'+cat.id+'" title="Financiar alvo">🎯</button>' : '') +
+            (ti && ti.snoozed ? '<button data-action="unsnooze-cat" data-id="'+cat.id+'" title="Reativar o alvo este mês">☀️</button>'
+              : (ti && ti.need>0 ? '<button data-action="snooze-cat" data-id="'+cat.id+'" title="Adiar o alvo este mês — não pedir agora">😴</button>' : '')) +
             (avail < -0.005 ? '<button data-action="cover-overspend" data-id="'+cat.id+'" title="Cobrir o que gastou a mais…">⚠️</button>' : '') +
           '</span></div>' + (cat.note?'<div class="tag" style="margin-top:3px;">📝 '+esc(cat.note)+'</div>':'') + targetHtml +
           (upc[cat.id] ? '<div class="target-note">📅 Ainda por sair este mês: '+fmt(upc[cat.id])+
@@ -2555,8 +2573,8 @@
   // Os <option> não aceitam HTML, por isso o estado do alvo vai num símbolo antes do nome
   // (funciona em todo o lado, incluindo no seletor nativo do iPhone). A cor é um extra
   // que só alguns navegadores de computador respeitam.
-  var STATUS_MARCA = { ok:"🟢", warn:"🟡", neg:"🔴", none:"⚪" };
-  var STATUS_COR   = { ok:"var(--positive)", warn:"var(--warning)", neg:"var(--negative)", none:"var(--text-muted)" };
+  var STATUS_MARCA = { ok:"🟢", warn:"🟡", neg:"🔴", none:"⚪", snoozed:"😴" };
+  var STATUS_COR   = { ok:"var(--positive)", warn:"var(--warning)", neg:"var(--negative)", none:"var(--text-muted)", snoozed:"var(--text-muted)" };
   function optCat(cat, m, selId){
     var st = catStatus(cat, m);
     return '<option value="'+cat.id+'"'+(selId===cat.id?" selected":"")+' style="color:'+STATUS_COR[st]+'">'+
@@ -2849,7 +2867,7 @@
           '<div style="font-weight:700;font-size:13px;">1 · Histórico — voltar a um dia anterior</div>'+
           '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;margin-top:8px;">'+
             '<input type="checkbox" data-action="toggle-autobackup" '+(state.settings.autoBackup!==false?"checked":"")+' style="width:auto;"> Guardar o estado do orçamento uma vez por dia</label>'+
-          '<div class="hint" style="margin-top:4px;">Os <b>5 dias</b> mais recentes, guardados dentro da aplicação. Servem para voltar atrás — <b>não</b> o salvam se perder o aparelho.</div>'+
+          '<div class="hint" style="margin-top:4px;">Os <b>5 dias</b> mais recentes, para voltar atrás. <b>Não</b> o salvam se perder o aparelho.</div>'+
           snapshotsHtml()+
         '</div>'+
 
@@ -2861,13 +2879,18 @@
               : 'Ainda não guardou nenhuma cópia de segurança em ficheiro.')+
           '</div>'+
           '<div class="hint" style="margin-top:4px;">'+(backupPending()?'⚠️ Há alterações por guardar em ficheiro.':'✅ A última cópia está atualizada.')+'</div>'+
-          '<div class="hint" style="margin-top:6px;">Manual. Guarde o ficheiro <b>fora daqui</b> — OneDrive, e-mail, pen.'+
-          (usaPartilha()?' Neste aparelho abre a partilha do iPhone.':'')+'</div>'+
+          '<div class="hint" style="margin-top:6px;">Guarde-o <b>fora daqui</b> (OneDrive, e-mail, pen).'+
+          (usaPartilha()?' Abre a partilha do iPhone.':'')+'</div>'+
         '</div>'+
-        '<div class="field"><button class="btn primary" data-action="export-json" style="width:100%;justify-content:center;">⬇ Guardar cópia de segurança (.json)</button></div>'+
-        '<div class="field"><button class="btn" data-action="export-csv" style="width:100%;justify-content:center;">⬇ Exportar transações (.csv)</button></div>'+
-        '<div class="field"><button class="btn" data-action="export-budget-csv" style="width:100%;justify-content:center;">⬇ Exportar orçamento do mês (.csv)</button><div class="hint">A tabela do mês em vista: Atribuído, Atividade e Disponível por categoria.</div></div>'+
-        '<div class="field"><button class="btn" data-action="export-config-csv" style="width:100%;justify-content:center;">⬇ Exportar configuração do orçamento (.csv)</button><div class="hint">A «planta» de cada categoria: tipo de alvo, método (Repor/Reservar) e valor.</div></div>'+
+        '<div class="field"><button class="btn primary" data-action="export-json" style="width:100%;justify-content:center;">⬇ Guardar cópia de segurança (.json)</button>'+
+          '<div class="hint">A cópia completa e fiel — a única que repõe tudo tal como está.</div></div>'+
+        '<details class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">'+
+          '<summary style="cursor:pointer;font-weight:700;font-size:13px;">⬇ Exportar para folha de cálculo (.csv)</summary>'+
+          '<div class="hint" style="margin:8px 0 10px;">Para abrir no Excel/Sheets — <b>não</b> substitui a cópia .json.</div>'+
+          '<button class="btn" data-action="export-csv" style="width:100%;justify-content:center;margin-bottom:8px;">Transações</button>'+
+          '<button class="btn" data-action="export-budget-csv" style="width:100%;justify-content:center;margin-bottom:8px;">Orçamento do mês em vista</button>'+
+          '<button class="btn" data-action="export-config-csv" style="width:100%;justify-content:center;">Configuração dos alvos</button>'+
+        '</details>'+
         '<div class="field"><label>Importar cópia de segurança (.json)</label><input id="importFile" type="file" accept="application/json,.json"><div class="hint">Substitui todos os dados atuais por este ficheiro.</div></div>'+
         '<div class="field"><button class="btn" data-action="import-csv" style="width:100%;justify-content:center;">📥 Importar transações do banco (.csv)</button><div class="hint">Acrescenta transações às existentes, sem substituir nada.</div></div>'+
         '<hr style="border:0;border-top:1px solid var(--border);margin:18px 0;">'+
@@ -2881,7 +2904,7 @@
         '</div>'+
         '<div class="field"><button class="btn" data-action="archived-menu" style="width:100%;justify-content:center;">🗄 Contas e categorias arquivadas</button>'+
           '<div class="hint">Repor o que escondeu do orçamento sem apagar o histórico.</div></div>'+
-        '<div class="field"><button class="btn" data-action="load-sample" style="width:100%;justify-content:center;">🧪 Carregar dados de exemplo</button></div>'+
+        (temDados() ? '' : '<div class="field"><button class="btn" data-action="load-sample" style="width:100%;justify-content:center;">🧪 Carregar dados de exemplo</button></div>')+
         '<div class="field"><button class="btn danger" data-action="reset-data" style="width:100%;justify-content:center;">🗑 Apagar todos os dados</button></div>'+
         (function(){ var e=espacoApp(); if(!e) return "";
           return '<div class="hint" style="border-top:1px solid var(--border);padding-top:10px;">Espaço usado: <b>'+mb(e.total)+
@@ -3237,6 +3260,7 @@
         '<li>Definem-se no <b>✎</b> de cada categoria: mensal, semanal, trimestral, semestral, anual, ou até uma data.</li>'+
         '<li>No mensal, «<b>Repor até X</b>» acrescenta só o que falta para ter X disponível; «<b>Reservar X</b>» acrescenta sempre X, mesmo que já o tenha.</li>'+
         '<li>Trimestral, <b>semestral</b> e anual <b>param de pedir</b> quando já tiver o total. Indicando o mês da despesa, repartem o que falta até lá.</li>'+
+        '<li><b>😴 Adiar este mês:</b> num alvo que ainda pede dinheiro, o <b>😴</b> na linha da categoria diz para <b>não chatear só este mês</b> — deixa de aparecer a amarelo e sai do «Financiar alvos». No mês seguinte volta ao normal, ou reative antes com o <b>☀️</b>.</li>'+
       '</ul>'+
 
       sec("Distribuir o dinheiro")+
@@ -3583,14 +3607,23 @@
       el("rcTo").addEventListener("change", sync);
       sync();
     } else {
+      // Conta de acompanhamento está fora do orçamento: uma despesa/receita recorrente aí não leva
+      // categoria (senão cada lançamento automático desequilibrava o orçamento). Esconde o campo.
+      var catVis = function(){
+        var a=lkAcc(el("rcAcc").value);
+        el("rcCatField").classList.toggle("hidden", !!(a && a.type==="tracking"));
+      };
       var sugerir = function(){
         if (el("rcCat").value) return;
+        var a=lkAcc(el("rcAcc").value); if(a && a.type==="tracking") return;
         var c = payeeCategoria(el("rcPayee").value);
         if (c) el("rcCat").value = c;
       };
       el("rcPayee").addEventListener("change", sugerir);
       el("rcPayee").addEventListener("blur", sugerir);
+      el("rcAcc").addEventListener("change", catVis);
       wirePayeeAutocomplete(el("rcPayee"));
+      catVis();
     }
   }
   // Guarda no objeto de trabalho o que já está escrito, para não se perder ao trocar de tipo.
@@ -3724,7 +3757,11 @@
     if(!_split){ _split={ date:todayISO(), accountId:(state.accounts[0]||{}).id, payee:"", memo:"", cleared:true, dir:"out", lines:[{categoryId:"",amount:""},{categoryId:"",amount:""}] }; }
     var s=_split;
     var editando=!!s.editSplit;
-    var accOpts=state.accounts.filter(function(a){return !a.hidden || a.id===s.accountId;}).map(function(a){return '<option value="'+a.id+'"'+(s.accountId===a.id?" selected":"")+'>'+esc(a.name)+'</option>';}).join("");
+    // Dividir por categorias só faz sentido em contas de orçamento ou cartão — as de acompanhamento
+    // estão fora do orçamento. Se a conta escolhida for de acompanhamento, passa para a primeira válida.
+    var divisiveis=state.accounts.filter(function(a){return a.type!=="tracking" && (!a.hidden || a.id===s.accountId);});
+    if(!divisiveis.some(function(a){return a.id===s.accountId;})){ s.accountId=(divisiveis[0]||{}).id; }
+    var accOpts=divisiveis.map(function(a){return '<option value="'+a.id+'"'+(s.accountId===a.id?" selected":"")+'>'+esc(a.name)+'</option>';}).join("");
     function catOptsFor(sel){ return catOptionsHTML(sel).replace("— Sem categoria —","— Categoria —"); }
     var total=0; s.lines.forEach(function(l){ if(typeof l.amount==="number") total+=l.amount; });
     var lineRows=s.lines.map(function(l,i){
@@ -3884,6 +3921,7 @@
       var type = _tmpAccType || "budget";
       var note = valLim("acNote", LIM_NOTA);
       var payFrom = el("acPayFrom") ? (el("acPayFrom").value||null) : null;
+      pushUndo(id ? "Conta alterada." : "Conta criada.");
       if (id) {
         var a=accountById(id); a.name=name; a.type=type; a.note=note; a.payFrom = type!=="budget"?payFrom:null;
         if (type==="credit") ensurePaymentCategory(a);
@@ -3994,6 +4032,8 @@
 
     "add-split": function(){ _split=null; splitModal(); },
     "to-split": function(){
+      var _accTs=lkAcc(el("txAcc")?el("txAcc").value:null);
+      if(_accTs && _accTs.type==="tracking"){ toast("Dividir por categorias não se aplica a contas de acompanhamento."); return; }
       var dir=(el("txIn")&&el("txIn").value&&!(el("txOut")&&el("txOut").value))?"in":"out";
       _split={ date:dateVal("txDate")||todayISO(), accountId:(el("txAcc")?el("txAcc").value:(state.accounts[0]||{}).id),
         payee:(el("txPayee")?corta(el("txPayee").value, LIM_PAYEE):""), memo:(el("txMemo")?corta(el("txMemo").value, LIM_NOTA):""),
@@ -4060,6 +4100,22 @@
     "budget-filter-clear": function(){ state.ui.budgetFilters={}; state.ui.prioFilters={}; save(); render(); },
     // Atalho do aviso de excedidas: mostra só as categorias no vermelho (equivalente ao "Cover" do YNAB).
     "show-overspent": function(){ state.ui.budgetFilters={neg:true}; state.ui.prioFilters={}; save(); render(); },
+    // Adiar/reativar o alvo de uma categoria SÓ neste mês (😴). Não mexe em dinheiro nenhum — só
+    // diz ao orçamento para não pedir agora. No mês seguinte volta ao normal por si.
+    "snooze-cat": function(id){
+      var m=state.ui.month, nm=(categoryById(id)||{}).name||"";
+      pushUndo("Alvo adiado.");
+      state.snooze=state.snooze||{}; state.snooze[id+"|"+m]=true;
+      logMove("😴 Adiou «"+nm+"» este mês", null);
+      save(); render(); toast("«"+nm+"» adiada este mês — pode reativar quando quiser.");
+    },
+    "unsnooze-cat": function(id){
+      var m=state.ui.month, nm=(categoryById(id)||{}).name||"";
+      pushUndo("Alvo reativado.");
+      if(state.snooze) delete state.snooze[id+"|"+m];
+      logMove("☀️ Reativou «"+nm+"» este mês", null);
+      save(); render(); toast("«"+nm+"» reativada este mês.");
+    },
 
     "add-category": function(id){ categoryModal(null, id); },
     "edit-category": function(id){ var c=categoryById(id); if(c&&c.cardId){ toast("Categoria de pagamento de cartão (automática)."); return; } categoryModal(c); },
@@ -4294,8 +4350,9 @@
       } else {
         if((d.outflow||0)===0 && (d.inflow||0)===0){ toast("Indique um valor de saída ou entrada."); return; }
         if((d.outflow||0)>0 && (d.inflow||0)>0){ toast("Preencha só a Saída OU a Entrada, não as duas."); return; }
+        var accR=accountById(d.accountId);
         dados = { nextDate:d.nextDate||todayISO(), freq:d.freq, accountId:d.accountId, toAccountId:null,
-                  payee:d.payee||"", categoryId:d.categoryId||null, memo:d.memo||"",
+                  payee:d.payee||"", categoryId:(accR && accR.type==="tracking") ? null : (d.categoryId||null), memo:d.memo||"",
                   outflow:d.outflow||0, inflow:d.inflow||0, active:!!d.active };
       }
       pushUndo(d._id ? "Recorrente alterada." : "Recorrente criada.");
@@ -4315,6 +4372,7 @@
     "post-recurring-now": function(id){
       var r=recById(id); if(!r) return;
       if(!recValida(r)){ toast("As contas desta regra já não existem."); return; }
+      pushUndo("Recorrente lançada.");
       lancarRecorrente(r, r.nextDate);
       r.nextDate=advanceDate(r.nextDate, r.freq);
       closeModal(); save(); render(); toast("Lançado. Próxima: "+fmtDate(r.nextDate));
@@ -4333,8 +4391,9 @@
       var cruza = !el("tfCatField").classList.contains("hidden");
       var cat = cruza ? (el("tfCat").value||null) : null;
       if(cruza && !cat){ toast("Escolha a categoria — este movimento entra ou sai do orçamento."); return; }
+      pushUndo("Transferência registada.");
       if(createTransfer(from,to,amt,date,cl,cat,valLim("tfMemo", LIM_NOTA))){ closeModal(); save(); render(); toast("Transferência registada."); }
-      else toast("Não foi possível transferir.");
+      else { _undo.pop(); toast("Não foi possível transferir."); }
     },
     "save-transfer": function(pair){
       var from=el("tfFrom").value, to=el("tfTo").value, amt=num("tfAmt"), date=dateVal("tfDate")||todayISO(), cl=el("tfClear").checked;
@@ -4426,7 +4485,7 @@
     },
     "sync-keep-local": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ await pushLocal(pc.remoteRev+1); setSyncStatus("Guardado na nuvem ✓"); toast("Mantido este dispositivo — enviado para a nuvem."); }catch(e){ toast("Falhou: "+e.message); } _pendingConflict=null; })(); },
     "sync-use-remote": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ adoptRemote(await decEnvelope(pc.enc, _sync.pass), pc.remoteRev); toast("Adotada a versão da nuvem."); }catch(e){ toast("Falhou: "+e.message); } _pendingConflict=null; })(); },
-    "load-sample": function(){ var hasData=state.accounts.length||state.categories.length||state.groups.length||state.transactions.length||(state.recurring&&state.recurring.length); if(hasData && !confirm("Atenção: os dados atuais serão substituídos pelos dados de exemplo. Esta ação não pode ser anulada. Pretende continuar?")) return; loadSample(); },
+    "load-sample": function(){ if(temDados() && !confirm("Atenção: os dados atuais serão substituídos pelos dados de exemplo. Esta ação não pode ser anulada. Pretende continuar?")) return; loadSample(); },
     "reset-data": function(){ if(confirm("Apagar TODOS os dados definitivamente? Esta ação não pode ser anulada.")){ state=JSON.parse(JSON.stringify(DEFAULT_STATE)); state.ui.month=nowMonthKey(); _undo=[]; hideUndo(); closeModal(); save(); render(); toast("Dados apagados."); } }
   };
 
@@ -4938,8 +4997,9 @@
       var accId=defaultAccountId;
       if("conta" in idx){ var an=accByName[normKey(f[idx.conta])]; if(an) accId=an; }
       var catId=null;
-      if("categoria" in idx){ var cn=normKey(f[idx.categoria]); if(cn==="rendimento"||cn==="income") catId=INCOME; else if(catByName[cn]) catId=catByName[cn]; }
-      if(!catId && inf<0.005) semCat++;
+      var accObj=lkAcc(accId), ehTrack=!!(accObj && accObj.type==="tracking");   // acompanhamento não leva categoria
+      if(!ehTrack && "categoria" in idx){ var cn=normKey(f[idx.categoria]); if(cn==="rendimento"||cn==="income") catId=INCOME; else if(catByName[cn]) catId=catByName[cn]; }
+      if(!ehTrack && !catId && inf<0.005) semCat++;
       var cl=true;
       if("cleared" in idx){ var cv=normKey(f[idx.cleared]); if(cv==="nao"||cv==="n"||cv==="false"||cv==="0") cl=false; }
       var kr=accId+"|"+date+"|"+round2(out).toFixed(2)+"|"+round2(inf).toFixed(2);
