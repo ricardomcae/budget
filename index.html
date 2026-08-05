@@ -713,7 +713,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.9";
+  var APP_VERSION = "2.0";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -2040,10 +2040,13 @@
           '<span class="cat-actions">' +
             '<button data-action="move-money" data-id="'+cat.id+'" title="Mover dinheiro">↔</button>' +
             '<button data-action="edit-category" data-id="'+cat.id+'" title="Editar / alvo">✎</button>' +
-            (ti && ti.need>0 ? '<button data-action="fund-one" data-id="'+cat.id+'" title="Financiar alvo">🎯</button>' : '') +
+            // Ordem deliberada: primeiro o que TAPA O BURACO (🩹, traz a zero), só depois o que
+            // LEVA AO ALVO (🎯). É a sequência lógica de quem estourou numa categoria — e os dois
+            // aparecem juntos sempre que a categoria ficou negativa e ainda está abaixo do alvo.
+            (avail < -0.005 ? '<button data-action="cover-overspend" data-id="'+cat.id+'" title="Cobrir o excesso — trazer a zero, tirando de outras categorias">🩹</button>' : '') +
+            (ti && ti.need>0 ? '<button data-action="fund-one" data-id="'+cat.id+'" title="Financiar o alvo — juntar o que falta, do Pronto a atribuir">🎯</button>' : '') +
             (ti && ti.snoozed ? '<button data-action="unsnooze-cat" data-id="'+cat.id+'" title="Reativar o alvo este mês">☀️</button>'
               : (ti && ti.need>0 ? '<button data-action="snooze-cat" data-id="'+cat.id+'" title="Adiar o alvo este mês — não pedir agora">😴</button>' : '')) +
-            (avail < -0.005 ? '<button data-action="cover-overspend" data-id="'+cat.id+'" title="Cobrir o que gastou a mais…">⚠️</button>' : '') +
           '</span></div>' + (cat.note?'<div class="tag" style="margin-top:3px;">📝 '+esc(cat.note)+'</div>':'') + targetHtml +
           (upc[cat.id] ? '<div class="target-note">📅 Ainda por sair este mês: '+fmt(upc[cat.id])+
             (avail < upc[cat.id]-0.005 ? ' <b style="color:var(--warning)">— faltam '+fmt(round2(upc[cat.id]-avail))+'</b>' : '')+'</div>' : '') + '</td>' +
@@ -3289,7 +3292,9 @@
         '<li><b>🎯 Financiar alvos</b> — <i>Pronto a atribuir → categorias.</i> Está sempre disponível. Dá a cada categoria o que lhe falta para cumprir o alvo do mês. Pode <b>financiar tudo</b>, ou <b>repartir só o que está por atribuir</b> — esta nunca o deixa negativo, e reparte de três maneiras: <b>por prioridade</b> (serve as Altas primeiro), <b>proporcional</b> (todas ficam igualmente perto do alvo — quem precisa de mais leva mais) ou <b>pela ordem da lista</b> (completa de cima para baixo até acabar).</li>'+
         '<li><b>↩ Repor a zero</b> — <i>categorias → Pronto a atribuir.</i> Aparece quando atribuiu mais do que tinha e o «Pronto a atribuir» ficou <b>negativo</b>. Retira às categorias com dinheiro parado até voltar a zero, com as mesmas três maneiras de repartir — mas ao contrário: <b>por prioridade</b> tira primeiro das <b>Baixas</b>, para proteger as Altas. Nenhuma categoria fica negativa.</li>'+
         '<li><b>🧹 Libertar excedente</b> — <i>categorias → Pronto a atribuir.</i> Aparece quando alguma categoria tem <b>mais do que o alvo dela pede</b> — por exemplo «repor até 200 €» com 500 € lá dentro. No <b>cartão de crédito</b>, o teto é o que falta liquidar: se atribuiu 500 € e só deve 200 €, liberta os 300 € de folga. Estar <b>adiantado</b> num objetivo com data não conta como excedente: se quer 3.000 € e já juntou 2.000 €, o dinheiro é seu e fica onde está — esticar o prazo apenas <b>baixa a mensalidade</b>. As de «reservar todos os meses» nunca entram, porque aí o dinheiro é mesmo para acumular.</li>'+
-        '<li><b>⚠️ Cobrir</b> — <i>outras categorias → uma categoria.</i> Aparece na linha de uma categoria que ficou <b>negativa</b>, por ter gasto nela mais do que lá tinha. Mostra o que falta e quem tem dinheiro parado, cada um com um cursor. Escolha de onde tirar: <b>primeiro das prioridades mais baixas</b> (sai de onde faz menos falta), <b>primeiro de quem tem mais folga</b>, ou <b>manual</b>. O que ainda não está atribuído é sempre gasto primeiro. Ao cartão de crédito só se tira a folga, nunca o que é preciso para o liquidar.</li>'+
+        '<li><b>🩹 Cobrir</b> — <i>outras categorias → uma categoria.</i> Aparece na linha de uma categoria que ficou <b>negativa</b>, por ter gasto nela mais do que lá tinha. O objetivo é <b>trazê-la a zero</b>. Mostra o que falta e quem tem dinheiro parado, cada um com um cursor. Escolha de onde tirar: <b>primeiro das prioridades mais baixas</b> (sai de onde faz menos falta), <b>primeiro de quem tem mais folga</b>, ou <b>manual</b>. O que ainda não está atribuído é sempre gasto primeiro. Ao cartão de crédito só se tira a folga, nunca o que é preciso para o liquidar.</li>'+
+        '<li><b>🎯 na linha de uma categoria</b> — <i>Pronto a atribuir → essa categoria.</i> Faz num toque o que a janela acima faz para todas: junta-lhe de uma vez o que falta para o <b>alvo do mês</b>. Se o «Pronto a atribuir» não chegar, <b>avisa antes</b> de o deixar negativo.</li>'+
+        '<li><b>🩹 e 🎯 são coisas diferentes</b> — e podem aparecer os dois na mesma categoria. O <b>🩹 traz a zero</b> (tapa o que gastou a mais) e vai buscar o dinheiro a <b>outras categorias</b>; o <b>🎯 leva ao alvo</b> (o que planeou ter) e vai buscá-lo ao <b>Pronto a atribuir</b>. Por isso o 🩹 fica à esquerda: primeiro tapa-se o buraco, depois volta-se ao plano.</li>'+
         '<li><b>🧽 Limpar atribuições</b> — <i>categorias → Pronto a atribuir.</i> Devolve <b>tudo</b> o que atribuiu neste mês, para recomeçar do zero. Só mexe no mês que está a ver: o que transitou de meses anteriores fica onde está, e as transações não são tocadas. Se já gastou numa categoria mais do que o que transitou, ela fica negativa — a janela avisa quantas, antes de confirmar.</li>'+
                 '<li>As cinco <b>mostram o que ia acontecer antes de mexer em alguma coisa</b>, nenhuma tira dinheiro das contas — só muda a função que ele tem — e todas se desfazem com o <b>↩ Anular</b> que fica no topo.</li>'+
         '<li><b>Prioridade</b> ▲ ● ▼ à frente de cada categoria, muda com um clique. É ela que comanda o «por prioridade» das operações acima; entre iguais, manda a <b>ordem da lista</b>.</li>'+
@@ -3351,6 +3356,13 @@
       '<div class="modal-head"><h2>📋 Novidades</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
+
+      ver("2.0", "agosto 2026", [
+        '<b>Ficou claro o que faz cada botão:</b> o <b>🩹 Cobrir</b> <i>traz a categoria a zero</i> (tapa o que gastou a mais, tirando de outras categorias); o <b>🎯 Financiar</b> <i>leva-a ao alvo</i> (junta o que falta, do «Pronto a atribuir»). São operações diferentes e podem aparecer as duas na mesma categoria.',
+        '<b>Nova ordem dos botões:</b> o 🩹 passou para a esquerda do 🎯 — primeiro tapa-se o buraco, depois volta-se ao plano. O ícone do Cobrir deixou de ser ⚠️ (que na aplicação significa «aviso») e passou a 🩹.',
+        '<b>O 🎯 avisa antes de o deixar a descoberto:</b> se financiar o alvo deixasse o «Pronto a atribuir» negativo, pergunta primeiro — como a janela de financiar em lote já fazia.',
+        '<b>«Como funciona?»</b> passou a explicar os dois botões lado a lado, com a diferença entre eles.'
+      ])+
 
       ver("1.9", "agosto 2026", [
         '<b>Correção:</b> ao guardar a cópia de segurança (.json), o aviso de «alterações por guardar» passa a desaparecer em <b>todos</b> os orçamentos — antes reaparecia no outro orçamento apesar de já ter sido guardado (o ficheiro sempre incluiu todos).',
@@ -3424,7 +3436,7 @@
     var anyNeed = fullPlan.entries.length>0;
     var after = plan.rtaAfter;
     var afterCls = after < -0.005 ? "neg" : (after>0.005 ? "pos" : "");
-    var afterMsg = after < -0.005 ? ("⚠️ Ficaria negativo em "+fmt(after)+" — não tem dinheiro para cobrir todos os alvos.")
+    var afterMsg = after < -0.005 ? ("⚠️ Ficaria negativo em "+fmt(-after)+" — não tem dinheiro para cobrir todos os alvos.")
                  : (after>0.005 ? ("Sobrariam "+fmt(after)+" por atribuir.") : "Ficaria exatamente a zero. 🎯");
     var rows;
     if (plan.entries.length) rows = plan.entries.map(function(e){
@@ -3551,7 +3563,7 @@
 
     if (!fontes.length) {
       openModal(
-        '<div class="modal-head"><h2>⚠️ Cobrir «'+esc(cat.name)+'» — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+        '<div class="modal-head"><h2>🩹 Cobrir «'+esc(cat.name)+'» — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
         '<div class="modal-body">'+
         opIntro('Gastou <b>'+fmt(falta)+'</b> a mais nesta categoria, mas <b>nenhuma outra tem dinheiro parado</b> nem há nada por atribuir.',
           "Nenhuma origem", "«"+esc(cat.name)+"»")+
@@ -3570,9 +3582,9 @@
     }).join("");
 
     openModal(
-      '<div class="modal-head"><h2>⚠️ Cobrir «'+esc(cat.name)+'» — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>🩹 Cobrir «'+esc(cat.name)+'» — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
-        opIntro('Gastou <b>'+fmt(falta)+'</b> a mais nesta categoria. Escolha de onde tirar esse valor.',
+        opIntro('Gastou <b>'+fmt(falta)+'</b> a mais nesta categoria — o objetivo é <b>trazê-la a zero</b>. Escolha de onde tirar esse valor.',
           "Outras categorias", "«"+esc(cat.name)+"»")+
         '<div class="field"><label>De onde tirar</label><select id="covModo">'+
           '<option value="prio"'+(modo==="prio"?" selected":"")+'>Primeiro das prioridades mais baixas</option>'+
@@ -4322,7 +4334,7 @@
       var ka=alvo+"|"+m; guarda(ka); state.assignments[ka]=round2((state.assignments[ka]||0)+tot);
       state.ui.lastFunding={month:m, entries:snap};
       var nome=(categoryById(alvo)||{}).name||"";
-      logMove("⚠️ Cobriu «"+nome+"»", tot);
+      logMove("🩹 Cobriu «"+nome+"»", tot);
       _covSel=null; _covAlvo=null; _covFontes=null;
       closeModal(); save(); render();
       toast("Coberto "+fmt(tot)+" em «"+nome+"» — pode anular no topo.");
@@ -4330,12 +4342,23 @@
     "fund-one": function(id){
       var m=state.ui.month; var c=categoryById(id); if(!c) return;
       var ti=targetInfo(c,m); if(!ti||!(ti.need>0)){ toast("Alvo já cumprido."); return; }
+      // O 🎯 tira sempre do «Pronto a atribuir». Se não chegar, avisa ANTES — o mesmo cuidado que a
+      // janela de financiar em lote já tinha. Sem isto, um toque podia pôr o mês a vermelho sem dar
+      // por isso. (Deixa passar se o utilizador confirmar: às vezes é mesmo o que se quer.)
+      var rtaDepois = round2(readyToAssign(m) - ti.need);
+      if (rtaDepois < -0.005 && !confirm(
+            "Financiar «"+c.name+"» precisa de "+fmt(ti.need)+", mas só tem "+fmt(readyToAssign(m))+" por atribuir.\n\n"+
+            "O «Pronto a atribuir» ficaria negativo em "+fmt(-rtaDepois)+".\n\n"+
+            "Financiar mesmo assim?")) return;
       pushUndo("Alvo financiado.");
       var key=id+"|"+m;
       state.ui.lastFunding={month:m, entries:[{key:key, prev: state.assignments.hasOwnProperty(key)?state.assignments[key]:null}]};
       state.assignments[key]=round2((state.assignments[key]||0)+ti.need);
       logMove("🎯 Financiou «"+c.name+"»", ti.need);
-      save(); render(); toast("Alvo financiado — pode anular no topo.");
+      save(); render();
+      toast(rtaDepois < -0.005
+        ? ("Alvo financiado — o «Pronto a atribuir» ficou negativo em "+fmt(-rtaDepois)+".")
+        : "Alvo financiado — pode anular no topo.");
     },
     "fund-preview": function(){ if(!state.categories.length){ toast("Crie categorias com alvos primeiro."); return; } state.ui._fundMode="full"; fundModal(); },
     "recover-preview": function(){ recoverModal(); },
