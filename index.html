@@ -2630,6 +2630,8 @@
     // sobrepor uma escolha que já tenha feito.
     function sugerirCategoria(){
       if (el("txCat").value) return;
+      var accS=lkAcc(el("txAcc").value);
+      if (accS && accS.type==="tracking") return;   // conta de acompanhamento não leva categoria
       var c = payeeCategoria(el("txPayee").value);
       if (!c) return;
       el("txCat").value = c;
@@ -3943,8 +3945,12 @@
     },
     "save-tx": function(id){
       var accId = val("txAcc"); if(!accId){ toast("Selecione uma conta."); return; }
+      var accSel = lkAcc(accId);
+      // Conta de acompanhamento está fora do orçamento: nunca guarda categoria (senão o orçamento
+      // conta com dinheiro que não existe nas contas de orçamento — o aviso de integridade).
+      var catId = (accSel && accSel.type==="tracking") ? null : (el("txCat").value || null);
       var data = { date: dateVal("txDate")||todayISO(), accountId: accId, payee: valLim("txPayee", LIM_PAYEE),
-        categoryId: el("txCat").value || null, memo: valLim("txMemo", LIM_NOTA),
+        categoryId: catId, memo: valLim("txMemo", LIM_NOTA),
         outflow: num("txOut"), inflow: num("txIn"), cleared: el("txClear").checked };
       if (data.outflow===0 && data.inflow===0) { toast("Indique um valor de saída ou entrada."); return; }
       if (data.outflow>0 && data.inflow>0) { toast("Preencha só a Saída OU a Entrada, não as duas."); return; }
