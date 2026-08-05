@@ -711,6 +711,7 @@
   }
 
   // ---------- Estado ----------
+  var APP_VERSION = "1.4";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -2910,7 +2911,7 @@
           return '<div class="hint" style="border-top:1px solid var(--border);padding-top:10px;">Espaço usado: <b>'+mb(e.total)+
             '</b> de cerca de 5 MB (orçamento '+mb(e.dados)+' · histórico '+mb(e.hist)+').</div>'; })()+
       '</div>'+
-      '<div class="modal-foot"><span class="muted" style="font-size:12px;">Versão 1.0 · Orçamento base-zero</span><button class="btn" data-action="close">Fechar</button></div>');
+      '<div class="modal-foot"><span class="muted" style="font-size:12px;">Orçamento base-zero · <a href="#" data-action="changelog" style="color:var(--primary);cursor:pointer;">Versão '+APP_VERSION+' — novidades</a></span><button class="btn" data-action="close">Fechar</button></div>');
     el("importFile").addEventListener("change", function(e){ importJSON(e.target.files[0]); });
     el("curSel").addEventListener("change", function(){ state.settings.currency=el("curSel").value; save(); render(); dataModal(); });
   }
@@ -3318,6 +3319,59 @@
 
       '</div></div>'+
       '<div class="modal-foot"><span></span><button class="btn primary" data-action="close">Entendido</button></div>');
+  }
+
+  function changelogModal() {
+    function ver(v, data, itens){
+      return '<div style="font-weight:700;color:var(--text);margin:16px 0 6px;font-size:13px;">Versão '+v+
+        ' <span class="muted" style="font-weight:400;">· '+data+'</span></div>'+
+        '<ul style="margin:0;padding-inline-start:18px;">'+itens.map(function(i){return '<li>'+i+'</li>';}).join("")+'</ul>';
+    }
+    openModal(
+      '<div class="modal-head"><h2>📋 Novidades</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body"><div class="help-list">'+
+      '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
+
+      ver("1.4", "agosto 2026", [
+        '<b>😴 Adiar categorias:</b> pôr um alvo «em pausa» só neste mês, para não pedir dinheiro. Volta sozinho no mês seguinte (ou reative com o ☀️).',
+        '<b>🔵 Filtro «Com excedente»:</b> mostra as categorias com mais do que o alvo pede — as candidatas a libertar dinheiro.',
+        '<b>Contas de acompanhamento mais limpas:</b> o campo Categoria deixa de aparecer onde não faz sentido (nova transação, dividir, recorrentes, importar CSV), evitando descontrolar o orçamento.',
+        '<b>Anular mais completo:</b> passou a cobrir também transferências, pagamentos de cartão, criar/editar contas e lançar recorrentes.',
+        '<b>«Dados e cópias» arrumada:</b> exportações agrupadas num só menu e o «dados de exemplo» só aparece num orçamento vazio.',
+        '<b>Sincronização:</b> botão para atualizar só o token do GitHub quando expira, sem desligar nem recolar o gist.'
+      ])+
+
+      ver("1.3", "agosto 2026", [
+        '<b>Data e hora da última sincronização</b> visível no ecrã de sincronização.',
+        '<b>Barra do cartão de crédito</b> desaparece quando não há dívida a pagar.',
+        'A lista de <b>«Movimentos recentes»</b> limpa-se ao trocar de orçamento.',
+        '<b>Manual de instalação e sincronização</b> (documento à parte) para configurar noutro dispositivo ou para outra pessoa.'
+      ])+
+
+      ver("1.2", "agosto 2026", [
+        '<b>Ordem das transações:</b> no mesmo dia, a mais recente aparece agora no topo.',
+        '<b>Duplicar</b> uma transação passa a usar a data de hoje e a aparecer nos movimentos.',
+        '<b>«Cobrir»</b> uma categoria: a lista de onde tirar o dinheiro ordena-se pela opção escolhida, e há um resumo antes de confirmar.',
+        '<b>Exportar a configuração do orçamento</b> (a «planta» dos alvos) para folha de cálculo.'
+      ])+
+
+      ver("1.1", "agosto 2026", [
+        '<b>«Repor até X» à YNAB:</b> o verde mantém-se depois de gastar; a barra encolhe à medida que se gasta, sem mudar de cor.',
+        '<b>Anular / Refazer</b> as últimas ações, com um painel de <b>«Movimentos recentes»</b>.',
+        '<b>Filtros</b> por estado (🟢🟡🔴), «com saldo» e prioridade.',
+        '<b>Teclado de cálculo</b> no campo «Atribuído», útil no telemóvel.',
+        '<b>Vários orçamentos</b> no mesmo aparelho, com uma sincronização única.',
+        '<b>Correção</b> do cálculo dos alvos com data (ex.: juntar para as prendas de Natal).'
+      ])+
+
+      ver("1.0", "versão base", [
+        'Orçamento base-zero com <b>alvos</b>: mensal, semanal, trimestral, semestral, anual ou até uma data.',
+        'Contas de <b>orçamento</b>, <b>cartões de crédito</b> e de <b>acompanhamento</b>.',
+        '<b>Sincronização cifrada</b> entre dispositivos (gist do GitHub) e <b>cópias de segurança</b> em ficheiro.'
+      ])+
+
+      '</div></div>'+
+      '<div class="modal-foot"><span></span><button class="btn primary" data-action="close">Fechar</button></div>');
   }
 
   function fundModal() {
@@ -3864,6 +3918,7 @@
     "toggle-theme": function(){ state.settings.theme = (state.settings && state.settings.theme==="rose") ? "green" : "rose"; save(); render(); },
     "close": closeModal,
     "help": helpModal,
+    "changelog": changelogModal,
     "data-menu": dataModal,
     "budgets": function(){ budgetsModal(); },
     "budget-switch": function(id){ switchBudget(id); },
