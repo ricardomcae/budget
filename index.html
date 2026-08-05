@@ -2590,7 +2590,7 @@
           '<div class="field"><label>Conta</label><select id="txAcc">'+accOpts+'</select></div>'+
         '</div>'+
         '<div class="field"><label>Beneficiário</label><div class="ac-wrap"><input id="txPayee" maxlength="100" autocomplete="off" value="'+esc(tx.payee||"")+'" placeholder="Ex.: Continente, Salário, EDP…"></div></div>'+
-        '<div class="field"><label>Categoria</label><select id="txCat">'+catOpts+'</select>'+
+        '<div class="field" id="txCatField"><label>Categoria</label><select id="txCat">'+catOpts+'</select>'+
           '<div class="hint hidden" id="txCatSug">💡 Categoria preenchida a partir da última vez que usou este beneficiário.</div>'+
           '<div class="hint hidden" id="txCatWarn">⚠️ Sem categoria, este movimento muda o saldo da conta mas fica de fora do orçamento — as contas deixam de bater certo.</div></div>'+
         '<div class="grid-2">'+
@@ -2612,10 +2612,20 @@
       var mostrar = !!(acc && acc.type==="budget" && !el("txCat").value && (Math.abs(o)>0.005 || Math.abs(e)>0.005));
       el("txCatWarn").classList.toggle("hidden", !mostrar);
     }
+    // Contas de acompanhamento estão fora do orçamento: uma transação normal aí não leva categoria.
+    // Esconde o campo — exceto se, por engano ou herança, já tiver uma categoria escolhida (para se
+    // poder ver e limpar). Cartões e contas de orçamento mostram-no sempre.
+    function txCatVis(){
+      var acc=lkAcc(el("txAcc").value);
+      var esconder = !!(acc && acc.type==="tracking" && !el("txCat").value);
+      el("txCatField").classList.toggle("hidden", esconder);
+    }
     ["txAcc","txCat","txOut","txIn"].forEach(function(f){
       var n=el(f); if(!n) return;
       n.addEventListener("change", txWarn); n.addEventListener("input", txWarn);
     });
+    el("txAcc").addEventListener("change", txCatVis);
+    el("txCat").addEventListener("change", txCatVis);
     // Sugere a categoria da última vez que usou este beneficiário — sem nunca
     // sobrepor uma escolha que já tenha feito.
     function sugerirCategoria(){
@@ -2630,7 +2640,7 @@
     el("txPayee").addEventListener("blur", sugerirCategoria);
     el("txCat").addEventListener("change", function(){ el("txCatSug").classList.add("hidden"); });
     wirePayeeAutocomplete(el("txPayee"));
-    txWarn();
+    txWarn(); txCatVis();
   }
 
   // Autocomplete próprio dos beneficiários: filtra à medida que se escreve, sugere a categoria
