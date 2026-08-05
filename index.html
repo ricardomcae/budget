@@ -713,7 +713,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "2.1";
+  var APP_VERSION = "2.2";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -3366,16 +3366,17 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
+      ver("2.2", "agosto 2026", [
+        '<b>Correção:</b> ao guardar a cópia de segurança, o ecrã «Dados e cópias» atualiza-se logo — já não é preciso fechar e reabrir para ver que ficou tudo guardado.'
+      ])+
+
       ver("2.1", "agosto 2026", [
-        '<b>Correção de cálculo (importante):</b> nos alvos <b>«até uma data»</b> e <b>trimestral/semestral/anual</b> no modo <b>Repor</b>, se durante o mês tivesse <b>tirado</b> dinheiro da categoria, a mensalidade pedida vinha inflacionada — chegava a pedir de uma vez tudo o que faltava, como se fosse a prestação de um só mês. O que se retira já baixa o saldo (e por isso já aumenta a prestação); estava a ser contado <b>duas vezes</b>. Agora reparte corretamente pelos meses que faltam.',
-        'Quem nunca retirou dinheiro de uma categoria a meio do mês não vê qualquer diferença — as contas ficam <b>exatamente iguais</b>.'
+        '<b>Correção de cálculo:</b> nos alvos <b>«até uma data»</b> e <b>trimestral/semestral/anual</b> (modo Repor), se tivesse <b>tirado</b> dinheiro da categoria a meio do mês, a mensalidade pedida vinha a dobrar. Agora reparte certo pelos meses que faltam.'
       ])+
 
       ver("2.0", "agosto 2026", [
-        '<b>Ficou claro o que faz cada botão:</b> o <b>🩹 Cobrir</b> <i>traz a categoria a zero</i> (tapa o que gastou a mais, tirando de outras categorias); o <b>🎯 Financiar</b> <i>leva-a ao alvo</i> (junta o que falta, do «Pronto a atribuir»). São operações diferentes e podem aparecer as duas na mesma categoria.',
-        '<b>Nova ordem dos botões:</b> o 🩹 passou para a esquerda do 🎯 — primeiro tapa-se o buraco, depois volta-se ao plano. O ícone do Cobrir deixou de ser ⚠️ (que na aplicação significa «aviso») e passou a 🩹.',
-        '<b>O 🎯 avisa antes de o deixar a descoberto:</b> se financiar o alvo deixasse o «Pronto a atribuir» negativo, pergunta primeiro — como a janela de financiar em lote já fazia.',
-        '<b>«Como funciona?»</b> passou a explicar os dois botões lado a lado, com a diferença entre eles.'
+        '<b>🩹 Cobrir</b> e <b>🎯 Financiar</b> deixaram de se confundir: o 🩹 <i>traz a categoria a zero</i> (tirando de outras categorias), o 🎯 <i>leva-a ao alvo</i> (do «Pronto a atribuir»). Novo ícone 🩹 (era ⚠️), à esquerda do 🎯, e os dois explicados no «Como funciona?».',
+        '<b>O 🎯 avisa</b> antes de deixar o «Pronto a atribuir» negativo — como a janela de financiar em lote já fazia.'
       ])+
 
       ver("1.9", "agosto 2026", [
@@ -5016,6 +5017,10 @@
     guardarFicheiro(nome, JSON.stringify(syncContainer(), null, 2), "application/json", function(via){
       markBackupDone();
       save(); hideBackupBar(); renderSidebar();
+      // Se o ecrã «Dados e cópias» estiver aberto (é de lá que se carrega no botão), redesenhá-lo:
+      // senão continuava a mostrar «há alterações por guardar» e o contador antigo até se fechar e
+      // reabrir a janela. O "curSel" (Moeda) só existe nesse ecrã, por isso serve de deteção.
+      if (el("curSel")) dataModal();
       if(!silent) toast(via==="partilha" ? "Cópia de segurança guardada." : "Cópia de segurança exportada.");
     });
   }
