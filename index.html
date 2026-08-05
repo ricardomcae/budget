@@ -713,7 +713,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "2.0";
+  var APP_VERSION = "2.1";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -1392,7 +1392,10 @@
       else fatia = round2(amt/per);
       if (falta > 0.005 && fatia < 0.01) fatia = 0.01;      // idem: não encravar nos últimos cêntimos
       // Nunca pedir mais do que falta para o total — é isto que faz o alvo "acabar".
-      var needQ = Math.max(0, round2(Math.min(fatia - assignedThis, falta)));
+      // Conta só o que se PÔS este mês (positivo): ter TIRADO dinheiro já baixou o saldo e por
+      // isso já subiu o "falta" e a fatia — descontar um negativo cobrava o movimento duas vezes.
+      var postoQ = assignedThis>0 ? assignedThis : 0;
+      var needQ = Math.max(0, round2(Math.min(fatia - postoQ, falta)));
       var lbl;
       if (needQ > 0.005) {
         lbl = dueEff ? ("Juntar "+fmt(needQ)+" este mês até "+monthLabel(dueEff)+" — faltam "+fmt(falta)+" de "+fmt(amt))
@@ -1422,11 +1425,17 @@
       }
       var diff = monthsBetween(m, target), left = diff>=0 ? diff+1 : 1;
       var remain = round2(amt - avail);
-      // Descontar o que já foi atribuído ESTE mês, senão cada financiamento voltava a
-      // pedir uma fatia nova e atribuía a mais em silêncio.
+      // Descontar o que já foi atribuído ESTE mês, senão cada financiamento voltava a pedir uma
+      // fatia nova e atribuía a mais em silêncio. Mas conta SÓ o que se PÔS (positivo): se este
+      // mês se TIROU dinheiro da categoria, isso já baixou o saldo — logo já subiu o "falta
+      // juntar" e, com ele, a fatia mensal. Descontar um atribuído NEGATIVO cobrava o mesmo
+      // movimento duas vezes e pedia o total em falta como se fosse a mensalidade (o rótulo
+      // chegava a dizer "142,34/mês" faltando 142,34 no total, com dois meses pela frente).
+      // É a mesma proteção que o sliceAteData já fazia no modo Reservar.
+      var posto3 = assignedThis>0 ? assignedThis : 0;
       var fatia3 = round2(remain / left);
       if (remain > 0.005 && fatia3 < 0.01) fatia3 = 0.01;   // nunca deixar o alvo encravado nos últimos cêntimos
-      var need3 = Math.max(0, round2(Math.min(fatia3 - assignedThis, remain)));
+      var need3 = Math.max(0, round2(Math.min(fatia3 - posto3, remain)));
       var lbl3;
       if (remain <= 0.005) lbl3 = "🎯 Objetivo atingido ("+fmt(amt)+")";
       else if (need3 > 0.005) lbl3 = "Juntar "+fmt(need3)+"/mês até "+monthLabel(target)+" — faltam "+fmt(remain)+" de "+fmt(amt);
@@ -3356,6 +3365,11 @@
       '<div class="modal-head"><h2>📋 Novidades</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
+
+      ver("2.1", "agosto 2026", [
+        '<b>Correção de cálculo (importante):</b> nos alvos <b>«até uma data»</b> e <b>trimestral/semestral/anual</b> no modo <b>Repor</b>, se durante o mês tivesse <b>tirado</b> dinheiro da categoria, a mensalidade pedida vinha inflacionada — chegava a pedir de uma vez tudo o que faltava, como se fosse a prestação de um só mês. O que se retira já baixa o saldo (e por isso já aumenta a prestação); estava a ser contado <b>duas vezes</b>. Agora reparte corretamente pelos meses que faltam.',
+        'Quem nunca retirou dinheiro de uma categoria a meio do mês não vê qualquer diferença — as contas ficam <b>exatamente iguais</b>.'
+      ])+
 
       ver("2.0", "agosto 2026", [
         '<b>Ficou claro o que faz cada botão:</b> o <b>🩹 Cobrir</b> <i>traz a categoria a zero</i> (tapa o que gastou a mais, tirando de outras categorias); o <b>🎯 Financiar</b> <i>leva-a ao alvo</i> (junta o que falta, do «Pronto a atribuir»). São operações diferentes e podem aparecer as duas na mesma categoria.',
