@@ -441,7 +441,9 @@
   .undo-bar .btn { background: rgba(255,255,255,.18); color: #fff; border: 1px solid rgba(255,255,255,.3); }
   .undo-bar .btn:hover { background: rgba(255,255,255,.32); }
   .backup-bar { z-index: 205; max-width: calc(100vw - 24px); flex-wrap: wrap; }
-  .dot-badge { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--warning); margin-inline-start: 5px; vertical-align: middle; }
+  .count-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 9px; background: var(--warning); color: #fff; font-size: 10.5px; font-weight: 700; line-height: 1; margin-inline-start: 5px; vertical-align: middle; box-sizing: border-box; }
+  .count-badge:empty { min-width: 0; width: 7px; height: 7px; padding: 0; border-radius: 50%; }
+  .count-badge.corner { position: absolute; top: -5px; inset-inline-end: -5px; margin: 0; box-shadow: 0 0 0 2px var(--surface); }
 
   .hidden { display: none !important; }
   .mobile-only { display: none; }
@@ -586,7 +588,7 @@
         <button class="btn sm" data-action="budgets" aria-label="Trocar orçamento">📚</button>
         <button class="btn sm" data-action="add-tx" aria-label="Nova transação">➕</button>
         <button class="btn sm" data-action="payees" aria-label="Beneficiários">🏷️</button>
-        <button class="btn sm" data-action="data-menu" aria-label="Dados e cópias de segurança">💾</button>
+        <button class="btn sm" id="btnDataM" data-action="data-menu" aria-label="Dados e cópias de segurança" style="position:relative;">💾</button>
         <button class="btn sm" data-action="help" aria-label="Como funciona">❓</button>
       </div>
       <div class="undo-redo">
@@ -711,7 +713,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.4";
+  var APP_VERSION = "1.8";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -722,7 +724,7 @@
     snooze: {},        // "idCategoria|AAAA-MM": true — alvo adiado nesse mês (não pede dinheiro)
     transactions: [],
     recurring: [],     // regras recorrentes
-    backup: { at:null, sig:null, autoDay:null },  // controlo da cópia de segurança em ficheiro
+    backup: { at:null, sig:null, autoDay:null, pend:0 },  // controlo da cópia de segurança em ficheiro (pend = alterações desde a última)
     collapsed: {},     // idGrupo: true
     ui: { view: "budget", month: nowMonthKey() }
   };
@@ -1500,7 +1502,7 @@
       o.settings = o.settings || { locale:"pt-PT", currency:"EUR" };
       o.collapsed = o.collapsed || {}; o.assignments = o.assignments || {}; o.snooze = o.snooze || {};
       o.recurring = o.recurring || []; o.ui = o.ui || { view:"budget", month:nowMonthKey() };
-      o.backup = o.backup || { at:null, sig:null, autoDay:null };
+      o.backup = o.backup || { at:null, sig:null, autoDay:null, pend:0 };
       return o;
     } catch(e){ return JSON.parse(JSON.stringify(DEFAULT_STATE)); }
   }
@@ -1835,8 +1837,13 @@
     }
     el("netWorth").textContent = fmt(netWorth());
     var pend = backupPending();
+    var pn = (state.backup && state.backup.pend) || 0;
+    var pTit = 'Há alterações por guardar em ficheiro' + (pn>0 ? (' ('+pn+')') : '');
+    function badge(cls){ return pend ? ('<span class="count-badge'+cls+'" title="'+pTit+'">'+(pn>0 ? (pn>99?'99+':pn) : '')+'</span>') : ''; }
     var bd = el("btnData");
-    if (bd) bd.innerHTML = '<span>💾</span> Dados e cópias' + (pend ? '<span class="dot-badge" title="Há alterações por guardar em ficheiro"></span>' : '');
+    if (bd) bd.innerHTML = '<span>💾</span> Dados e cópias' + badge('');
+    var bdm = el("btnDataM");
+    if (bdm) bdm.innerHTML = '💾' + badge(' corner');
   }
 
   function renderRTA() {
@@ -2876,10 +2883,12 @@
           '<div style="font-weight:700;font-size:13px;">2 · Cópia de segurança em ficheiro</div>'+
           '<div style="font-size:12.5px;font-weight:600;margin-top:8px;">'+
             (state.backup && state.backup.at
-              ? ('Última: '+fmtDate(state.backup.at.slice(0,10))+((daysSinceBackup()||0)>0?(' ('+daysSinceBackup()+' dia'+((daysSinceBackup()===1)?'':'s')+')'):' (hoje)'))
+              ? ('Última: '+fmtDateTime(state.backup.at)+((daysSinceBackup()||0)>0?(' · há '+daysSinceBackup()+' dia'+((daysSinceBackup()===1)?'':'s')):' · hoje'))
               : 'Ainda não guardou nenhuma cópia de segurança em ficheiro.')+
           '</div>'+
-          '<div class="hint" style="margin-top:4px;">'+(backupPending()?'⚠️ Há alterações por guardar em ficheiro.':'✅ A última cópia está atualizada.')+'</div>'+
+          '<div class="hint" style="margin-top:4px;">'+(backupPending()
+            ? ('⚠️ Há alterações por guardar'+(state.backup&&state.backup.pend>0?(' — <b>'+state.backup.pend+'</b> '+(state.backup.pend===1?'alteração':'alterações')+' desde a última cópia'):'')+'.')
+            : '✅ A última cópia está atualizada.')+'</div>'+
           '<div class="hint" style="margin-top:6px;">Guarde-o <b>fora daqui</b> (OneDrive, e-mail, pen).'+
           (usaPartilha()?' Abre a partilha do iPhone.':'')+'</div>'+
         '</div>'+
@@ -3332,12 +3341,28 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.4", "agosto 2026", [
+      ver("1.8", "agosto 2026", [
+        '<b>Aviso de gravar mais claro:</b> o botão 💾 «Dados e cópias» mostra agora <b>o número</b> de alterações por guardar (ex.: «2»), igual ao que aparece na secção «Cópia de segurança em ficheiro». Também no telemóvel.'
+      ])+
+
+      ver("1.7", "agosto 2026", [
+        '<b>Cópia de segurança:</b> mostra a <b>data e hora</b> da última cópia (antes só a data) e <b>quantas alterações</b> fez desde então.',
+        '<b>Adiar categorias</b> passou a contar como alteração por guardar e a entrar na sincronização (antes ficava de fora).'
+      ])+
+
+      ver("1.6", "agosto 2026", [
         '<b>😴 Adiar categorias:</b> pôr um alvo «em pausa» só neste mês, para não pedir dinheiro. Volta sozinho no mês seguinte (ou reative com o ☀️).',
-        '<b>🔵 Filtro «Com excedente»:</b> mostra as categorias com mais do que o alvo pede — as candidatas a libertar dinheiro.',
-        '<b>Contas de acompanhamento mais limpas:</b> o campo Categoria deixa de aparecer onde não faz sentido (nova transação, dividir, recorrentes, importar CSV), evitando descontrolar o orçamento.',
         '<b>Anular mais completo:</b> passou a cobrir também transferências, pagamentos de cartão, criar/editar contas e lançar recorrentes.',
-        '<b>«Dados e cópias» arrumada:</b> exportações agrupadas num só menu e o «dados de exemplo» só aparece num orçamento vazio.',
+        '<b>Estas «Novidades»:</b> o histórico de alterações, acessível pelo número da versão aqui em baixo.'
+      ])+
+
+      ver("1.5", "agosto 2026", [
+        '<b>Contas de acompanhamento mais limpas:</b> o campo Categoria deixa de aparecer onde não faz sentido (nova transação, dividir, recorrentes, importar CSV), evitando descontrolar o orçamento.',
+        '<b>«Dados e cópias» arrumada:</b> exportações agrupadas num só menu e o «dados de exemplo» só aparece num orçamento vazio.'
+      ])+
+
+      ver("1.4", "agosto 2026", [
+        '<b>🔵 Filtro «Com excedente»:</b> mostra as categorias com mais do que o alvo pede — as candidatas a libertar dinheiro.',
         '<b>Sincronização:</b> botão para atualizar só o token do GitHub quando expira, sem desligar nem recolar o gist.'
       ])+
 
@@ -4571,7 +4596,7 @@
   function sigOf(st){
     try {
       var s = JSON.stringify([st.settings, st.accounts, st.groups, st.categories,
-                              st.assignments, st.transactions, st.recurring||[]]);
+                              st.assignments, st.snooze||{}, st.transactions, st.recurring||[]]);
       return hash32(s) + "/" + s.length;                  // o comprimento afasta colisões
     } catch(e){
       return "x/" + ((st && st.transactions) ? st.transactions.length : 0);
@@ -4608,6 +4633,7 @@
     state.backup = state.backup || {};
     state.backup.at = new Date().toISOString();
     state.backup.sig = backupSig();
+    state.backup.pend = 0;   // acabou de guardar: zera o contador de alterações desde a última cópia
   }
   var _backupBarDismissed=false;
   function maybeShowBackupReminder(){
@@ -5229,7 +5255,7 @@
   // Guarda uma fotografia do estado ANTES de uma alteração. Chamado por eliminações E edições
   // (categoria, transação, grupo, recorrente), por isso o Anular cobre tudo isso, não só apagar.
   // A gravação que se segue invalida o Refazer (ver save()) — uma ação nova fecha o "futuro".
-  function pushUndo(desc){ _undo.push({ desc:desc, json:JSON.stringify(state) }); if(_undo.length>UNDO_MAX) _undo.shift(); }
+  function pushUndo(desc){ _undo.push({ desc:desc, json:JSON.stringify(state) }); if(_undo.length>UNDO_MAX) _undo.shift(); if(state.backup) state.backup.pend=(state.backup.pend||0)+1; }
   // Aplica um estado já lido, preservando a vista/mês deste aparelho. _navHist evita que o save()
   // interno limpe a pilha oposta a meio da navegação.
   function aplicarEstado(obj){
