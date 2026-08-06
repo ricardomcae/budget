@@ -637,7 +637,9 @@
   function novoId(){ return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
   function budKey(id){ return STORAGE_KEY + "::" + id; }
   function loadIndex(){ try { return JSON.parse(localStorage.getItem(BUDGETS_KEY)); } catch(e){ return null; } }
-  function saveIndex(ix){ try { localStorage.setItem(BUDGETS_KEY, JSON.stringify(ix)); } catch(e){} }
+  // Trocar/criar/eliminar/renomear orçamento passa por aqui: é o momento certo para esquecer a
+  // cache do estado de cópia dos OUTROS orçamentos (ver outrosPorGuardar).
+  function saveIndex(ix){ try { localStorage.setItem(BUDGETS_KEY, JSON.stringify(ix)); } catch(e){} esquecerOutrosPend(); }
   var _bindex = null;   // { active:id, list:[{id,name}] }
   // Garante que há sempre pelo menos um orçamento. Migra a versão antiga (um só, na chave
   // STORAGE_KEY) para o primeiro orçamento da lista, sem perder nada.
@@ -713,7 +715,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "2.2";
+  var APP_VERSION = "2.3";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -1845,9 +1847,16 @@
       }).join("");
     }
     el("netWorth").textContent = fmt(netWorth());
-    var pend = backupPending();
-    var pn = (state.backup && state.backup.pend) || 0;
-    var pTit = 'Há alterações por guardar em ficheiro' + (pn>0 ? (' ('+pn+')') : '');
+    // O aviso é GLOBAL: a cópia em ficheiro guarda todos os orçamentos, por isso o badge conta
+    // também o que está por guardar nos outros — senão, estando num orçamento guardado, nada
+    // indicava que outro tinha alterações a descoberto.
+    var outrosP = outrosPorGuardar().lista;
+    var meuP = backupPending();
+    var pend = meuP || outrosP.length>0;
+    var pn = meuP ? ((state.backup && state.backup.pend) || 0) : 0;
+    for (var oi=0; oi<outrosP.length; oi++) pn += outrosP[oi].pend||0;
+    var pTit = 'Há alterações por guardar em ficheiro' + (pn>0 ? (' ('+pn+')') : '')
+             + (outrosP.length ? ' — inclui outro(s) orçamento(s)' : '');
     function badge(cls){ return pend ? ('<span class="count-badge'+cls+'" title="'+pTit+'">'+(pn>0 ? (pn>99?'99+':pn) : '')+'</span>') : ''; }
     var bd = el("btnData");
     if (bd) bd.innerHTML = '<span>💾</span> Dados e cópias' + badge('');
@@ -2898,9 +2907,7 @@
               ? ('Última: '+fmtDateTime(state.backup.at)+((daysSinceBackup()||0)>0?(' · há '+daysSinceBackup()+' dia'+((daysSinceBackup()===1)?'':'s')):' · hoje'))
               : 'Ainda não guardou nenhuma cópia de segurança em ficheiro.')+
           '</div>'+
-          '<div class="hint" style="margin-top:4px;">'+(backupPending()
-            ? ('⚠️ Há alterações por guardar'+(state.backup&&state.backup.pend>0?(' — <b>'+state.backup.pend+'</b> '+(state.backup.pend===1?'alteração':'alterações')+' desde a última cópia'):'')+'.')
-            : '✅ A última cópia está atualizada.')+'</div>'+
+          '<div class="hint" style="margin-top:4px;">'+textoEstadoCopia()+'</div>'+
           '<div class="hint" style="margin-top:6px;">Guarde-o <b>fora daqui</b> (OneDrive, e-mail, pen).'+
           (usaPartilha()?' Abre a partilha do iPhone.':'')+'</div>'+
         '</div>'+
@@ -3349,6 +3356,7 @@
       sec("Os seus dados")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li>Vivem <b>só neste aparelho</b>. Em <b>Dados e cópias</b> há três níveis: <b>1</b> histórico dos 5 últimos dias, para voltar atrás; <b>2</b> cópia em ficheiro, a única que sobrevive a perder o aparelho; <b>3</b> sincronização cifrada entre telemóvel e PC.</li>'+
+        '<li>A <b>cópia em ficheiro guarda todos os orçamentos</b> de uma vez — por isso o aviso de «alterações por guardar» também é de todos, mesmo os que não tem abertos.</li>'+
       '</ul>'+
 
       '</div></div>'+
@@ -3365,6 +3373,10 @@
       '<div class="modal-head"><h2>📋 Novidades</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
+
+      ver("2.3", "agosto 2026", [
+        '<b>Aviso de guardar passou a ser de todos os orçamentos:</b> como a cópia guarda todos de uma vez, o ecrã já não diz «atualizada» quando outro orçamento tem alterações por guardar — diz qual é, e o número no botão 💾 soma todos.'
+      ])+
 
       ver("2.2", "agosto 2026", [
         '<b>Correção:</b> ao guardar a cópia de segurança, o ecrã «Dados e cópias» atualiza-se logo — já não é preciso fechar e reabrir para ver que ficou tudo guardado.'
@@ -4677,6 +4689,40 @@
     var b=state.backup||{};
     return !b.at || b.sig!==backupSig();
   }
+  // A cópia em ficheiro guarda TODOS os orçamentos, por isso a pergunta "os meus dados estão
+  // salvos?" é global — mas o backupPending() acima só sabe do orçamento ABERTO. Sem isto, estando
+  // no orçamento A (guardado) o ecrã dizia "✅ atualizada" enquanto o B tinha alterações por
+  // guardar, sem forma de dar por isso. Varre os outros orçamentos e diz quais estão em falta.
+  // O resultado fica em cache porque isto lê e assina cada orçamento (caro para fazer a cada
+  // desenho): os outros orçamentos só mudam ao trocar/criar/eliminar (saveIndex) ou ao marcar a
+  // cópia como feita (markBackupDone) — é aí que a cache se limpa.
+  var _outrosPend = null;
+  function esquecerOutrosPend(){ _outrosPend = null; }
+  function outrosPorGuardar(){
+    if (_outrosPend) return _outrosPend;
+    var lista = [];
+    for (var i=0;i<_bindex.list.length;i++){
+      var b = _bindex.list[i];
+      if (b.id === _bindex.active) continue;
+      var st = loadBudgetRaw(b.id);
+      if (!st.transactions.length && !st.categories.length) continue;   // vazio: nada a guardar
+      var bk = st.backup||{};
+      if (!bk.at || bk.sig !== sigOf(st)) lista.push({ id:b.id, name:b.name, pend:(bk.pend||0) });
+    }
+    _outrosPend = { lista:lista };
+    return _outrosPend;
+  }
+  // Frase única do estado da cópia, usada no ecrã «Dados e cópias».
+  function textoEstadoCopia(){
+    var outros = outrosPorGuardar().lista, meu = backupPending();
+    var n = (state.backup && state.backup.pend) || 0;
+    var nTxt = n>0 ? (' — <b>'+n+'</b> '+(n===1?'alteração':'alterações')) : '';
+    var quais = outros.map(function(o){ return '<b>«'+esc(o.name)+'»</b>'+(o.pend>0?(' ('+o.pend+')'):''); }).join(', ');
+    if (meu && outros.length) return '⚠️ Há alterações por guardar'+nTxt+' neste orçamento. Também em '+quais+'.';
+    if (meu)                  return '⚠️ Há alterações por guardar'+nTxt+' desde a última cópia.';
+    if (outros.length)        return '⚠️ Este orçamento está guardado, mas falta guardar '+quais+' — a cópia inclui <b>todos</b> os orçamentos.';
+    return '✅ A última cópia está atualizada'+(_bindex.list.length>1?' (todos os orçamentos)':'')+'.';
+  }
   function daysSinceBackup(){
     var b=state.backup||{};
     if(!b.at) return null;
@@ -4688,6 +4734,7 @@
     // guardados — não só o ativo. Senão, ao trocar de orçamento, os outros mostravam «por guardar»
     // (com o (x) de alterações) apesar de já terem sido gravados no mesmo ficheiro.
     var agora = new Date().toISOString();
+    esquecerOutrosPend();          // vamos mexer nos outros orçamentos: a cache deixa de valer
     for (var i=0;i<_bindex.list.length;i++){
       var id=_bindex.list[i].id;
       if (id===_bindex.active){
@@ -4705,7 +4752,7 @@
   function maybeShowBackupReminder(){
     if(_backupBarDismissed) return;
     var b=el("backupBar"); if(!b) return;
-    if(!backupPending()){ b.classList.remove("show"); return; }
+    if(!backupPending() && !outrosPorGuardar().lista.length){ b.classList.remove("show"); return; }
     var d=daysSinceBackup();
     if(d!==null && d<3) { b.classList.remove("show"); return; }   // só avisa a partir de 3 dias
     el("backupText").textContent = (d===null)
