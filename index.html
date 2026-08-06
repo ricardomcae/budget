@@ -715,7 +715,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.12";
+  var APP_VERSION = "1.13";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -1054,15 +1054,31 @@
     return { acc:acc, net:net, delta: round2(real - esperado) };
   }
 
-  // Compras no cartão sem categoria: não desequilibram o orçamento (o cartão não é conta de
-  // orçamento), por isso a barra de integridade nunca aparecia por causa delas — e o aviso que
-  // existia dentro do «Ver porquê» ficava inalcançável, a menos que outra coisa desequilibrasse.
-  // Contam-se à parte para poder avisar mesmo estando tudo o resto certo. Passagem única e barata.
+  // Regra única de quem PRECISA de categoria, para não haver duas versões da verdade espalhadas
+  // pela aplicação. Vale para transações avulsas, duplicados e regras recorrentes.
+  //   • conta de ORÇAMENTO  → obrigatória: sem ela o movimento mexe no saldo mas fica fora do
+  //     orçamento, e as contas deixam de bater certo (é a "barra de integridade").
+  //   • CARTÃO de crédito   → obrigatória: é ela que guarda o dinheiro para pagar a dívida (compras)
+  //     ou o devolve à categoria de origem (devoluções/cashback).
+  //   • ACOMPANHAMENTO      → nunca leva (está fora do orçamento).
+  // Ficam de fora, por não serem movimentos a classificar: o «Saldo inicial» (gerado pela app) e as
+  // transferências (que têm a sua própria regra: só levam categoria quando cruzam a fronteira do
+  // orçamento — validada no do-transfer/save-transfer).
+  function precisaCategoria(acc){ return !!(acc && (acc.type==="budget" || acc.type==="credit")); }
+  function faltaCategoria(t){
+    if(!t || t.transfer || isOpening(t) || t.categoryId) return false;
+    if(!((t.outflow||0) > 0.005) && !((t.inflow||0) > 0.005)) return false;
+    return precisaCategoria(lkAcc(t.accountId));
+  }
+  // Movimentos por classificar, criados ANTES de a categoria passar a ser obrigatória (ou vindos de
+  // uma importação de ficheiro do banco, que não bloqueia por ser em lote). Os do CARTÃO precisam de
+  // um aviso próprio: ao contrário dos das contas de orçamento, não desequilibram a invariante — por
+  // isso a barra de integridade nunca os mostraria e passariam despercebidos para sempre.
   function comprasCartaoSemCat(m){
     var n=0;
     for(var i=0;i<state.transactions.length;i++){
       var t=state.transactions[i];
-      if(t.transfer || t.categoryId || monthOf(t.date) > m) continue;
+      if(monthOf(t.date) > m || !faltaCategoria(t)) continue;
       var a=lkAcc(t.accountId);
       if(a && a.type==="credit") n++;
     }
@@ -1928,8 +1944,8 @@
       var semCat = comprasCartaoSemCat(state.ui.month);
       if (semCat > 0) {
         aviso = '<div class="integrity-bar"><span>ℹ️</span><span class="grow"><b>'+semCat+'</b> '+
-          (semCat===1 ? 'movimento no cartão de crédito sem categoria' : 'movimentos no cartão de crédito sem categoria')+
-          ' — não reserva'+(semCat===1?'':'m')+' dinheiro para a fatura.'+
+          (semCat===1 ? 'movimento no cartão de crédito está sem categoria' : 'movimentos no cartão de crédito estão sem categoria')+
+          ' — o orçamento não '+(semCat===1?'o':'os')+' acompanha.'+
           '</span><button data-action="integrity">Ver quais</button></div>';
       }
     }
@@ -2693,7 +2709,8 @@
         '<div class="field"><label>Beneficiário</label><div class="ac-wrap"><input id="txPayee" maxlength="100" autocomplete="off" value="'+esc(tx.payee||"")+'" placeholder="Ex.: Continente, Salário, EDP…"></div></div>'+
         '<div class="field" id="txCatField"><label>Categoria</label><select id="txCat">'+catOpts+'</select>'+
           '<div class="hint hidden" id="txCatSug">💡 Categoria preenchida a partir da última vez que usou este beneficiário.</div>'+
-          '<div class="hint hidden" id="txCatWarn">⚠️ Sem categoria, este movimento muda o saldo da conta mas fica de fora do orçamento — as contas deixam de bater certo.</div></div>'+
+          '<div class="hint hidden" id="txCatWarn">⚠️ Sem categoria, este movimento muda o saldo da conta mas fica de fora do orçamento — as contas deixam de bater certo.</div>'+
+          '<div class="hint hidden" id="txCatReq" style="color:var(--warning);font-weight:600;">⚠️ No cartão de crédito a categoria é obrigatória — é ela que faz o orçamento guardar o dinheiro para pagar a dívida.</div></div>'+
         '<div class="grid-2">'+
           '<div class="field"><label>Saída (despesa)</label><input id="txOut" class="money" data-par="txIn" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(tx.outflow)+'" placeholder="0,00"></div>'+
           '<div class="field"><label>Entrada (receita)</label><input id="txIn" class="money" data-par="txOut" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(tx.inflow)+'" placeholder="0,00"></div>'+
@@ -2710,8 +2727,17 @@
       var acc=lkAcc(el("txAcc").value);
       var o=parseAmount(el("txOut").value); if(isNaN(o)) o=0;
       var e=parseAmount(el("txIn").value);  if(isNaN(e)) e=0;
-      var mostrar = !!(acc && acc.type==="budget" && !el("txCat").value && (Math.abs(o)>0.005 || Math.abs(e)>0.005));
-      el("txCatWarn").classList.toggle("hidden", !mostrar);
+      var temValor = (Math.abs(o)>0.005 || Math.abs(e)>0.005);
+      var semCat = !el("txCat").value;
+      var falta = !!(semCat && temValor && precisaCategoria(acc));
+      el("txCatWarn").classList.add("hidden");            // substituído pelo aviso único abaixo
+      var req=el("txCatReq");
+      if (req) {
+        req.classList.toggle("hidden", !falta);
+        if (falta) req.innerHTML = (acc.type==="credit")
+          ? "⚠️ No cartão de crédito a categoria é obrigatória — é ela que faz o orçamento guardar o dinheiro para pagar a dívida."
+          : "⚠️ A categoria é obrigatória — sem ela o movimento mexe no saldo da conta mas fica de fora do orçamento.";
+      }
     }
     // Contas de acompanhamento estão fora do orçamento: uma transação normal aí não leva categoria.
     // Esconde o campo — exceto se, por engano ou herança, já tiver uma categoria escolhida (para se
@@ -3269,8 +3295,10 @@
     }
 
     if (iss.cartaoSemCat > 0) {
-      corpo += '<div class="hint" style="border-top:1px solid var(--border);padding-top:10px;">ℹ️ Há ainda <b>'+iss.cartaoSemCat+
-        '</b> movimento(s) no cartão de crédito sem categoria. Não desequilibram o orçamento, mas também não reservam dinheiro para a fatura.</div>';
+      corpo += '<div class="hint" style="border-top:1px solid var(--border);padding-top:10px;">ℹ️ Há <b>'+iss.cartaoSemCat+
+        '</b> movimento(s) no cartão de crédito <b>sem categoria</b>, criado(s) antes de a categoria passar a ser obrigatória. '+
+        'Numa <b>compra</b>, é a categoria que faz o orçamento guardar o dinheiro para pagar o cartão; numa <b>devolução</b>, é ela que devolve o dinheiro à categoria onde tinha gasto. '+
+        'Abra a conta do cartão e escolha a categoria de cada um.</div>';
     }
 
     openModal(
@@ -3391,7 +3419,8 @@
       sec("Contas e transações")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li>Contas de <b>orçamento</b> (à ordem, poupança) entram no orçamento. De <b>acompanhamento</b> (investimentos, empréstimos) não.</li>'+
-        '<li><b>Cartão de crédito:</b> ao gastar, a aplicação reserva logo o valor para a fatura. O <b>💳 Pagar</b> usa essa reserva.</li>'+
+        '<li><b>A categoria é obrigatória</b> em tudo o que entra ou sai de uma conta de orçamento ou de um cartão — é ela que liga o movimento ao orçamento. Não a levam: as contas de <b>acompanhamento</b> (estão fora do orçamento), o <b>saldo inicial</b> e as <b>transferências</b> entre contas suas (que só pedem categoria quando o dinheiro sai do orçamento ou entra nele). Ao <b>importar do banco</b> não se pede, por serem muitas de uma vez — a aplicação diz quantas ficaram por classificar.</li>'+
+        '<li><b>Cartão de crédito:</b> ao gastar, a aplicação retira o valor à categoria da compra e guarda-o na categoria do cartão, para o ter quando pagar. O <b>💳 Pagar</b> usa esse dinheiro. Por isso a <b>categoria é obrigatória</b> nos movimentos do cartão — também nas <b>devoluções e cashbacks</b>, onde deve indicar a categoria em que tinha feito a despesa, para o dinheiro voltar para lá. (O saldo inicial e o pagamento do cartão são à parte e não levam categoria.)</li>'+
         '<li><b>↔ Transferir</b> move entre contas — está no ecrã <b>Contas</b>, na barra lateral e dentro da janela de nova transação. Se o dinheiro sair do orçamento para uma conta de acompanhamento, leva categoria.</li>'+
         '<li><b>➗ Dividir</b> reparte uma compra por várias categorias.</li>'+
         '<li><b>📅 Recorrentes</b> lançam-se sozinhas na data — semanal, quinzenal, mensal, semestral ou anual. Podem ser uma <b>despesa/receita</b> ou uma <b>↔ transferência</b> entre contas, útil para pôr dinheiro de lado na poupança todos os meses.</li>'+
@@ -3429,10 +3458,17 @@
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
       '<p class="muted" style="margin-top:-6px;font-size:12px;">A numeração foi acertada: o que tinha saído como «2.0» a «2.3» está agora agrupado de 1.7 a 1.10 — eram melhorias, não uma mudança de fundo. O <b>2.0</b> fica reservado para essa.</p>'+
 
+      ver("1.13", "agosto 2026", [
+        '<b>A categoria passou a ser obrigatória</b> em todos os movimentos de contas de orçamento e de cartões — ao criar, ao editar, ao duplicar e nas regras recorrentes. Antes era possível gravar sem ela, e esses movimentos ficavam de fora do orçamento sem dar por isso.',
+        'No <b>cartão</b> isso vale também para devoluções e cashbacks: indique a categoria onde tinha feito a despesa, para o dinheiro voltar para lá.',
+        'Continuam sem categoria, por não serem movimentos a classificar: o <b>saldo inicial</b>, as <b>transferências</b> entre contas suas e as contas de <b>acompanhamento</b>.',
+        'Ao <b>importar do banco</b> não se pede categoria (são muitas de uma vez), mas a aplicação diz quantas ficaram por classificar — e o ecrã do Orçamento lembra-o depois.'
+      ])+
+
       ver("1.12", "agosto 2026", [
         '<b>Correção nas recorrentes:</b> uma regra do dia 29, 30 ou 31 que passasse por fevereiro ficava presa nesse dia mais curto para sempre. Agora recupera no mês seguinte (31 jan → 28 fev → <b>31</b> mar).',
         '<b>Importação do banco:</b> valores entre parênteses — <i>(50,00)</i>, como o Excel e alguns extratos escrevem os negativos — passam a ser lidos como despesa, não como receita.',
-        '<b>Aviso novo:</b> compras no cartão de crédito sem categoria passam a ser assinaladas no ecrã do Orçamento — não reservam dinheiro para a fatura.'
+        '<b>Aviso novo:</b> compras no cartão de crédito sem categoria passam a ser assinaladas no ecrã do Orçamento — o orçamento não guardou dinheiro para as pagar.'
       ])+
 
       ver("1.11", "agosto 2026", [
@@ -4184,6 +4220,15 @@
         outflow: num("txOut"), inflow: num("txIn"), cleared: el("txClear").checked };
       if (data.outflow===0 && data.inflow===0) { toast("Indique um valor de saída ou entrada."); return; }
       if (data.outflow>0 && data.inflow>0) { toast("Preencha só a Saída OU a Entrada, não as duas."); return; }
+      // Categoria obrigatória nas contas de orçamento e de cartão (ver precisaCategoria).
+      // As transferências e o saldo inicial não passam por aqui.
+      if (!catId && precisaCategoria(accSel)) {
+        toast(accSel.type==="credit"
+          ? (data.inflow>0 ? "Escolha a categoria — no cartão, indique a categoria onde tinha feito a despesa."
+                           : "Escolha a categoria — no cartão é obrigatória, para o orçamento guardar o dinheiro da dívida.")
+          : "Escolha a categoria — sem ela este movimento fica de fora do orçamento e as contas deixam de bater certo.");
+        return;
+      }
       pushUndo(id ? "Transação alterada." : "Transação criada.");
       if (id) { var t=txById(id); for(var k in data) t[k]=data[k]; }
       else { data.id=uid(); state.transactions.push(data); }
@@ -4201,6 +4246,10 @@
     "toggle-clear": function(id){ var t=txById(id); if(t){ t.cleared=!t.cleared; save(); render(); } },
     "duplicate-tx": function(id){
       var t=txById(id); if(!t) return;
+      // Duplicar copia tudo tal e qual — incluindo a falta de categoria. Seria a porta das traseiras
+      // para criar movimentos sem categoria depois de esta passar a ser obrigatória: pede-se antes
+      // para corrigir o original (uma correção, em vez de dois problemas).
+      if(faltaCategoria(t)){ toast("Escolha primeiro a categoria desta transação — só depois a pode duplicar."); return; }
       // O duplicado fica com a data de hoje (por confirmar) — copia tudo o resto tal e qual.
       function copyOf(src, extra){ var c=JSON.parse(JSON.stringify(src)); c.id=uid(); c.cleared=false; c.date=todayISO(); if(extra) for(var k in extra) c[k]=extra[k]; return c; }
       pushUndo("Transação duplicada.");
@@ -4554,6 +4603,13 @@
         if((d.outflow||0)===0 && (d.inflow||0)===0){ toast("Indique um valor de saída ou entrada."); return; }
         if((d.outflow||0)>0 && (d.inflow||0)>0){ toast("Preencha só a Saída OU a Entrada, não as duas."); return; }
         var accR=accountById(d.accountId);
+        // Mesma regra da transação avulsa (precisaCategoria): senão a regra passaria a lançar
+        // TODOS os meses movimentos que o orçamento não acompanha — o pior sítio para os deixar.
+        if(!d.categoryId && precisaCategoria(accR)){
+          toast(accR.type==="credit" ? "Escolha a categoria — no cartão de crédito é obrigatória."
+                                     : "Escolha a categoria — sem ela o movimento fica de fora do orçamento.");
+          return;
+        }
         dados = { nextDate:d.nextDate||todayISO(), freq:d.freq, accountId:d.accountId, toAccountId:null,
                   payee:d.payee||"", categoryId:(accR && accR.type==="tracking") ? null : (d.categoryId||null), memo:d.memo||"",
                   outflow:d.outflow||0, inflow:d.inflow||0, active:!!d.active };
@@ -5257,7 +5313,10 @@
       var catId=null;
       var accObj=lkAcc(accId), ehTrack=!!(accObj && accObj.type==="tracking");   // acompanhamento não leva categoria
       if(!ehTrack && "categoria" in idx){ var cn=normKey(f[idx.categoria]); if(cn==="rendimento"||cn==="income") catId=INCOME; else if(catByName[cn]) catId=catByName[cn]; }
-      if(!ehTrack && !catId && inf<0.005) semCat++;
+      // Conta TODAS as linhas que ficariam por classificar (saídas e entradas), com a mesma regra
+      // do resto da aplicação. Importar é em lote, por isso não se bloqueia — mas diz-se quantas
+      // ficam por corrigir, e o aviso do ecrã do Orçamento continua a lembrá-lo depois.
+      if(!catId && precisaCategoria(accObj)) semCat++;
       var cl=true;
       if("cleared" in idx){ var cv=normKey(f[idx.cleared]); if(cv==="nao"||cv==="n"||cv==="false"||cv==="0") cl=false; }
       var kr=accId+"|"+date+"|"+round2(out).toFixed(2)+"|"+round2(inf).toFixed(2);
@@ -5295,7 +5354,8 @@
           '<div class="hint" style="margin-top:4px;">Mesma conta, mesma data e mesmo valor de transações que já tem registadas — costuma acontecer quando os extratos se sobrepõem. Desligue só se souber que são movimentos mesmo repetidos.</div>':'')+
         '<div class="hint" style="margin-top:8px;"><b>'+aImportar+'</b> transações a importar'+
         (_csv.skipped?' · <b>'+_csv.skipped+'</b> linhas ignoradas (sem data ou sem valor)':'')+
-        (_csv.semCat?' · <b>'+_csv.semCat+'</b> ficam sem categoria':'')+'</div>'+
+        '</div>'+
+        (_csv.semCat?'<div class="hint" style="color:var(--warning);font-weight:600;margin-top:4px;">⚠️ <b>'+_csv.semCat+'</b> ficam <b>sem categoria</b> — atribua-lhes uma depois de importar, senão o orçamento não as acompanha. (Ao importar não se pede categoria, por serem muitas de uma vez.)</div>':'')+
         (_csv.cortado?'<div class="hint" style="color:var(--warning);font-weight:600;">⚠️ O ficheiro tem mais linhas do que o limite de '+MAX_LINHAS_CSV+
           ' por importação — ficaram <b>'+_csv.cortado+'</b> por ler. Importe o resto num segundo ficheiro.</div>':'')+
         '</div>';
