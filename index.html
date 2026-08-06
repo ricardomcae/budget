@@ -715,7 +715,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.11";
+  var APP_VERSION = "1.12";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -1054,6 +1054,20 @@
     return { acc:acc, net:net, delta: round2(real - esperado) };
   }
 
+  // Compras no cartão sem categoria: não desequilibram o orçamento (o cartão não é conta de
+  // orçamento), por isso a barra de integridade nunca aparecia por causa delas — e o aviso que
+  // existia dentro do «Ver porquê» ficava inalcançável, a menos que outra coisa desequilibrasse.
+  // Contam-se à parte para poder avisar mesmo estando tudo o resto certo. Passagem única e barata.
+  function comprasCartaoSemCat(m){
+    var n=0;
+    for(var i=0;i<state.transactions.length;i++){
+      var t=state.transactions[i];
+      if(t.transfer || t.categoryId || monthOf(t.date) > m) continue;
+      var a=lkAcc(t.accountId);
+      if(a && a.type==="credit") n++;
+    }
+    return n;
+  }
   // Lista os movimentos que desequilibram o orçamento, já com o motivo identificado.
   // A soma dos "delta" é, por construção, igual ao integrityDelta.
   function integrityIssues(m){
@@ -1158,16 +1172,25 @@
   }
   function isoOf(dt){ return dt.getFullYear()+"-"+pad(dt.getMonth()+1)+"-"+pad(dt.getDate()); }
   var FREQ_LABEL = { weekly:"Semanal", biweekly:"Quinzenal", monthly:"Mensal", semiannual:"Semestral", yearly:"Anual" };
-  function advanceDate(iso, freq){
+  // `dia` é o dia ORIGINAL da regra (r.dia). Sem ele, uma regra do dia 31 que passasse por
+  // fevereiro ficava presa no 28 para sempre (31 jan → 28 fev → 28 mar → ...), porque o mês
+  // seguinte era calculado a partir da data já encurtada. Guardando o dia pretendido, o
+  // encurtamento é só naquele mês: 31 jan → 28 fev → 31 mar. É como funcionam os débitos do banco.
+  // (Semanal/quinzenal somam dias, por isso não usam o dia original.)
+  function advanceDate(iso, freq, dia){
     var p=iso.split("-"), y=+p[0], mo=+p[1]-1, d=+p[2];
+    var alvo = (dia>0 && dia<=31) ? dia : d;
     if(freq==="weekly") return isoOf(new Date(y,mo,d+7));
     if(freq==="biweekly") return isoOf(new Date(y,mo,d+14));
-    if(freq==="yearly"){ var lastY=new Date(y+1,mo+1,0).getDate(); return (y+1)+"-"+pad(mo+1)+"-"+pad(Math.min(d,lastY)); }
-    if(freq==="semiannual"){ var sm=mo+6, sy=y; if(sm>11){ sm-=12; sy++; } var lastS=new Date(sy,sm+1,0).getDate(); return sy+"-"+pad(sm+1)+"-"+pad(Math.min(d,lastS)); }
+    if(freq==="yearly"){ var lastY=new Date(y+1,mo+1,0).getDate(); return (y+1)+"-"+pad(mo+1)+"-"+pad(Math.min(alvo,lastY)); }
+    if(freq==="semiannual"){ var sm=mo+6, sy=y; if(sm>11){ sm-=12; sy++; } var lastS=new Date(sy,sm+1,0).getDate(); return sy+"-"+pad(sm+1)+"-"+pad(Math.min(alvo,lastS)); }
     var nm=mo+1, ny=y; if(nm>11){nm-=12;ny++;}
     var lastM=new Date(ny,nm+1,0).getDate();
-    return ny+"-"+pad(nm+1)+"-"+pad(Math.min(d,lastM));
+    return ny+"-"+pad(nm+1)+"-"+pad(Math.min(alvo,lastM));
   }
+  // O dia pretendido de uma regra. Regras antigas não têm `dia` guardado: usa-se o da próxima
+  // data, o que mantém exatamente o comportamento atual até a regra ser gravada de novo.
+  function diaDaRegra(r){ return (r && r.dia>0) ? r.dia : (r && r.nextDate ? +r.nextDate.slice(8,10) : 0); }
   // Uma regra com conta de destino lança uma TRANSFERÊNCIA (as duas metades de uma vez);
   // sem destino, lança uma transação normal. É o mesmo caminho em ambos os casos.
   function lancarRecorrente(r, data){
@@ -1193,7 +1216,7 @@
       var guard=0;
       while(r.nextDate && r.nextDate<=today && guard<120){
         lancarRecorrente(r, r.nextDate);
-        r.nextDate=advanceDate(r.nextDate, r.freq);
+        r.nextDate=advanceDate(r.nextDate, r.freq, diaDaRegra(r));
         created++; guard++;
       }
     }
@@ -1213,7 +1236,7 @@
       var d=r.nextDate, guarda=0;
       while(d && d.slice(0,7)<=m && guarda++<600){
         if(d.slice(0,7)===m && d>=hoje) out.push({r:r, date:d});
-        d=advanceDate(d, r.freq);
+        d=advanceDate(d, r.freq, diaDaRegra(r));
       }
     }
     out.sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:0); });
@@ -1513,6 +1536,12 @@
       o.settings = o.settings || { locale:"pt-PT", currency:"EUR" };
       o.collapsed = o.collapsed || {}; o.assignments = o.assignments || {}; o.snooze = o.snooze || {};
       o.recurring = o.recurring || []; o.ui = o.ui || { view:"budget", month:nowMonthKey() };
+      // Regras criadas antes de existir o «dia pretendido»: fixa-se agora, a partir da próxima
+      // data. Não muda nada no imediato, mas passa a proteger do encurtamento de fevereiro.
+      for (var ri=0; ri<o.recurring.length; ri++){
+        var rr=o.recurring[ri];
+        if (rr && !(rr.dia>0) && rr.nextDate) rr.dia = +String(rr.nextDate).slice(8,10) || null;
+      }
       o.backup = o.backup || { at:null, sig:null, autoDay:null, pend:0 };
       return o;
     } catch(e){ return JSON.parse(JSON.stringify(DEFAULT_STATE)); }
@@ -1893,6 +1922,16 @@
         (dv < 0 ? ('O orçamento conta com <b>'+fmt(-dv)+'</b> que já não estão nas contas de orçamento.')
                 : ('Há <b>'+fmt(dv)+'</b> nas contas de orçamento que ainda não passaram por nenhuma categoria.')) +
         '</span><button data-action="integrity">Ver porquê</button></div>';
+    } else {
+      // Tudo bate certo, mas pode haver compras no cartão sem categoria: não reservam dinheiro
+      // para a fatura, e sem este aviso o utilizador não tinha como dar por isso.
+      var semCat = comprasCartaoSemCat(state.ui.month);
+      if (semCat > 0) {
+        aviso = '<div class="integrity-bar"><span>ℹ️</span><span class="grow"><b>'+semCat+'</b> '+
+          (semCat===1 ? 'movimento no cartão de crédito sem categoria' : 'movimentos no cartão de crédito sem categoria')+
+          ' — não reserva'+(semCat===1?'':'m')+' dinheiro para a fatura.'+
+          '</span><button data-action="integrity">Ver quais</button></div>';
+      }
     }
     // Aviso de categorias excedidas (disponível negativo). Só visual + atalho para as filtrar.
     var excedidas = 0;
@@ -3390,6 +3429,12 @@
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
       '<p class="muted" style="margin-top:-6px;font-size:12px;">A numeração foi acertada: o que tinha saído como «2.0» a «2.3» está agora agrupado de 1.7 a 1.10 — eram melhorias, não uma mudança de fundo. O <b>2.0</b> fica reservado para essa.</p>'+
 
+      ver("1.12", "agosto 2026", [
+        '<b>Correção nas recorrentes:</b> uma regra do dia 29, 30 ou 31 que passasse por fevereiro ficava presa nesse dia mais curto para sempre. Agora recupera no mês seguinte (31 jan → 28 fev → <b>31</b> mar).',
+        '<b>Importação do banco:</b> valores entre parênteses — <i>(50,00)</i>, como o Excel e alguns extratos escrevem os negativos — passam a ser lidos como despesa, não como receita.',
+        '<b>Aviso novo:</b> compras no cartão de crédito sem categoria passam a ser assinaladas no ecrã do Orçamento — não reservam dinheiro para a fatura.'
+      ])+
+
       ver("1.11", "agosto 2026", [
         '<b>Os filtros também deixam de transitar:</b> ao entrar na aplicação ou trocar de orçamento, os filtros do orçamento e das transações começam limpos — antes podiam ficar ligados a esconder categorias, dando a ideia de que faltavam.'
       ])+
@@ -3943,7 +3988,10 @@
     if (typeof s === "number") return s;
     s = String(s==null?"":s).trim();
     if (!s) return NaN;
-    var neg = s.indexOf("-") >= 0;
+    // Negativo pode vir como "-45,90", "45,90-" (alguns bancos põem o sinal à direita) ou entre
+    // parênteses, "(45,90)" — a convenção contabilística que o Excel e vários extratos usam. Sem
+    // reconhecer os parênteses, uma despesa era importada como ENTRADA de dinheiro.
+    var neg = s.indexOf("-") >= 0 || (/\(\s*[0-9][0-9.,\s]*\)/.test(s));
     s = s.replace(/[^0-9.,]/g, "");
     if (!s) return NaN;
     var di = Math.max(s.lastIndexOf(","), s.lastIndexOf("."));
@@ -4510,6 +4558,9 @@
                   payee:d.payee||"", categoryId:(accR && accR.type==="tracking") ? null : (d.categoryId||null), memo:d.memo||"",
                   outflow:d.outflow||0, inflow:d.inflow||0, active:!!d.active };
       }
+      // Dia pretendido da regra: fixa-se aqui, a partir da data escolhida. É o que permite a uma
+      // regra do dia 31 voltar ao 31 depois de passar por fevereiro (ver advanceDate).
+      dados.dia = +String(dados.nextDate).slice(8,10) || null;
       pushUndo(d._id ? "Recorrente alterada." : "Recorrente criada.");
       if(d._id){ var r=recById(d._id); for(var k in dados) r[k]=dados[k]; }
       else { dados.id=uid(); state.recurring.push(dados); }
@@ -4529,7 +4580,7 @@
       if(!recValida(r)){ toast("As contas desta regra já não existem."); return; }
       pushUndo("Recorrente lançada.");
       lancarRecorrente(r, r.nextDate);
-      r.nextDate=advanceDate(r.nextDate, r.freq);
+      r.nextDate=advanceDate(r.nextDate, r.freq, diaDaRegra(r));
       closeModal(); save(); render(); toast("Lançado. Próxima: "+fmtDate(r.nextDate));
     },
 
