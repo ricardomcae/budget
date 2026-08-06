@@ -715,7 +715,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.10";
+  var APP_VERSION = "1.11";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -1517,6 +1517,20 @@
       return o;
     } catch(e){ return JSON.parse(JSON.stringify(DEFAULT_STATE)); }
   }
+  // Estado de VISTA reposto sempre que se "abre" um orçamento (entrar na aplicação ou trocar de
+  // orçamento). Só toca no state.ui — nunca em dados. Sem isto, a aplicação reabria onde se tinha
+  // saído: noutro separador, noutro mês (com risco de atribuir dinheiro ao mês errado) ou com
+  // filtros ligados a esconder categorias, dando a impressão de que faltavam.
+  function reporVistaInicial(){
+    state.ui = state.ui || {};
+    state.ui.view = "budget";
+    state.ui.month = nowMonthKey();
+    state.ui.budgetFilters = {};      // 🟢🟡🔴 / com saldo / com excedente
+    state.ui.prioFilters = {};        // ▲ ● ▼
+    state.ui.txFilter = null;         // filtros da lista de transações
+    state.ui.txLimit = PAGINA;        // volta à primeira página
+    state.ui.openAccount = null;      // fecha o registo de uma conta
+  }
   function switchBudget(id){
     if (id === _bindex.active) { closeModal(); return; }
     if (!budgetName(id)) return;
@@ -1524,8 +1538,7 @@
     _bindex.active = id; saveIndex(_bindex);
     state = loadBudgetRaw(id);
     if (!state.ui) state.ui = { view:"budget", month:nowMonthKey() };
-    state.ui.view = "budget";                 // trocar de orçamento aterra sempre no Orçamento...
-    state.ui.month = nowMonthKey();            // ...do mês corrente, como ao abrir a aplicação
+    reporVistaInicial();          // aterra no Orçamento do mês corrente, sem filtros do outro orçamento
     _idx=null; _payees=null; _undo=[]; _moves=[]; hideUndo();
     var posted = processRecurring();
     closeModal(); render();
@@ -3376,6 +3389,10 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
       '<p class="muted" style="margin-top:-6px;font-size:12px;">A numeração foi acertada: o que tinha saído como «2.0» a «2.3» está agora agrupado de 1.7 a 1.10 — eram melhorias, não uma mudança de fundo. O <b>2.0</b> fica reservado para essa.</p>'+
+
+      ver("1.11", "agosto 2026", [
+        '<b>Os filtros também deixam de transitar:</b> ao entrar na aplicação ou trocar de orçamento, os filtros do orçamento e das transações começam limpos — antes podiam ficar ligados a esconder categorias, dando a ideia de que faltavam.'
+      ])+
 
       ver("1.10", "agosto 2026", [
         '<b>Abre sempre no Orçamento do mês atual</b> — ao entrar na aplicação e ao trocar de orçamento. Antes reabria onde tinha ficado, o que o podia deixar noutro separador ou noutro mês sem dar por isso.'
@@ -5803,8 +5820,7 @@
   // aplicação (o render() grava o state inteiro), pelo que sem isto a app reabria onde se tivesse
   // saído — no separador Transações, ou pior, num mês futuro que se andou a espreitar, com o risco
   // de se atribuir dinheiro ao mês errado. É o mesmo que já acontece ao clicar em "Orçamento".
-  state.ui.view = "budget";
-  state.ui.month = nowMonthKey();
+  reporVistaInicial();
   state.recurring = state.recurring || [];
   state.backup = state.backup || { at:null, sig:null, autoDay:null };
   var _posted = processRecurring();
