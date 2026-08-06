@@ -188,6 +188,9 @@
   .int-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
   .int-row .who { min-width: 0; }
   .int-row .who b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* A descrição por baixo do nome tem de caber SEMPRE numa linha: partida em duas, a linha do
+     beneficiário ficava com o dobro da altura e a lista perdia o alinhamento. Corta com "…". */
+  .int-row .who .tag { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .int-row .amt { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
   /* Os dois botões de cada beneficiário, lado a lado e sempre na mesma linha. */
   .py-acoes { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
@@ -3287,7 +3290,10 @@
         // Os dois botões vão na MESMA célula da grelha (a .int-row tem 3 colunas: 1fr auto auto).
         // Postos como dois filhos separados, o segundo caía para a linha de baixo.
         return '<div class="int-row" data-pk="'+esc(payeeKey(x.e.name))+'"><span class="who"><b>'+esc(x.e.name)+'</b>'+
-          '<span class="tag">'+x.e.count+' transaç'+(x.e.count===1?'ão':'ões')+' · última em '+fmtDate(x.e.lastDate)+' · '+esc(c)+'</span></span>'+
+          // No telemóvel a forma longa não cabe e era cortada a meio: usa-se a curta
+          // («4 · 05/08/2026 · Supermercado»), que diz o mesmo em metade do espaço.
+          '<span class="tag"><span class="rot">'+x.e.count+' transaç'+(x.e.count===1?'ão':'ões')+' · última em </span>'+
+            '<span class="so-fone">'+x.e.count+' · </span>'+fmtDate(x.e.lastDate)+' · '+esc(c)+'</span></span>'+
           '<span></span>'+
           '<span class="py-acoes">'+
             '<button class="btn sm" data-action="payee-report" data-id="'+x.k+'" title="Ver as transações e o total deste beneficiário">📊 Ver</button>'+
@@ -3585,7 +3591,7 @@
 
       ver("1.16", "agosto 2026", [
         '<b>Resumo por beneficiário:</b> em 🏷 Beneficiários, o novo <b>📊 Ver</b> mostra quanto gastou nesse sítio — total, número de vezes, média e em que categorias entrou. Abre na lista de transações, por isso pode juntar-lhe um período («este ano») e editar a partir dali.',
-        'Nesse ecrã, os dois botões de cada beneficiário ficam agora <b>lado a lado</b>, sem quebrar a linha.'
+        'Nesse ecrã, os dois botões de cada beneficiário ficam agora <b>lado a lado</b> e cada beneficiário ocupa <b>uma só linha</b>, também em ecrãs estreitos.'
       ])+
 
       ver("1.15", "agosto 2026", [
