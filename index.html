@@ -739,7 +739,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.15";
+  var APP_VERSION = "1.16";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -2388,6 +2388,9 @@
     if (de) list = list.filter(function(t){return t.date>=de;});
     if (ate) list = list.filter(function(t){return t.date<=ate;});
     if (f.q) { var q=f.q.toLowerCase(); list = list.filter(function(t){ return (t.payee||"").toLowerCase().indexOf(q)>=0 || (t.memo||"").toLowerCase().indexOf(q)>=0; }); }
+    // Filtro por beneficiário EXATO (vindo do 🏷 Beneficiários). Diferente da procura por texto:
+    // ali "Continente" apanharia também "Continente Bom Dia"; aqui é só aquele beneficiário.
+    if (f.payee) list = list.filter(function(t){ return payeeKey(t.payee||"")===f.payee; });
 
     var perOpts = PERIODOS.map(function(p){ return '<option value="'+p[0]+'"'+((f.per||"")===p[0]?" selected":"")+'>'+p[1]+'</option>'; }).join("");
     var accOpts = '<option value="">Todas as contas</option>' + state.accounts.map(function(a){return '<option value="'+a.id+'"'+(f.account===a.id?" selected":"")+'>'+esc(a.name)+'</option>';}).join("");
@@ -2396,8 +2399,53 @@
 
     // Chega-se aqui filtrado a partir da atividade de uma categoria — sem isto não há
     // forma óbvia de voltar a ver tudo.
-    var temFiltro = !!(f.account || f.category || f.per || f.from || f.to || (f.q||"").trim());
-    var soConta = !!(f.account && !f.category && !f.per && !f.from && !f.to && !(f.q||"").trim());
+    var temFiltro = !!(f.account || f.category || f.per || f.from || f.to || f.payee || (f.q||"").trim());
+    var soConta = !!(f.account && !f.category && !f.per && !f.from && !f.to && !f.payee && !(f.q||"").trim());
+    // Resumo de um beneficiário: em vez de um ecrã novo, aproveita esta lista já filtrada e
+    // acrescenta-lhe uma faixa com os totais. Conta sobre a lista VISÍVEL, por isso cruzar com
+    // um período ou uma conta dá logo "quanto gastei aqui este ano".
+    var resumoPayee = "";
+    if (f.payee && list.length) {
+      var rSaida=0, rEntrada=0, porCat={}, primeira=list[list.length-1].date, ultima=list[0].date, nome="";
+      for (var rp=0; rp<list.length; rp++){
+        var tr=list[rp];
+        rSaida = round2(rSaida + (tr.outflow||0));
+        rEntrada = round2(rEntrada + (tr.inflow||0));
+        if (!nome && tr.payee) nome = tr.payee;
+        var ck = tr.categoryId || "";
+        porCat[ck] = round2((porCat[ck]||0) + (tr.outflow||0) - (tr.inflow||0));
+        if (tr.date < primeira) primeira = tr.date;
+        if (tr.date > ultima) ultima = tr.date;
+      }
+      var liquido = round2(rSaida - rEntrada);
+      var media = round2(rSaida / Math.max(1, list.length));
+      // As três categorias onde mais gastou com este beneficiário.
+      var cats=[]; for (var ck2 in porCat) if (porCat.hasOwnProperty(ck2) && porCat[ck2] > 0.005) cats.push([ck2, porCat[ck2]]);
+      cats.sort(function(a,b){ return b[1]-a[1]; });
+      var catsTxt = cats.slice(0,3).map(function(p){
+        var nomeC = p[0]===INCOME ? "Rendimento" : (p[0] ? ((lkCat(p[0])||{name:"(apagada)"}).name) : "sem categoria");
+        return esc(nomeC)+' <b>'+fmt(p[1])+'</b>';
+      }).join(' &nbsp;·&nbsp; ');
+      function bloco(rot, val, cor){
+        return '<div style="min-width:110px;"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);font-weight:700;">'+rot+'</div>'+
+               '<div style="font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px;'+(cor||'')+'">'+val+'</div></div>';
+      }
+      resumoPayee =
+        '<div class="data-card" style="padding:14px 16px;margin-bottom:12px;">'+
+          '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'+
+            '<h3 style="margin:0;font-size:15px;">🏷 '+esc(nome||"Beneficiário")+'</h3>'+
+            '<span class="muted" style="font-size:12px;">de '+fmtDate(primeira)+' a '+fmtDate(ultima)+'</span></div>'+
+          '<div style="display:flex;gap:18px 26px;flex-wrap:wrap;">'+
+            bloco("Gasto", fmt(rSaida))+
+            (rEntrada>0.005 ? bloco("Recebido/devolvido", fmt(rEntrada)) : "")+
+            (rEntrada>0.005 ? bloco("Líquido", fmt(liquido), liquido<0?'color:var(--positive);':'') : "")+
+            bloco("Transações", String(list.length))+
+            bloco("Média por vez", fmt(media))+
+          '</div>'+
+          (catsTxt ? '<div class="hint" style="margin-top:10px;">Onde entrou: '+catsTxt+'</div>' : '')+
+          '<div class="hint" style="margin-top:6px;">Conta só o que os filtros deixam à vista — escolha um período para ver, por exemplo, só este ano.</div>'+
+        '</div>';
+    }
     var head = '<div class="toolbar">'+
       // O «Dividir» e o «Beneficiários» saíram daqui: o primeiro está dentro da nova
       // transação, o segundo na barra lateral (e no 🏷️ do topo, no telemóvel).
@@ -2438,7 +2486,7 @@
     if (list.length > LIM) body += '<tr><td colspan="9" style="text-align:center;padding:14px;">'+
       '<button class="btn" data-action="show-more-tx">Mostrar mais '+PAGINA+' (a ver '+LIM+' de '+list.length+')</button></td></tr>';
 
-    el("content").innerHTML = head +
+    el("content").innerHTML = head + resumoPayee +
       '<div class="data-card"><table class="data"><thead><tr>'+
       '<th>'+thSelTodas()+'Data</th>'+(soConta?'':'<th>Conta</th>')+'<th>Beneficiário</th><th>Categoria</th><th class="col-nota">Nota</th>'+
       '<th class="num">Saída</th><th class="num">Entrada</th>'+(soConta?'<th class="num">Saldo</th>':'')+
@@ -3237,6 +3285,7 @@
         return '<div class="int-row" data-pk="'+esc(payeeKey(x.e.name))+'"><span class="who"><b>'+esc(x.e.name)+'</b>'+
           '<span class="tag">'+x.e.count+' transaç'+(x.e.count===1?'ão':'ões')+' · última em '+fmtDate(x.e.lastDate)+' · '+esc(c)+'</span></span>'+
           '<span></span>'+
+          '<button class="btn sm" data-action="payee-report" data-id="'+x.k+'" title="Ver as transações e o total deste beneficiário">📊 Ver</button> '+
           '<button class="btn sm" data-action="rename-payee" data-id="'+x.k+'">✎ Mudar nome</button></div>';
       }).join("") + '</div>';
     }
@@ -3495,7 +3544,7 @@
         '<li><b>Somar à pressa:</b> as caixas à esquerda da data selecionam transações e mostram o total em baixo. A caixa no <b>cabeçalho</b> marca todas as que estão à vista. É só uma conta rápida — não altera nada, e a seleção desaparece ao mudar de página.</li>'+
         '<li><b>Campos de valor:</b> algarismos e um separador decimal. Em <b>Saída/Entrada</b>, o «-» troca de lado.</li>'+
         '<li><b>Procurar:</b> o campo no topo das Transações procura no <b>beneficiário</b> e na <b>nota</b>, e cruza-se com os filtros de conta, categoria e período.</li>'+
-        '<li><b>🏷️ Beneficiários:</b> mudar um nome altera todas as transações; dar-lhe um nome que já existe <b>junta</b> os dois.</li>'+
+        '<li><b>🏷️ Beneficiários:</b> mudar um nome altera todas as transações; dar-lhe um nome que já existe <b>junta</b> os dois. O <b>📊 Ver</b> mostra tudo o que gastou nesse beneficiário — total, número de vezes, média e em que categorias entrou. Como é a lista de transações normal, pode juntar-lhe um <b>período</b> para ver só um ano, e editar as transações a partir dali.</li>'+
         '<li><b>Importar .csv</b> do banco: as linhas que já existem são detetadas e saltadas.</li>'+
       '</ul>'+
 
@@ -3527,6 +3576,10 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
       '<p class="muted" style="margin-top:-6px;font-size:12px;">A numeração foi acertada: o que tinha saído como «2.0» a «2.3» está agora agrupado de 1.7 a 1.10 — eram melhorias, não uma mudança de fundo. O <b>2.0</b> fica reservado para essa.</p>'+
+
+      ver("1.16", "agosto 2026", [
+        '<b>Resumo por beneficiário:</b> em 🏷 Beneficiários, o novo <b>📊 Ver</b> mostra quanto gastou nesse sítio — total, número de vezes, média e em que categorias entrou. Abre na lista de transações, por isso pode juntar-lhe um período («este ano») e editar a partir dali.'
+      ])+
 
       ver("1.15", "agosto 2026", [
         '<b>Mais rápida:</b> a verificação de alterações para a sincronização deixou de correr a cada clique — passou a correr uma vez por pausa. Num orçamento com milhares de transações isso valia dezenas de milissegundos <i>por cada</i> mudança de mês, separador ou filtro.',
@@ -4188,6 +4241,15 @@
     "integrity": function(){ integrityModal(); },
     "payees": function(){ payeesModal(); },
     "rename-payee": function(k){ renamePayeeModal(k); },
+    // Relatório de um beneficiário: não é um ecrã novo — leva à lista de transações já filtrada
+    // por ele, com uma faixa de totais por cima. Assim continua a poder cruzar com período, conta
+    // ou categoria, e a editar as transações a partir dali.
+    "payee-report": function(k){
+      closeModal();
+      state.ui.view="transactions"; state.ui.openAccount=null;
+      state.ui.txFilter={ payee:k }; state.ui.txLimit=PAGINA;
+      save(); render();
+    },
     "save-payee": function(k){
       var idx=payeeIndex(), e=idx[k]; if(!e) return;
       var novo=valLim("pyNome", LIM_PAYEE);
