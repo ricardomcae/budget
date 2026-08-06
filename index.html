@@ -194,6 +194,8 @@
   .int-row .amt { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
   /* Os dois botões de cada beneficiário, lado a lado e sempre na mesma linha. */
   .py-acoes { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+  /* Botões só de ícone: quadrados e com área de toque suficiente para o dedo. */
+  .btn.sm.py-ico { padding: 7px 10px; font-size: 15px; line-height: 1; }
 
   .content { padding: 20px 26px 60px; }
 
@@ -744,7 +746,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.17";
+  var APP_VERSION = "1.18";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -3295,9 +3297,12 @@
           '<span class="tag"><span class="rot">'+x.e.count+' transaç'+(x.e.count===1?'ão':'ões')+' · última em </span>'+
             '<span class="so-fone">'+x.e.count+' · </span>'+fmtDate(x.e.lastDate)+' · '+esc(c)+'</span></span>'+
           '<span></span>'+
+          // Só os ícones: com o rótulo por extenso os dois botões comiam 163px dos 432 úteis da
+          // janela, e a descrição (que precisa de ~290px) era cortada com "…". Assim sobram 356px
+          // e cabe inteira. O que fazem fica no title (rato) e no aria-label (leitor de ecrã).
           '<span class="py-acoes">'+
-            '<button class="btn sm" data-action="payee-report" data-id="'+x.k+'" title="Ver as transações e o total deste beneficiário">📊 Ver</button>'+
-            '<button class="btn sm" data-action="rename-payee" data-id="'+x.k+'" title="Mudar o nome deste beneficiário"><span class="rot">✎ Mudar nome</span><span class="so-fone">✎</span></button>'+
+            '<button class="btn sm py-ico" data-action="payee-report" data-id="'+x.k+'" title="Ver as transações e o total deste beneficiário" aria-label="Ver transações e totais de '+esc(x.e.name)+'">📊</button>'+
+            '<button class="btn sm py-ico" data-action="rename-payee" data-id="'+x.k+'" title="Mudar o nome deste beneficiário" aria-label="Mudar o nome de '+esc(x.e.name)+'">✎</button>'+
           '</span></div>';
       }).join("") + '</div>';
     }
@@ -3589,8 +3594,8 @@
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
       '<p class="muted" style="margin-top:-6px;font-size:12px;">A numeração foi acertada: o que tinha saído como «2.0» a «2.3» está agora agrupado de 1.7 a 1.10 — eram melhorias, não uma mudança de fundo. O <b>2.0</b> fica reservado para essa.</p>'+
 
-      ver("1.17", "agosto 2026", [
-        '<b>Ecrã dos beneficiários arrumado:</b> os dois botões ficam <b>lado a lado</b> e cada beneficiário ocupa <b>uma só linha</b>, mesmo em ecrãs estreitos — antes o «Mudar nome» caía para baixo, esticado, e a descrição partia-se em duas linhas.'
+      ver("1.18", "agosto 2026", [
+        '<b>Ecrã dos beneficiários arrumado:</b> os botões passaram a ser só <b>📊</b> e <b>✎</b> (o que fazem aparece ao passar o rato), ficam lado a lado, e cada beneficiário ocupa <b>uma só linha</b> — com a descrição inteira, sem cortes.'
       ])+
 
       ver("1.16", "agosto 2026", [
