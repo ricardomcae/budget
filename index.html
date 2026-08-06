@@ -189,6 +189,8 @@
   .int-row .who { min-width: 0; }
   .int-row .who b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .int-row .amt { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+  /* Os dois botões de cada beneficiário, lado a lado e sempre na mesma linha. */
+  .py-acoes { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
 
   .content { padding: 20px 26px 60px; }
 
@@ -3282,11 +3284,15 @@
         '<div id="pyEmpty" class="muted hidden" style="text-align:center;padding:16px 0;">Nenhum beneficiário corresponde.</div>'+
         '<div id="pyList" style="max-height:340px;overflow:auto;">' + arr.map(function(x){
         var c = x.e.cat===INCOME ? "Rendimento" : (x.e.cat ? ((lkCat(x.e.cat)||{name:"(apagada)"}).name) : "sem categoria");
+        // Os dois botões vão na MESMA célula da grelha (a .int-row tem 3 colunas: 1fr auto auto).
+        // Postos como dois filhos separados, o segundo caía para a linha de baixo.
         return '<div class="int-row" data-pk="'+esc(payeeKey(x.e.name))+'"><span class="who"><b>'+esc(x.e.name)+'</b>'+
           '<span class="tag">'+x.e.count+' transaç'+(x.e.count===1?'ão':'ões')+' · última em '+fmtDate(x.e.lastDate)+' · '+esc(c)+'</span></span>'+
           '<span></span>'+
-          '<button class="btn sm" data-action="payee-report" data-id="'+x.k+'" title="Ver as transações e o total deste beneficiário">📊 Ver</button> '+
-          '<button class="btn sm" data-action="rename-payee" data-id="'+x.k+'">✎ Mudar nome</button></div>';
+          '<span class="py-acoes">'+
+            '<button class="btn sm" data-action="payee-report" data-id="'+x.k+'" title="Ver as transações e o total deste beneficiário">📊 Ver</button>'+
+            '<button class="btn sm" data-action="rename-payee" data-id="'+x.k+'" title="Mudar o nome deste beneficiário"><span class="rot">✎ Mudar nome</span><span class="so-fone">✎</span></button>'+
+          '</span></div>';
       }).join("") + '</div>';
     }
     openModal(
@@ -3578,7 +3584,8 @@
       '<p class="muted" style="margin-top:-6px;font-size:12px;">A numeração foi acertada: o que tinha saído como «2.0» a «2.3» está agora agrupado de 1.7 a 1.10 — eram melhorias, não uma mudança de fundo. O <b>2.0</b> fica reservado para essa.</p>'+
 
       ver("1.16", "agosto 2026", [
-        '<b>Resumo por beneficiário:</b> em 🏷 Beneficiários, o novo <b>📊 Ver</b> mostra quanto gastou nesse sítio — total, número de vezes, média e em que categorias entrou. Abre na lista de transações, por isso pode juntar-lhe um período («este ano») e editar a partir dali.'
+        '<b>Resumo por beneficiário:</b> em 🏷 Beneficiários, o novo <b>📊 Ver</b> mostra quanto gastou nesse sítio — total, número de vezes, média e em que categorias entrou. Abre na lista de transações, por isso pode juntar-lhe um período («este ano») e editar a partir dali.',
+        'Nesse ecrã, os dois botões de cada beneficiário ficam agora <b>lado a lado</b>, sem quebrar a linha.'
       ])+
 
       ver("1.15", "agosto 2026", [
