@@ -746,7 +746,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.18";
+  var APP_VERSION = "1.19";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -3594,19 +3594,17 @@
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
       '<p class="muted" style="margin-top:-6px;font-size:12px;">A numeração foi acertada: o que tinha saído como «2.0» a «2.3» está agora agrupado de 1.7 a 1.10 — eram melhorias, não uma mudança de fundo. O <b>2.0</b> fica reservado para essa.</p>'+
 
-      ver("1.18", "agosto 2026", [
-        '<b>Ecrã dos beneficiários arrumado:</b> os botões passaram a ser só <b>📊</b> e <b>✎</b> (o que fazem aparece ao passar o rato), ficam lado a lado, e cada beneficiário ocupa <b>uma só linha</b> — com a descrição inteira, sem cortes.'
-      ])+
-
-      ver("1.16", "agosto 2026", [
-        '<b>Resumo por beneficiário:</b> em 🏷 Beneficiários, o novo <b>📊 Ver</b> mostra quanto gastou nesse sítio — total, número de vezes, média e em que categorias entrou. Abre na lista de transações, por isso pode juntar-lhe um período («este ano») e editar a partir dali.'
+      ver("1.16 – 1.19", "agosto 2026", [
+        '<b>Resumo por beneficiário:</b> o novo <b>📊</b> em 🏷 Beneficiários mostra quanto gastou nesse sítio — total, número de vezes, média e categorias.',
+        'Abre na lista de transações, por isso pode juntar-lhe um período («este ano») e editar a partir dali.',
+        'O ecrã dos beneficiários ficou arrumado: cada um ocupa uma só linha, também em ecrãs estreitos.'
       ])+
 
       ver("1.15", "agosto 2026", [
-        '<b>Mais rápida:</b> a verificação de alterações para a sincronização deixou de correr a cada clique — passou a correr uma vez por pausa. Num orçamento com milhares de transações isso valia dezenas de milissegundos <i>por cada</i> mudança de mês, separador ou filtro.',
-        '<b>Correção:</b> uma conta criada com <b>saldo negativo</b> (a descoberto) fazia aparecer o aviso vermelho de contas desalinhadas sem nada estar errado.',
-        '<b>Correção:</b> ao eliminar uma categoria, as regras recorrentes que a usavam ficavam a apontar para o vazio e continuavam a lançar. Agora ficam em pausa e a aplicação avisa.',
-        '<b>Correções várias:</b> o «▼ descer» podia baralhar a ordem se a categoria estivesse arquivada; importar uma cópia antiga deixava as recorrentes por inicializar; importar vários orçamentos sem espaço podia deixar os dados a meio; e os dois contadores de movimentos de cartão sem categoria não davam o mesmo número.',
+        '<b>Mais rápida</b> a mudar de mês, de separador e de filtro — sobretudo com muitas transações.',
+        '<b>Correção:</b> uma conta criada com <b>saldo negativo</b> dava um aviso vermelho sem nada estar errado.',
+        '<b>Correção:</b> ao eliminar uma categoria, as regras recorrentes que a usavam ficavam a lançar para o vazio. Agora ficam em pausa, com aviso.',
+        '<b>Correções várias</b> ao reordenar categorias arquivadas, a importar cópias antigas e nos avisos do cartão.',
         '<b>«Como funciona?»</b> explica agora como o <b>excesso transita</b> para o mês seguinte.'
       ])+
 
@@ -3618,24 +3616,24 @@
       ])+
 
       ver("1.13", "agosto 2026", [
-        '<b>A categoria passou a ser obrigatória</b> em todos os movimentos de contas de orçamento e de cartões — ao criar, ao editar, ao duplicar e nas regras recorrentes. Antes era possível gravar sem ela, e esses movimentos ficavam de fora do orçamento sem dar por isso.',
-        'No <b>cartão</b> isso vale também para devoluções e cashbacks: indique a categoria onde tinha feito a despesa, para o dinheiro voltar para lá.',
-        'Continuam sem categoria, por não serem movimentos a classificar: o <b>saldo inicial</b>, as <b>transferências</b> entre contas suas e as contas de <b>acompanhamento</b>.',
-        'Ao <b>importar do banco</b> não se pede categoria (são muitas de uma vez), mas a aplicação diz quantas ficaram por classificar — e o ecrã do Orçamento lembra-o depois.'
+        '<b>A categoria passou a ser obrigatória</b> em contas de orçamento e cartões — ao criar, editar, duplicar e nas recorrentes. Sem ela o movimento ficava de fora do orçamento.',
+        'No <b>cartão</b> vale também para devoluções e cashbacks: indique a categoria onde tinha feito a despesa.',
+        'Continuam sem categoria: o <b>saldo inicial</b>, as <b>transferências</b> entre contas suas e as contas de <b>acompanhamento</b>.',
+        'Ao <b>importar do banco</b> não se pede (são muitas de uma vez), mas a aplicação diz quantas ficaram por classificar.'
       ])+
 
       ver("1.12", "agosto 2026", [
-        '<b>Correção nas recorrentes:</b> uma regra do dia 29, 30 ou 31 que passasse por fevereiro ficava presa nesse dia mais curto para sempre. Agora recupera no mês seguinte (31 jan → 28 fev → <b>31</b> mar).',
-        '<b>Importação do banco:</b> valores entre parênteses — <i>(50,00)</i>, como o Excel e alguns extratos escrevem os negativos — passam a ser lidos como despesa, não como receita.',
-        '<b>Aviso novo:</b> compras no cartão de crédito sem categoria passam a ser assinaladas no ecrã do Orçamento — o orçamento não guardou dinheiro para as pagar.'
+        '<b>Correção nas recorrentes:</b> uma regra do dia 29, 30 ou 31 ficava presa no dia mais curto depois de fevereiro. Agora recupera (31 jan → 28 fev → <b>31</b> mar).',
+        '<b>Importação do banco:</b> valores entre parênteses — <i>(50,00)</i> — passam a ser lidos como despesa, não como receita.',
+        '<b>Aviso novo</b> no ecrã do Orçamento para compras no cartão sem categoria.'
       ])+
 
       ver("1.11", "agosto 2026", [
-        '<b>Os filtros também deixam de transitar:</b> ao entrar na aplicação ou trocar de orçamento, os filtros do orçamento e das transações começam limpos — antes podiam ficar ligados a esconder categorias, dando a ideia de que faltavam.'
+        '<b>Os filtros também começam limpos</b> ao entrar na aplicação ou trocar de orçamento — antes podiam ficar ligados a esconder categorias.'
       ])+
 
       ver("1.10", "agosto 2026", [
-        '<b>Abre sempre no Orçamento do mês atual</b> — ao entrar na aplicação e ao trocar de orçamento. Antes reabria onde tinha ficado, o que o podia deixar noutro separador ou noutro mês sem dar por isso.'
+        '<b>Abre sempre no Orçamento do mês atual</b> — ao entrar na aplicação e ao trocar de orçamento. Antes reabria onde tinha ficado, e podia deixá-lo noutro mês sem dar por isso.'
       ])+
 
       ver("1.9", "agosto 2026", [
