@@ -417,6 +417,9 @@
   .ac-item.ac-new { color: var(--primary); font-weight: 600; }
   /* Seleção temporária de transações (só visual): checkbox por linha + barra de somatório. */
   .tx-selcell { display: inline-flex; align-items: center; margin-inline-end: 8px; vertical-align: middle; cursor: pointer; }
+  /* A caixa do cabeçalho fica na mesma célula da coluna Data, alinhada com as das linhas. */
+  table.data th .tx-selcell { margin-inline-end: 8px; }
+  .tx-sel-all { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); margin: 0; }
   .tx-sel { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); margin: 0; }
   .tx-sel-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 90; display: none; align-items: center; gap: 8px 14px; flex-wrap: wrap; justify-content: center; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg); border-radius: 12px; padding: 10px 16px; font-size: 13px; max-width: calc(100% - 24px); }
   .tx-sel-bar.show { display: flex; }
@@ -513,6 +516,10 @@
        a partir em duas linhas deixava as alturas das linhas todas diferentes. */
     .col-nota { display: none !important; }
     table.data { min-width: 520px; }
+    /* Área de toque maior nas caixas de seleção (a caixa continua com o mesmo tamanho, o que
+       cresce é a zona sensível à volta) — 16px são difíceis de acertar com o dedo. */
+    .tx-selcell { padding: 10px 8px 10px 2px; margin-inline-end: 2px; }
+    .tx-sel, .tx-sel-all { width: 19px; height: 19px; }
     .btn.f-filtro { padding: 6px 9px; font-size: 13px; }
     .rot { display: none; }          /* rótulo longo: fica só o símbolo ou a forma curta */
 
@@ -630,6 +637,23 @@
 (function () {
   // ---------- Constantes e auxiliares ----------
   var STORAGE_KEY = "meu-orcamento-v1";
+  // Identificador deste aparelho, criado à primeira utilização e guardado só aqui. Serve para
+  // saber se a última cópia de segurança foi feita NESTE aparelho ou noutro: como o carimbo da
+  // cópia viaja na sincronização, sem isto o telemóvel mostrava a cópia feita no PC como se fosse
+  // sua. É um código anónimo — não sai daqui a não ser dentro da cópia cifrada.
+  var DEVICE_KEY = "meu-orcamento-aparelho-v1";
+  var _deviceId = (function(){
+    try {
+      var d = localStorage.getItem(DEVICE_KEY);
+      if(!d){ d = "d" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); localStorage.setItem(DEVICE_KEY, d); }
+      return d;
+    } catch(e){ return "d0"; }
+  })();
+  // Nome legível do aparelho, só para o utilizador se orientar ("neste telemóvel" vs "no PC").
+  function nomeDesteAparelho(){
+    try { return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? "telemóvel" : "computador"; }
+    catch(e){ return "aparelho"; }
+  }
   // ---------- Vários orçamentos (Pessoal, Família, …) ----------
   // Cada orçamento vive numa chave própria; `state` continua a ser SEMPRE o que está aberto,
   // por isso o resto da app não muda nada. Um índice guarda a lista e qual está ativo.
@@ -715,7 +739,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.13";
+  var APP_VERSION = "1.15";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -733,23 +757,16 @@
 
   var state = load();
 
+  // Delega no loadBudgetRaw para haver UMA só normalização/migração. Antes tinha uma cópia
+  // desatualizada da lista de campos: faltavam o `snooze`, o `backup.pend` e — pior — a migração
+  // do `dia` das regras recorrentes. Como o orçamento ATIVO é sempre carregado por aqui, era
+  // precisamente esse que ficava por migrar; ao trocar de orçamento e voltar, já ficava certo.
+  // Dados iguais a comportarem-se de forma diferente é o pior tipo de bug.
   function load() {
     ensureBudgets();
-    try {
-      var raw = localStorage.getItem(budKey(_bindex.active));
-      if (raw) {
-        var s = JSON.parse(raw);
-        s.settings = s.settings || { locale: "pt-PT", currency: "EUR" };
-        s.collapsed = s.collapsed || {};
-        s.ui = s.ui || { view: "budget", month: nowMonthKey() };
-        s.assignments = s.assignments || {};
-        s.recurring = s.recurring || [];
-        s.backup = s.backup || { at:null, sig:null, autoDay:null };
-        delete s._tmpAccType;   // lixo de versões anteriores: era guardado por engano
-        return s;
-      }
-    } catch (e) { console.warn("Falha ao ler dados", e); }
-    return JSON.parse(JSON.stringify(DEFAULT_STATE));
+    var s = loadBudgetRaw(_bindex.active);
+    delete s._tmpAccType;   // lixo de versões anteriores: era guardado por engano
+    return s;
   }
   // Se o armazenamento encher, o estado fica só em memória — perde-se ao fechar o separador.
   // Por isso isto não pode ser um aviso que desaparece em dois segundos.
@@ -1107,7 +1124,9 @@
       var acc = cb.acc;
       // Compras no cartão sem categoria não desequilibram nada, mas também não reservam
       // dinheiro para a fatura — vale a pena contá-las à parte.
-      if(!t.transfer && !t.categoryId && acc.type==="credit") cartaoSemCat++;
+      // Mesma regra do aviso do ecrã do Orçamento (faltaCategoria), senão os dois números não
+      // batiam certo: este contava também o «Saldo inicial» do cartão, o outro não.
+      if(faltaCategoria(t) && acc.type==="credit") cartaoSemCat++;
       if(t.transfer){
         if(parJaVisto[t.transfer]) continue;
         if(Math.abs(deltaPar[t.transfer]||0) < 0.005) continue;
@@ -1187,7 +1206,7 @@
     return count;
   }
   function isoOf(dt){ return dt.getFullYear()+"-"+pad(dt.getMonth()+1)+"-"+pad(dt.getDate()); }
-  var FREQ_LABEL = { weekly:"Semanal", biweekly:"Quinzenal", monthly:"Mensal", semiannual:"Semestral", yearly:"Anual" };
+  var FREQ_LABEL = { daily:"Diária", weekly:"Semanal", biweekly:"Quinzenal", monthly:"Mensal", semiannual:"Semestral", yearly:"Anual" };
   // `dia` é o dia ORIGINAL da regra (r.dia). Sem ele, uma regra do dia 31 que passasse por
   // fevereiro ficava presa no 28 para sempre (31 jan → 28 fev → 28 mar → ...), porque o mês
   // seguinte era calculado a partir da data já encurtada. Guardando o dia pretendido, o
@@ -1196,6 +1215,7 @@
   function advanceDate(iso, freq, dia){
     var p=iso.split("-"), y=+p[0], mo=+p[1]-1, d=+p[2];
     var alvo = (dia>0 && dia<=31) ? dia : d;
+    if(freq==="daily") return isoOf(new Date(y,mo,d+1));
     if(freq==="weekly") return isoOf(new Date(y,mo,d+7));
     if(freq==="biweekly") return isoOf(new Date(y,mo,d+14));
     if(freq==="yearly"){ var lastY=new Date(y+1,mo+1,0).getDate(); return (y+1)+"-"+pad(mo+1)+"-"+pad(Math.min(alvo,lastY)); }
@@ -1229,8 +1249,11 @@
     for(var i=0;i<list.length;i++){
       var r=list[i]; if(!r.active) continue;
       if(!recValida(r)) continue;
-      var guard=0;
-      while(r.nextDate && r.nextDate<=today && guard<120){
+      // Trava de segurança contra ciclos infinitos. Uma regra DIÁRIA gasta um passo por dia, por
+      // isso precisa de folga para recuperar longas ausências (400 ≈ mais de um ano); as outras
+      // frequências nunca chegam perto do limite antigo.
+      var guard=0, limite=(r.freq==="daily") ? 400 : 120;
+      while(r.nextDate && r.nextDate<=today && guard<limite){
         lancarRecorrente(r, r.nextDate);
         r.nextDate=advanceDate(r.nextDate, r.freq, diaDaRegra(r));
         created++; guard++;
@@ -1306,6 +1329,7 @@
     return state.accounts.filter(function(x){ return !x.hidden && ((x.type==="budget")?"b":"o")===t; }); }
   function moveAccount(id, dir){
     var sib=accSiblings(id), pos=-1; for(var i=0;i<sib.length;i++) if(sib[i].id===id) pos=i;
+    if(pos<0) return false;                    // conta fora da lista visível (arquivada): não mexe
     var alvo=sib[pos+dir]; if(!alvo) return false;
     var gi=-1,gj=-1; for(var k=0;k<state.accounts.length;k++){ if(state.accounts[k].id===id) gi=k; if(state.accounts[k].id===alvo.id) gj=k; }
     if(gi<0||gj<0) return false;
@@ -1323,6 +1347,9 @@
   function moveCategory(id, dir){
     var cat=categoryById(id); if(!cat) return;
     var sib=categoriesOfGroup(cat.groupId), pos=-1; for(var i=0;i<sib.length;i++) if(sib[i].id===id) pos=i;
+    // Sem esta guarda, uma categoria fora da lista visível (arquivada) dava pos=-1 e o "descer"
+    // trocava-a com a PRIMEIRA da lista, baralhando a ordem sem ninguém pedir.
+    if(pos<0) return;
     var target=sib[pos+dir]; if(!target) return;
     var gi=-1,gj=-1; for(var k=0;k<state.categories.length;k++){ if(state.categories[k].id===id) gi=k; if(state.categories[k].id===target.id) gj=k; }
     if(gi<0||gj<0) return;
@@ -2258,7 +2285,7 @@
       '</div>'+
       '<h3 style="margin:4px 2px 12px;">'+esc(acc.name)+' <span class="pill '+(acc.type==="budget"?"budget":(acc.type==="credit"?"credit":"tracking"))+'">'+(acc.type==="budget"?"Orçamento":(acc.type==="credit"?"Cartão de crédito":"Acompanhamento"))+'</span></h3>'+
       '<div class="data-card"><table class="data"><thead><tr>'+
-      '<th>Data</th><th>Beneficiário</th><th>Categoria</th><th class="col-nota">Nota</th><th class="num">Saída</th><th class="num">Entrada</th><th class="num">Saldo</th><th style="text-align:center;">✓</th><th></th></tr></thead><tbody>'+body+'</tbody></table></div>';
+      '<th>'+thSelTodas()+'Data</th><th>Beneficiário</th><th>Categoria</th><th class="col-nota">Nota</th><th class="num">Saída</th><th class="num">Entrada</th><th class="num">Saldo</th><th style="text-align:center;">✓</th><th></th></tr></thead><tbody>'+body+'</tbody></table></div>';
   }
 
   function txRow(t, runBal, withAccount) {
@@ -2288,6 +2315,24 @@
   // Guardada só em memória e limpa a cada render (mudar de página desfaz), como pedido. Nada é
   // gravado nem sofre qualquer ação — serve só para ver um somatório "na hora".
   var _txSel = {};
+  // Caixa "selecionar todas", no cabeçalho da coluna Data. Fica na mesma célula das caixas das
+  // linhas, por isso alinha por baixo umas das outras sem acrescentar coluna nenhuma — importante
+  // no telemóvel, onde não há espaço para mais uma. Seleciona as linhas VISÍVEIS (as que a
+  // paginação e os filtros deixaram no ecrã), que é o que o utilizador tem à frente.
+  function thSelTodas(){
+    return '<label class="tx-selcell" title="Selecionar todas as que estão à vista (só para somar)">'+
+      '<input type="checkbox" class="tx-sel-all" aria-label="Selecionar todas"></label>';
+  }
+  // Acerta o estado da caixa do cabeçalho com o que está mesmo selecionado no ecrã.
+  function syncSelTodas(){
+    var all=document.querySelectorAll(".tx-sel-all"); if(!all.length) return;
+    var boxes=document.querySelectorAll(".tx-sel");
+    var n=0; for(var i=0;i<boxes.length;i++) if(boxes[i].checked) n++;
+    for(var k=0;k<all.length;k++){
+      all[k].checked = (boxes.length>0 && n===boxes.length);
+      all[k].indeterminate = (n>0 && n<boxes.length);   // "algumas" — o traço a meio
+    }
+  }
   function txSelBar(){
     var b = document.getElementById("txSelBar");
     if(!b){
@@ -2297,7 +2342,7 @@
       b.querySelector(".txsel-clear").addEventListener("click", function(){
         _txSel = {};
         var boxes=document.querySelectorAll(".tx-sel"); for(var i=0;i<boxes.length;i++) boxes[i].checked=false;
-        renderTxSelBar();
+        syncSelTodas(); renderTxSelBar();
       });
     }
     return b;
@@ -2395,7 +2440,7 @@
 
     el("content").innerHTML = head +
       '<div class="data-card"><table class="data"><thead><tr>'+
-      '<th>Data</th>'+(soConta?'':'<th>Conta</th>')+'<th>Beneficiário</th><th>Categoria</th><th class="col-nota">Nota</th>'+
+      '<th>'+thSelTodas()+'Data</th>'+(soConta?'':'<th>Conta</th>')+'<th>Beneficiário</th><th>Categoria</th><th class="col-nota">Nota</th>'+
       '<th class="num">Saída</th><th class="num">Entrada</th>'+(soConta?'<th class="num">Saldo</th>':'')+
       '<th style="text-align:center;">✓</th><th></th></tr></thead><tbody>'+body+'</tbody></table></div>';
   }
@@ -2987,6 +3032,15 @@
               ? ('Última: '+fmtDateTime(state.backup.at)+((daysSinceBackup()||0)>0?(' · há '+daysSinceBackup()+' dia'+((daysSinceBackup()===1)?'':'s')):' · hoje'))
               : 'Ainda não guardou nenhuma cópia de segurança em ficheiro.')+
           '</div>'+
+          // Onde foi feita. O carimbo da cópia viaja na sincronização, por isso a última cópia pode
+          // ter sido feita no outro aparelho — e o ficheiro está lá, não aqui.
+          (function(){
+            var b=state.backup||{};
+            if(!b.at || !b.dev) return "";
+            if(b.dev===_deviceId) return '<div class="hint" style="margin-top:2px;">Feita <b>neste '+esc(nomeDesteAparelho())+'</b>.</div>';
+            return '<div class="hint" style="margin-top:2px;">⚠️ Feita <b>noutro aparelho</b>'+
+              (b.devNome?(' (o '+esc(b.devNome)+')'):'')+' — o ficheiro está lá, não aqui.</div>';
+          })()+
           '<div class="hint" style="margin-top:4px;">'+textoEstadoCopia()+'</div>'+
           '<div class="hint" style="margin-top:6px;">Guarde-o <b>fora daqui</b> (OneDrive, e-mail, pen).'+
           (usaPartilha()?' Abre a partilha do iPhone.':'')+'</div>'+
@@ -3102,10 +3156,22 @@
           (dLocal ? 'última sincronização deste aparelho a <b>'+esc(dLocal)+'</b>' : '')+
           '.</div>')
       : '';
+    // Quantas transações existem só de um lado — ajuda a perceber qual está mais completo.
+    var df = pc.dif, linhaDif = "";
+    if (df) {
+      function frase(n, orc, lado){
+        if(!n) return "nada que o outro não tenha";
+        return '<b>'+n+'</b> transaç'+(n===1?'ão':'ões')+(orc?(' (inclui '+orc+' orçamento'+(orc===1?'':'s')+' que só existe'+(orc===1?'':'m')+' '+lado+')'):'');
+      }
+      linhaDif = '<div class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-top:10px;">'+
+        '<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>☁️ Só na nuvem</span><span>'+frase(df.soNuvem, df.orcSoNuvem, 'na nuvem')+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>📱 Só neste aparelho</span><span>'+frase(df.soAqui, df.orcSoAqui, 'aqui')+'</span></div>'+
+        '<div class="hint" style="margin-top:6px;">Contagem aproximada: se a <b>mesma</b> transação foi editada dos dois lados, conta como existindo em ambos.</div></div>';
+    }
     openModal(
       '<div class="modal-head"><h2>⚠️ Conflito de sincronização</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body"><p>Este dispositivo tem alterações <b>e</b> a versão na nuvem também mudou desde a última sincronização.</p>'+
-        linhaDatas+
+        linhaDatas+ linhaDif +
         '<div class="hint">Não é possível juntar as duas automaticamente sem risco de perder dados. Escolha qual manter — a outra é substituída.</div></div>'+
       '<div class="modal-foot" style="gap:8px;">'+
         '<button class="btn" data-action="sync-use-remote" style="flex:1;flex-direction:column;line-height:1.3;">Usar a versão da nuvem<span class="muted" style="font-size:11px;">descarta as deste aparelho</span></button>'+
@@ -3374,7 +3440,8 @@
         '<li><b>Dê uma função a cada euro.</b> O <b>Pronto a atribuir</b> é o dinheiro por distribuir — o objetivo é chegar a 0 €.</li>'+
         '<li>Os <b>rendimentos</b> entram como transações de <b>Entrada</b> com a categoria «Rendimento».</li>'+
         '<li>O que atribui fica em <b>Disponível</b> e transita de mês para mês.</li>'+
-        '<li><b>Excesso</b> (a vermelho): gastou mais do que tinha atribuído. Atribua mais para o cobrir.</li>'+
+        '<li><b>Excesso</b> (a vermelho): gastou mais do que tinha atribuído. Atribua mais para o cobrir, ou use o <b>🩹</b> na linha da categoria para ir buscar o dinheiro a outra.</li>'+
+        '<li><b>O excesso transita com a categoria.</b> Se acabar o mês a vermelho, a categoria <b>começa o mês seguinte com esse valor negativo</b> — e continua vermelha até o cobrir. O dinheiro que atribuir em primeiro lugar tapa o buraco: só depois de chegar a zero é que fica disponível para gastar. Assim a dívida fica onde foi criada, à vista, em vez de desaparecer para uma conta geral.</li>'+
       '</ul>'+
 
       sec("Alvos")+
@@ -3423,9 +3490,11 @@
         '<li><b>Cartão de crédito:</b> ao gastar, a aplicação retira o valor à categoria da compra e guarda-o na categoria do cartão, para o ter quando pagar. O <b>💳 Pagar</b> usa esse dinheiro. Por isso a <b>categoria é obrigatória</b> nos movimentos do cartão — também nas <b>devoluções e cashbacks</b>, onde deve indicar a categoria em que tinha feito a despesa, para o dinheiro voltar para lá. (O saldo inicial e o pagamento do cartão são à parte e não levam categoria.)</li>'+
         '<li><b>↔ Transferir</b> move entre contas — está no ecrã <b>Contas</b>, na barra lateral e dentro da janela de nova transação. Se o dinheiro sair do orçamento para uma conta de acompanhamento, leva categoria.</li>'+
         '<li><b>➗ Dividir</b> reparte uma compra por várias categorias.</li>'+
-        '<li><b>📅 Recorrentes</b> lançam-se sozinhas na data — semanal, quinzenal, mensal, semestral ou anual. Podem ser uma <b>despesa/receita</b> ou uma <b>↔ transferência</b> entre contas, útil para pôr dinheiro de lado na poupança todos os meses.</li>'+
+        '<li><b>📅 Recorrentes</b> lançam-se sozinhas na data — diária, semanal, quinzenal, mensal, semestral ou anual. Podem ser uma <b>despesa/receita</b> ou uma <b>↔ transferência</b> entre contas, útil para pôr dinheiro de lado na poupança todos os meses.</li>'+
         '<li>Clique numa transação para a editar. Transferências e divididas editam-se <b>por inteiro</b>, nunca metade.</li>'+
+        '<li><b>Somar à pressa:</b> as caixas à esquerda da data selecionam transações e mostram o total em baixo. A caixa no <b>cabeçalho</b> marca todas as que estão à vista. É só uma conta rápida — não altera nada, e a seleção desaparece ao mudar de página.</li>'+
         '<li><b>Campos de valor:</b> algarismos e um separador decimal. Em <b>Saída/Entrada</b>, o «-» troca de lado.</li>'+
+        '<li><b>Procurar:</b> o campo no topo das Transações procura no <b>beneficiário</b> e na <b>nota</b>, e cruza-se com os filtros de conta, categoria e período.</li>'+
         '<li><b>🏷️ Beneficiários:</b> mudar um nome altera todas as transações; dar-lhe um nome que já existe <b>junta</b> os dois.</li>'+
         '<li><b>Importar .csv</b> do banco: as linhas que já existem são detetadas e saltadas.</li>'+
       '</ul>'+
@@ -3433,6 +3502,7 @@
       sec("Se algo não bater certo")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li>Um <b>⚠️</b> por baixo do «Pronto a atribuir» quer dizer que o dinheiro nas contas não bate com o orçamento. Carregue em <b>Ver porquê</b> — mostra os movimentos em causa e corrige-os.</li>'+
+        '<li>Um <b>ℹ️</b> no mesmo sítio avisa que há movimentos do <b>cartão de crédito sem categoria</b> — de antes de a categoria passar a ser obrigatória, ou vindos de uma importação. Não desequilibram as contas, mas ficam de fora do orçamento; <b>Ver quais</b> leva-o até eles.</li>'+
         '<li><b>↩ Anular</b> repõe as últimas <b>5</b> ações — tanto as operações em bloco como um valor que tenha mudado à mão numa linha.</li>'+
       '</ul>'+
 
@@ -3457,6 +3527,21 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
       '<p class="muted" style="margin-top:-6px;font-size:12px;">A numeração foi acertada: o que tinha saído como «2.0» a «2.3» está agora agrupado de 1.7 a 1.10 — eram melhorias, não uma mudança de fundo. O <b>2.0</b> fica reservado para essa.</p>'+
+
+      ver("1.15", "agosto 2026", [
+        '<b>Mais rápida:</b> a verificação de alterações para a sincronização deixou de correr a cada clique — passou a correr uma vez por pausa. Num orçamento com milhares de transações isso valia dezenas de milissegundos <i>por cada</i> mudança de mês, separador ou filtro.',
+        '<b>Correção:</b> uma conta criada com <b>saldo negativo</b> (a descoberto) fazia aparecer o aviso vermelho de contas desalinhadas sem nada estar errado.',
+        '<b>Correção:</b> ao eliminar uma categoria, as regras recorrentes que a usavam ficavam a apontar para o vazio e continuavam a lançar. Agora ficam em pausa e a aplicação avisa.',
+        '<b>Correções várias:</b> o «▼ descer» podia baralhar a ordem se a categoria estivesse arquivada; importar uma cópia antiga deixava as recorrentes por inicializar; importar vários orçamentos sem espaço podia deixar os dados a meio; e os dois contadores de movimentos de cartão sem categoria não davam o mesmo número.',
+        '<b>«Como funciona?»</b> explica agora como o <b>excesso transita</b> para o mês seguinte.'
+      ])+
+
+      ver("1.14", "agosto 2026", [
+        '<b>Regra recorrente diária</b> — junta-se à semanal, quinzenal, mensal, semestral e anual.',
+        '<b>Selecionar todas</b> na lista de transações: uma caixa no cabeçalho da coluna Data marca as que estão à vista, para as somar de uma vez.',
+        '<b>Cópia de segurança:</b> passa a dizer se a última foi feita <b>neste aparelho</b> ou noutro — o carimbo viaja na sincronização, e o ficheiro pode estar no outro.',
+        '<b>Conflito de sincronização:</b> mostra agora quantas transações existem só na nuvem e quantas só neste aparelho, para ajudar a escolher qual manter.'
+      ])+
 
       ver("1.13", "agosto 2026", [
         '<b>A categoria passou a ser obrigatória</b> em todos os movimentos de contas de orçamento e de cartões — ao criar, ao editar, ao duplicar e nas regras recorrentes. Antes era possível gravar sem ela, e esses movimentos ficavam de fora do orçamento sem dar por isso.',
@@ -3792,7 +3877,7 @@
         '</div></div>'+
         '<div class="grid-2">'+
           '<div class="field"><label>Próxima data</label>'+dateField("rcDate", s.nextDate)+'</div>'+
-          '<div class="field"><label>Frequência</label><select id="rcFreq">'+fo("weekly","Semanal")+fo("biweekly","Quinzenal")+fo("monthly","Mensal")+fo("semiannual","Semestral")+fo("yearly","Anual")+'</select></div>'+
+          '<div class="field"><label>Frequência</label><select id="rcFreq">'+fo("daily","Diária")+fo("weekly","Semanal")+fo("biweekly","Quinzenal")+fo("monthly","Mensal")+fo("semiannual","Semestral")+fo("yearly","Anual")+'</select></div>'+
         '</div>'+
         '<div class="field"><label>'+(ehTransf?"De (sai desta conta)":"Conta")+'</label><select id="rcAcc">'+opts(s.accountId)+'</select></div>'+
         (ehTransf
@@ -4162,7 +4247,13 @@
         var start = num("acStart");
         if (start !== 0) {
           state.transactions.push({ id:uid(), date: todayISO(), accountId: acc.id, opening:true,
-            payee:"Saldo inicial", categoryId: (type==="budget" && start>0)?INCOME:null,
+            // Numa conta de orçamento o saldo inicial entra sempre pelo «Pronto a atribuir» —
+            // também quando é NEGATIVO (conta a descoberto). Antes só o positivo levava categoria,
+            // e um saldo inicial negativo fazia aparecer a barra vermelha «o orçamento conta com X
+            // que já não estão nas contas» logo a seguir a criar a conta, sem nada estar errado.
+            // Com categoria, o «Pronto a atribuir» fica negativo — que é a verdade: está a
+            // descoberto e tem esse valor por cobrir.
+            payee:"Saldo inicial", categoryId: (type==="budget")?INCOME:null,
             memo:"", outflow: start<0?Math.abs(start):0, inflow: start>0?start:0, cleared:true });
         }
       }
@@ -4183,6 +4274,9 @@
       pushUndo("Conta «"+a.name+"» eliminada.");
       if (a.paymentCatId) removePaymentCategory(a);
       state.accounts = state.accounts.filter(function(x){return x.id!==id;});
+      // Um cartão podia ter esta conta como "conta de pagamento predefinida". Sem limpar, ficava
+      // uma referência morta e o "💳 Pagar" pré-selecionava uma conta que já não existe.
+      for (var pf=0; pf<state.accounts.length; pf++) if(state.accounts[pf].payFrom===id) state.accounts[pf].payFrom=null;
       state.transactions = state.transactions.filter(function(x){return x.accountId!==id;});
       for (i=0;i<state.transactions.length;i++){ t=state.transactions[i]; if(t.transfer && paresTocados[t.transfer]) delete t.transfer; }
       // regras recorrentes que usavam esta conta como origem OU como destino
@@ -4401,7 +4495,17 @@
       state.categories=state.categories.filter(function(c){return c.id!==id;});
       for (var t=0;t<state.transactions.length;t++) if(state.transactions[t].categoryId===id) state.transactions[t].categoryId=null;
       for (var k in state.assignments) if(state.assignments.hasOwnProperty(k) && k.split("|")[0]===id) delete state.assignments[k];
+      // As regras recorrentes também apontavam para a categoria apagada: continuavam ativas e
+      // passavam a lançar, TODOS os meses, transações com uma categoria que já não existe — que
+      // depois apareciam como "órfãs" no aviso de integridade. Desativam-se para o utilizador
+      // decidir o que fazer, em vez de desaparecerem em silêncio.
+      var recAfetadas=0;
+      for (var r=0;r<(state.recurring||[]).length;r++){
+        if(state.recurring[r].categoryId===id){ state.recurring[r].categoryId=null; state.recurring[r].active=false; recAfetadas++; }
+      }
+      for (var sk in state.snooze) if(state.snooze.hasOwnProperty(sk) && sk.split("|")[0]===id) delete state.snooze[sk];
       state.ui.lastFunding=null;
+      if(recAfetadas) toast(recAfetadas+" regra"+(recAfetadas===1?"":"s")+" recorrente"+(recAfetadas===1?"":"s")+" usava"+(recAfetadas===1?"":"m")+" esta categoria — ficou"+(recAfetadas===1?"":"ram")+" em pausa até lhe dar outra.");
       closeModal(); save(); render(); showUndo();
     },
     "clear-preview": function(){ clearModal(); },
@@ -4856,10 +4960,12 @@
       if (id===_bindex.active){
         state.backup = state.backup || {};
         state.backup.at = agora; state.backup.sig = sigOf(state); state.backup.pend = 0;
+        state.backup.dev = _deviceId; state.backup.devNome = nomeDesteAparelho();
       } else {
         var st = loadBudgetRaw(id);
         st.backup = st.backup || {};
         st.backup.at = agora; st.backup.sig = sigOf(st); st.backup.pend = 0;
+        st.backup.dev = _deviceId; st.backup.devNome = nomeDesteAparelho();
         try { localStorage.setItem(budKey(id), JSON.stringify(st)); } catch(e){}
       }
     }
@@ -5039,6 +5145,37 @@
     }
     _sync.baseRev = rev; _sync.syncedSig = sigPushed; saveSyncCfg();
   }
+  // Conta as diferenças entre o que está na nuvem e o que está neste aparelho, para o ecrã de
+  // conflito poder dizer "a nuvem tem 3 que este não tem". Compara transações por ID, orçamento a
+  // orçamento. É só uma AJUDA para decidir: duas edições diferentes na MESMA transação contam como
+  // "existe nos dois" — por isso o texto fala em transações a mais, nunca em "está tudo bem".
+  function compararComNuvem(remoto){
+    if(!remoto) return null;
+    if(remoto.accounts && !remoto.budgets)     // formato antigo: um só orçamento
+      remoto = { budgets:[{ id:_bindex.active, name:budgetName(_bindex.active), data:remoto }] };
+    if(!remoto.budgets) return null;
+    var soNuvem=0, soAqui=0, orcSoNuvem=0, orcSoAqui=0;
+    var remPorId={};
+    for(var i=0;i<remoto.budgets.length;i++){ var rb=remoto.budgets[i]; if(rb && rb.id) remPorId[rb.id]=rb; }
+    var vistos={};
+    for(var j=0;j<_bindex.list.length;j++){
+      var id=_bindex.list[j].id; vistos[id]=true;
+      var loc=(id===_bindex.active)?state:loadBudgetRaw(id);
+      var rem=remPorId[id];
+      if(!rem){ orcSoAqui++; soAqui+=(loc.transactions||[]).length; continue; }
+      var idsRem={}, rt=(rem.data&&rem.data.transactions)||[];
+      for(var k=0;k<rt.length;k++) idsRem[rt[k].id]=true;
+      var idsLoc={}, lt=loc.transactions||[];
+      for(var q=0;q<lt.length;q++) idsLoc[lt[q].id]=true;
+      for(var w=0;w<rt.length;w++) if(!idsLoc[rt[w].id]) soNuvem++;
+      for(var y=0;y<lt.length;y++) if(!idsRem[lt[y].id]) soAqui++;
+    }
+    for(var z=0;z<remoto.budgets.length;z++){
+      var b=remoto.budgets[z];
+      if(b && b.id && !vistos[b.id]){ orcSoNuvem++; soNuvem+=((b.data&&b.data.transactions)||[]).length; }
+    }
+    return { soNuvem:soNuvem, soAqui:soAqui, orcSoNuvem:orcSoNuvem, orcSoAqui:orcSoAqui };
+  }
   function adoptRemote(remoto, rev){
     // Compatibilidade: a nuvem pode ainda ter o formato antigo (um só orçamento).
     if (remoto && remoto.accounts && !remoto.budgets) {
@@ -5085,6 +5222,11 @@
           setSyncStatus("Atualizado da nuvem ✓"); toast("Sincronizado — dados atualizados da nuvem.");
         } else {
           _pendingConflict = { remoteRev:remoteRev, enc:outer.enc, remoteAt:outer.updatedAt };
+          // Abre a versão da nuvem só para CONTAR as diferenças — ajuda a escolher qual manter.
+          // Se falhar (palavra-passe diferente, pacote antigo), mostra-se o conflito na mesma:
+          // é uma ajuda, não uma condição para poder decidir.
+          try { _pendingConflict.dif = compararComNuvem(await decEnvelope(outer.enc, _sync.pass)); }
+          catch(e){ _pendingConflict.dif = null; }
           setSyncStatus("Conflito ⚠️"); _syncing = false; conflictModal(); return;
         }
       } else if (changed || !outer || remoteRev < base) {
@@ -5132,11 +5274,15 @@
   }
   function scheduleAutoSync(){
     if (!_sync.auto || !syncReady() || _syncing || _gistPerdido) return;
-    // Mudar de mês ou de separador também chama save(). Sem dados novos não vale a pena
-    // ir à rede — evita um pedido ao GitHub por cada clique de navegação.
-    if (!localChangedSinceSync()) return;
+    // A verificação "há dados novos?" (localChangedSinceSync -> allSig) lê e assina TODOS os
+    // orçamentos: num orçamento grande custa dezenas de milissegundos. Estava a correr a cada
+    // save() — ou seja, a cada mudança de mês, separador ou filtro — e travava o ecrã.
+    // Agora só corre DENTRO do temporizador, uma vez por pausa de 4 segundos, e não no clique.
     clearTimeout(_autoTimer);
-    _autoTimer = setTimeout(function(){ syncNow({silent:true}); }, 4000);
+    _autoTimer = setTimeout(function(){
+      if (!localChangedSinceSync()) return;    // sem dados novos, não vale a pena ir à rede
+      syncNow({silent:true});
+    }, 4000);
   }
 
   function download(filename, text, type) {
@@ -5189,7 +5335,7 @@
   }
   function exportCSV() {
     var rows = [["Data","Conta","Beneficiário","Categoria","Nota","Saída","Entrada","Confirmada"]];
-    var sorted = state.transactions.slice().sort(function(a,b){return a.date<b.date?-1:1;});
+    var sorted = state.transactions.slice().sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);});
     for (var i=0;i<sorted.length;i++){
       var t=sorted[i]; var acc=accountById(t.accountId);
       var cat = t.categoryId===INCOME?"Rendimento":(t.categoryId?((categoryById(t.categoryId)||{name:""}).name):"");
@@ -5409,17 +5555,29 @@
         var obj = JSON.parse(e.target.result), qtd;
         if (obj && obj.budgets && obj.budgets.length) {          // pacote com vários orçamentos
           if(!confirm("Isto substitui TODOS os orçamentos deste aparelho pelos "+obj.budgets.length+" do ficheiro. Continuar?")) return;
-          var lista=[];
+          // Validar e preparar TUDO antes de escrever seja o que for: se o armazenamento enchesse
+          // a meio do ciclo, ficavam alguns orçamentos já substituídos e outros não, com o índice
+          // por atualizar — uma mistura das duas cópias, e a mensagem só dizia «Ficheiro inválido».
+          var lista=[], porEscrever=[];
           for (var i=0;i<obj.budgets.length;i++){ var b=obj.budgets[i];
-            if(!b.data||!b.data.accounts||!b.data.transactions) throw new Error("formato");
-            localStorage.setItem(budKey(b.id), JSON.stringify(b.data)); lista.push({id:b.id,name:b.name});
+            if(!b || !b.id || !b.data || !b.data.accounts || !b.data.transactions) throw new Error("formato");
+            porEscrever.push({ chave: budKey(b.id), texto: JSON.stringify(b.data) });
+            lista.push({id:b.id,name:b.name});
           }
+          try { for (var w=0;w<porEscrever.length;w++) localStorage.setItem(porEscrever[w].chave, porEscrever[w].texto); }
+          catch(err){ toast("Não há espaço para importar tudo — nada foi alterado. Apague dados antigos e tente de novo."); return; }
           var act = obj.active && lista.some(function(x){return x.id===obj.active;}) ? obj.active : lista[0].id;
           _bindex = { active:act, list:lista }; saveIndex(_bindex);
           state = loadBudgetRaw(act); qtd = lista.length;
         } else if (obj && obj.accounts && obj.transactions) {    // ficheiro antigo: um só orçamento
+          // Normalização completa, igual à do loadBudgetRaw. Faltavam campos (sobretudo o
+          // `recurring`): criar ou apagar uma regra recorrente logo a seguir a importar um
+          // ficheiro antigo rebentava em silêncio — o botão simplesmente não fazia nada.
           obj.settings = obj.settings || {locale:"pt-PT",currency:"EUR"};
           obj.collapsed = obj.collapsed || {}; obj.assignments = obj.assignments || {};
+          obj.snooze = obj.snooze || {}; obj.recurring = obj.recurring || [];
+          obj.groups = obj.groups || []; obj.categories = obj.categories || [];
+          obj.backup = obj.backup || { at:null, sig:null, autoDay:null, pend:0 };
           obj.ui = { view:"budget", month: nowMonthKey() };
           state = obj; qtd = 1;
         } else throw new Error("formato");
@@ -5693,7 +5851,10 @@
     var a = e.target.closest("[data-action]");
     if (!a) return;
     var action = a.getAttribute("data-action");
-    if (!actions[action]) return;
+    // hasOwnProperty: sem isto, um data-action chamado "toString" ou "constructor" resolvia para
+    // um método herdado do Object e era invocado. Não é explorável (os data-action são todos
+    // gerados pela aplicação), mas é barato fechar a porta.
+    if (!Object.prototype.hasOwnProperty.call(actions, action)) return;
     var id = a.getAttribute("data-id");
     var ds = { account: a.getAttribute("data-account") };
     // Evita que o clique na linha dispare quando se carrega num botão lá dentro
@@ -5707,11 +5868,22 @@
     if (e.target.closest && e.target.closest(".tx-selcell")) e.stopPropagation();
   });
   el("content").addEventListener("change", function(e){
+    // "Selecionar todas": marca/desmarca as linhas que estão à vista (respeita filtros e paginação).
+    var todas = e.target.closest && e.target.closest(".tx-sel-all");
+    if(todas){
+      var boxes=document.querySelectorAll(".tx-sel");
+      for(var i=0;i<boxes.length;i++){
+        boxes[i].checked = todas.checked;
+        var bid = boxes[i].getAttribute("data-id");
+        if(todas.checked) _txSel[bid]=true; else delete _txSel[bid];
+      }
+      syncSelTodas(); renderTxSelBar(); return;
+    }
     var cb = e.target.closest && e.target.closest(".tx-sel");
     if(!cb) return;
     var id = cb.getAttribute("data-id");
     if(cb.checked) _txSel[id]=true; else delete _txSel[id];
-    renderTxSelBar();
+    syncSelTodas(); renderTxSelBar();
   });
 
   // Clicar no fundo escurecido fecha a janela
