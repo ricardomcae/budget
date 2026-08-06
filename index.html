@@ -746,7 +746,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.19";
+  var APP_VERSION = "1.21";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -1280,7 +1280,10 @@
       var r=list[i];
       if(!r.active || !accountById(r.accountId)) continue;
       var d=r.nextDate, guarda=0;
-      while(d && d.slice(0,7)<=m && guarda++<600){
+      // O guarda tem de dar para chegar a qualquer mês que se possa espreitar. Uma regra DIÁRIA
+      // gasta ~30 passos por mês, por isso 600 esgotava-se a ~20 meses de distância e a regra
+      // desaparecia do "Ainda este mês" sem aviso. 4000 dá para mais de 10 anos.
+      while(d && d.slice(0,7)<=m && guarda++<4000){
         if(d.slice(0,7)===m && d>=hoje) out.push({r:r, date:d});
         d=advanceDate(d, r.freq, diaDaRegra(r));
       }
@@ -3288,14 +3291,15 @@
         '<button type="button" class="date-btn" data-action="py-filter-clear" style="pointer-events:auto;cursor:pointer;color:var(--text-muted);" title="Limpar filtro" aria-label="Limpar filtro">✕</button></div>'+
         '<div id="pyEmpty" class="muted hidden" style="text-align:center;padding:16px 0;">Nenhum beneficiário corresponde.</div>'+
         '<div id="pyList" style="max-height:340px;overflow:auto;">' + arr.map(function(x){
-        var c = x.e.cat===INCOME ? "Rendimento" : (x.e.cat ? ((lkCat(x.e.cat)||{name:"(apagada)"}).name) : "sem categoria");
         // Os dois botões vão na MESMA célula da grelha (a .int-row tem 3 colunas: 1fr auto auto).
         // Postos como dois filhos separados, o segundo caía para a linha de baixo.
         return '<div class="int-row" data-pk="'+esc(payeeKey(x.e.name))+'"><span class="who"><b>'+esc(x.e.name)+'</b>'+
-          // No telemóvel a forma longa não cabe e era cortada a meio: usa-se a curta
-          // («4 · 05/08/2026 · Supermercado»), que diz o mesmo em metade do espaço.
+          // Sem a categoria: um nome de categoria comprido voltava a cortar a linha, e a informação
+          // é pouco fiável (é só a ÚLTIMA usada, não a habitual). Quem quiser vê no 📊, que mostra
+          // todas as categorias com os respetivos totais. Fica compacto e cabe sempre.
+          // No telemóvel encurta ainda mais («4 · 05/08/2026»).
           '<span class="tag"><span class="rot">'+x.e.count+' transaç'+(x.e.count===1?'ão':'ões')+' · última em </span>'+
-            '<span class="so-fone">'+x.e.count+' · </span>'+fmtDate(x.e.lastDate)+' · '+esc(c)+'</span></span>'+
+            '<span class="so-fone">'+x.e.count+' · </span>'+fmtDate(x.e.lastDate)+'</span></span>'+
           '<span></span>'+
           // Só os ícones: com o rótulo por extenso os dois botões comiam 163px dos 432 úteis da
           // janela, e a descrição (que precisa de ~290px) era cortada com "…". Assim sobram 356px
@@ -3592,12 +3596,16 @@
       '<div class="modal-head"><h2>📋 Novidades</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
-      '<p class="muted" style="margin-top:-6px;font-size:12px;">A numeração foi acertada: o que tinha saído como «2.0» a «2.3» está agora agrupado de 1.7 a 1.10 — eram melhorias, não uma mudança de fundo. O <b>2.0</b> fica reservado para essa.</p>'+
 
-      ver("1.16 – 1.19", "agosto 2026", [
+      ver("1.21", "agosto 2026", [
+        '<b>Correção nas recorrentes diárias:</b> ao espreitar meses muito à frente, uma regra diária deixava de aparecer no «Ainda este mês». Agora conta até mais de 10 anos.',
+        'Se a cópia na nuvem não puder ser aberta por o navegador ser antigo, a aplicação passa a dizê-lo em vez de dar um erro incompreensível.'
+      ])+
+
+      ver("1.16 – 1.20", "agosto 2026", [
         '<b>Resumo por beneficiário:</b> o novo <b>📊</b> em 🏷 Beneficiários mostra quanto gastou nesse sítio — total, número de vezes, média e categorias.',
         'Abre na lista de transações, por isso pode juntar-lhe um período («este ano») e editar a partir dali.',
-        'O ecrã dos beneficiários ficou arrumado: cada um ocupa uma só linha, também em ecrãs estreitos.'
+        'O ecrã dos beneficiários ficou mais compacto: cada um numa só linha, com o nome, quantas vezes lá comprou e a data da última.'
       ])+
 
       ver("1.15", "agosto 2026", [
@@ -5173,7 +5181,13 @@
     try { pt = await crypto.subtle.decrypt({name:"AES-GCM", iv:iv}, key, ct); }
     catch(e){ throw new Error("palavra-passe errada ou dados corrompidos"); }
     var bytes = new Uint8Array(pt);
-    if (env.z) bytes = await gzip(bytes,"d");
+    if (env.z) {
+      // A cópia veio comprimida. Sem a descompressão o gzip() devolveria os bytes tal e qual e o
+      // JSON.parse rebentava com uma mensagem incompreensível — dizemos antes o que se passa.
+      if (typeof DecompressionStream === "undefined")
+        throw new Error("este navegador é demasiado antigo para abrir a cópia (foi guardada comprimida) — use um mais recente");
+      bytes = await gzip(bytes,"d");
+    }
     return JSON.parse(new TextDecoder().decode(bytes));
   }
 
