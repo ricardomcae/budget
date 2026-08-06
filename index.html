@@ -715,7 +715,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "2.3";
+  var APP_VERSION = "1.10";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -1524,6 +1524,8 @@
     _bindex.active = id; saveIndex(_bindex);
     state = loadBudgetRaw(id);
     if (!state.ui) state.ui = { view:"budget", month:nowMonthKey() };
+    state.ui.view = "budget";                 // trocar de orçamento aterra sempre no Orçamento...
+    state.ui.month = nowMonthKey();            // ...do mês corrente, como ao abrir a aplicação
     _idx=null; _payees=null; _undo=[]; _moves=[]; hideUndo();
     var posted = processRecurring();
     closeModal(); render();
@@ -3373,36 +3375,26 @@
       '<div class="modal-head"><h2>📋 Novidades</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
+      '<p class="muted" style="margin-top:-6px;font-size:12px;">A numeração foi acertada: o que tinha saído como «2.0» a «2.3» está agora agrupado de 1.7 a 1.10 — eram melhorias, não uma mudança de fundo. O <b>2.0</b> fica reservado para essa.</p>'+
 
-      ver("2.3", "agosto 2026", [
-        '<b>Aviso de guardar passou a ser de todos os orçamentos:</b> como a cópia guarda todos de uma vez, o ecrã já não diz «atualizada» quando outro orçamento tem alterações por guardar — diz qual é, e o número no botão 💾 soma todos.'
-      ])+
-
-      ver("2.2", "agosto 2026", [
-        '<b>Correção:</b> ao guardar a cópia de segurança, o ecrã «Dados e cópias» atualiza-se logo — já não é preciso fechar e reabrir para ver que ficou tudo guardado.'
-      ])+
-
-      ver("2.1", "agosto 2026", [
-        '<b>Correção de cálculo:</b> nos alvos <b>«até uma data»</b> e <b>trimestral/semestral/anual</b> (modo Repor), se tivesse <b>tirado</b> dinheiro da categoria a meio do mês, a mensalidade pedida vinha a dobrar. Agora reparte certo pelos meses que faltam.'
-      ])+
-
-      ver("2.0", "agosto 2026", [
-        '<b>🩹 Cobrir</b> e <b>🎯 Financiar</b> deixaram de se confundir: o 🩹 <i>traz a categoria a zero</i> (tirando de outras categorias), o 🎯 <i>leva-a ao alvo</i> (do «Pronto a atribuir»). Novo ícone 🩹 (era ⚠️), à esquerda do 🎯, e os dois explicados no «Como funciona?».',
-        '<b>O 🎯 avisa</b> antes de deixar o «Pronto a atribuir» negativo — como a janela de financiar em lote já fazia.'
+      ver("1.10", "agosto 2026", [
+        '<b>Abre sempre no Orçamento do mês atual</b> — ao entrar na aplicação e ao trocar de orçamento. Antes reabria onde tinha ficado, o que o podia deixar noutro separador ou noutro mês sem dar por isso.'
       ])+
 
       ver("1.9", "agosto 2026", [
-        '<b>Correção:</b> ao guardar a cópia de segurança (.json), o aviso de «alterações por guardar» passa a desaparecer em <b>todos</b> os orçamentos — antes reaparecia no outro orçamento apesar de já ter sido guardado (o ficheiro sempre incluiu todos).',
-        '<b>Conflito de sincronização mais claro:</b> mostra agora a <b>data e hora</b> da versão na nuvem e da última sincronização deste aparelho, para ajudar a escolher qual manter.'
+        '<b>🩹 Cobrir</b> e <b>🎯 Financiar</b> deixaram de se confundir: o 🩹 <i>traz a categoria a zero</i>, o 🎯 <i>leva-a ao alvo</i>. Ícone novo, nova ordem, e os dois explicados no «Como funciona?».',
+        'O <b>🎯 avisa</b> antes de deixar o «Pronto a atribuir» negativo.',
+        '<b>Correção de cálculo:</b> nos alvos «até uma data» e trimestral/semestral/anual (modo Repor), ter tirado dinheiro da categoria a meio do mês fazia a mensalidade vir a dobrar.'
       ])+
 
       ver("1.8", "agosto 2026", [
-        '<b>Aviso de gravar mais claro:</b> o botão 💾 «Dados e cópias» mostra agora <b>o número</b> de alterações por guardar (ex.: «2»), igual ao que aparece na secção «Cópia de segurança em ficheiro». Também no telemóvel.'
+        '<b>Cópia de segurança mais fiável:</b> guardar passou a marcar <b>todos</b> os orçamentos, o aviso de «por guardar» é agora de todos (e diz qual falta), e o ecrã «Dados e cópias» atualiza-se logo ao guardar.',
+        '<b>Conflito de sincronização:</b> mostra a data e hora de cada versão, para ajudar a escolher qual manter.'
       ])+
 
       ver("1.7", "agosto 2026", [
-        '<b>Cópia de segurança:</b> mostra a <b>data e hora</b> da última cópia (antes só a data) e <b>quantas alterações</b> fez desde então.',
-        '<b>Adiar categorias</b> passou a contar como alteração por guardar e a entrar na sincronização (antes ficava de fora).'
+        '<b>Saber o que falta guardar:</b> data e hora da última cópia, quantas alterações fez desde então, e esse número também no botão 💾.',
+        '<b>Adiar categorias</b> passou a contar como alteração por guardar e a entrar na sincronização.'
       ])+
 
       ver("1.6", "agosto 2026", [
@@ -5807,7 +5799,12 @@
   }
 
   // ---------- Arranque ----------
-  if (!state.ui.month) state.ui.month = nowMonthKey();
+  // Abre SEMPRE no Orçamento do mês corrente. A vista e o mês ficam gravados enquanto se usa a
+  // aplicação (o render() grava o state inteiro), pelo que sem isto a app reabria onde se tivesse
+  // saído — no separador Transações, ou pior, num mês futuro que se andou a espreitar, com o risco
+  // de se atribuir dinheiro ao mês errado. É o mesmo que já acontece ao clicar em "Orçamento".
+  state.ui.view = "budget";
+  state.ui.month = nowMonthKey();
   state.recurring = state.recurring || [];
   state.backup = state.backup || { at:null, sig:null, autoDay:null };
   var _posted = processRecurring();
