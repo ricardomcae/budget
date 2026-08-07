@@ -362,7 +362,13 @@
   .avail-pill.warn { background: var(--warning-soft); color: var(--warning); }
 
   /* Tabela genérica (transações / contas) */
-  .data-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; box-shadow: var(--shadow); }
+  /* NO COMPUTADOR a tabela cabe na largura, por isso o cartão não precisa de deslizar para o
+     lado. Sem ser uma zona de deslize, o cabeçalho pode colar-se à PÁGINA — é o comportamento
+     natural, sem caixas dentro de caixas. O `clip` recorta os cantos arredondados sem criar
+     essa zona de deslize (ao contrário de `hidden`, que a criaria e estragaria tudo). */
+  .data-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: clip; -webkit-overflow-scrolling: touch; box-shadow: var(--shadow); }
+  /* O cabeçalho pára logo abaixo da barra de cima, cuja altura é medida e guardada em --topo. */
+  table.data thead th { position: sticky; top: var(--topo, 64px); z-index: 6; }
   table.data { width: 100%; border-collapse: collapse; }
   table.data th { text-align: start; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; padding: 11px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2); white-space: nowrap; }
   table.data td { padding: 10px 16px; vertical-align: middle; }
@@ -553,6 +559,12 @@
        título da secção. Esconde-se, e nas outras contas fica a forma curta: o espaço ganho é
        muito maior do que o pontinho de estado ocupa, por isso a vista continua a caber sem
        deslizar para o lado. */
+    /* NO TELEMÓVEL a tabela não cabe na largura: o cartão TEM de deslizar para o lado, e um
+       elemento que desliza não deixa nada colar-se à página. Então é o próprio cartão que passa
+       a deslizar também na vertical, e o cabeçalho cola-se ao topo DELE. A lista passa a correr
+       dentro do cartão em vez de a página inteira correr — é a diferença que se nota. */
+    .data-card { overflow: auto; max-height: calc(100dvh - var(--carta, 232px)); }
+    table.data thead th { top: 0; }
     .sem-tipo .col-tipo { display: none !important; }
     .t-longo { display: none; }
     .t-curto { display: inline; }
@@ -782,7 +794,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.32";
+  var APP_VERSION = "1.33";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -828,6 +840,9 @@
     return guardou;
   }
   // Quanto ocupa cada coisa no armazenamento deste navegador (aproximado: 2 bytes por caractere).
+  // O «histórico» aqui é só a LISTA (dia, hora, motivo). As cópias vivem no armazém grande,
+  // que tem espaço a mais e não conta para este limite — é essa a razão de o número ter
+  // encolhido em relação a versões anteriores.
   function espacoApp(){
     try {
       var dados=0, hist=0, outros=0;
@@ -1700,7 +1715,11 @@
     // orçamento que SOBREVIVE (a do que se elimina desaparece com ele), por isso só se escreve
     // depois de o orçamento ativo estar decidido, mais abaixo.
     var salvo = null; try { salvo = loadBudgetRaw(id); } catch(e){}
-    try { localStorage.removeItem(budKey(id)); localStorage.removeItem(SNAP_KEY+"::"+id); } catch(e){}
+    try {
+      var lst=[]; try{ lst=JSON.parse(localStorage.getItem(SNAP_KEY+"::"+id))||[]; }catch(_e){}
+      idbApagar(lst.map(function(x){return x.ref;}).filter(Boolean));
+      localStorage.removeItem(budKey(id)); localStorage.removeItem(SNAP_KEY+"::"+id);
+    } catch(e){}
     _bindex.list = _bindex.list.filter(function(b){ return b.id!==id; });
     if (_bindex.active===id) {
       _bindex.active = _bindex.list[0].id; saveIndex(_bindex);
@@ -1984,6 +2003,7 @@
     if (v === "recurring") renderRecurring();
     if (v === "reports") renderReports();
     refreshUndoButtons();
+    medirTopo();
   }
 
   function renderSidebar() {
@@ -2789,7 +2809,34 @@
   }
   // Toda a página volta ao topo. Usa-se quando o que está no ecrã passa a ser OUTRA coisa —
   // outra lista, outro ecrã — e não faz sentido aterrar a meio de conteúdo que já não é o mesmo.
-  function aoTopo(){ try { window.scrollTo(0,0); } catch(e){} }
+  function aoTopo(){
+    try { window.scrollTo(0,0); } catch(e){}
+    // No telemóvel quem desliza é o cartão da tabela, não a página: sem isto, «voltar ao topo»
+    // deixava a lista na mesma altura onde estava.
+    try {
+      var cs = document.querySelectorAll(".data-card");
+      for (var i=0;i<cs.length;i++) cs[i].scrollTop = 0;
+    } catch(e){}
+  }
+  // A barra de cima está colada ao topo e muda de altura (no telemóvel dobra para duas linhas).
+  // O cabeçalho das tabelas tem de parar exatamente por baixo dela, por isso mede-se.
+  function medirTopo(){
+    try {
+      var raiz = document.documentElement;
+      var tb = document.querySelector(".topbar");
+      if (tb) raiz.style.setProperty("--topo", Math.round(tb.getBoundingClientRect().height)+"px");
+      // No telemóvel, a altura que a lista pode ocupar não pode ser um palpite: mede-se onde a
+      // tabela começa e quanto ocupa a barra de baixo, senão as últimas linhas ficavam
+      // escondidas por trás dela — e como quem desliza é o cartão, nunca se lá chegava.
+      var card = document.querySelector(".data-card");
+      if (card) {
+        var acima = card.getBoundingClientRect().top + (window.pageYOffset||0);
+        var barra = document.querySelector(".sidebar");
+        var hb = (barra && getComputedStyle(barra).position === "fixed") ? barra.getBoundingClientRect().height : 0;
+        raiz.style.setProperty("--carta", Math.round(acima + hb + 18) + "px");
+      }
+    } catch(e){}
+  }
   function openModal(html) {
     el("modal").innerHTML = html;
     var h = el("modal").querySelector("h2");
@@ -3659,7 +3706,7 @@
 
       sec("Os seus dados")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
-        '<li>Vivem <b>só neste aparelho</b>. Em <b>Dados e cópias</b> há três níveis: <b>1</b> histórico dos 5 últimos dias — mais um ponto 🛟 guardado automaticamente antes de cada ação que não se pode anular —, para voltar atrás; <b>2</b> cópia em ficheiro, a única que sobrevive a perder o aparelho; <b>3</b> sincronização cifrada entre telemóvel e PC.</li>'+
+        '<li>Vivem <b>só neste aparelho</b>. Em <b>Dados e cópias</b> há três níveis: <b>1</b> histórico dos 5 últimos dias — mais um ponto 🛟 guardado automaticamente antes de cada ação que não se pode anular —, para voltar atrás (fica numa zona do navegador com espaço de sobra, por isso não fica mais curto por o orçamento crescer); <b>2</b> cópia em ficheiro, a única que sobrevive a perder o aparelho; <b>3</b> sincronização cifrada entre telemóvel e PC.</li>'+
         '<li>A <b>cópia em ficheiro guarda todos os orçamentos</b> de uma vez — por isso o aviso de «alterações por guardar» também é de todos, mesmo os que não tem abertos.</li>'+
       '</ul>'+
 
@@ -3677,6 +3724,12 @@
       '<div class="modal-head"><h2>📋 Novidades</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
+
+      ver("1.33", "agosto 2026", [
+        '<b>O histórico deixou de ter limite prático:</b> as cópias passaram para uma zona do navegador com espaço de sobra. Antes, num orçamento com milhares de transações não cabiam e iam-se perdendo até sobrar uma — agora ficam as oito, cresça o orçamento o que crescer.',
+        '<b>Cabeçalho fixo nas listas de transações:</b> Data, Beneficiário, Categoria e o resto ficam à vista enquanto desce a lista.',
+        'A aplicação passou a pedir ao navegador para não apagar os seus dados. O Safari limpa sozinho o que não é usado durante uns dias, e nada o impedia.'
+      ])+
 
       ver("1.32", "agosto 2026", [
         '<b>Cada ecrã novo começa no princípio:</b> abrir uma janela, abrir uma conta, mexer num filtro ou saltar para as transações de uma categoria já não o deixa a meio da lista onde estava.'
@@ -4439,6 +4492,8 @@
     },
     "limpar-historico": function(){
       if(!confirm("Apagar os pontos de histórico guardados?\nOs seus dados atuais não são afetados — perde apenas a possibilidade de voltar a um dia anterior.")) return;
+      // Também as cópias no armazém grande — senão ficavam lá a ocupar espaço sem dono.
+      try { idbApagar(loadSnaps().map(function(x){return x.ref;}).filter(Boolean)); } catch(e){}
       try { localStorage.removeItem(snapKey()); } catch(e){}
       _semEspaco=false;
       if (save()) { closeModal(); render(); toast("Histórico apagado — já há espaço para guardar."); }
@@ -5216,16 +5271,134 @@
   // Guardados numa chave separada do localStorage — não sincronizam nem incham o gist.
   // Servem de "máquina do tempo" para reverter enganos. Funciona igual no iPhone e no PC,
   // porque NÃO transfere ficheiros (evita o download que o iOS bloqueia em silêncio).
+  // ==========================================================================
+  //  ARMAZÉM GRANDE (IndexedDB) — só para as CÓPIAS do histórico
+  //
+  //  O armazenamento simples do navegador tem ~5 MB. Cada ponto de histórico é uma cópia
+  //  inteira do orçamento: com 3.400 transações são ~1 MB cada, e oito pontos vezes três
+  //  orçamentos passam dos 12 MB — não cabe, e o histórico degradava-se sozinho até sobrar
+  //  um ponto, precisamente em quem tem mais dados a proteger.
+  //
+  //  Este armazém guarda só as cópias, e tem espaço a mais (o Safari dá até 60% do disco).
+  //  A LISTA do histórico — dia, hora, motivo — continua no sítio simples: é minúscula e,
+  //  por ser lida sem esperas, todo o código à volta continua igual. Só ler o conteúdo de um
+  //  ponto (repor, descarregar) é que passa a ter de esperar, e são ações raras e deliberadas.
+  // ==========================================================================
+  var IDB_NOME = "meu-orcamento", IDB_LOJA = "copias", _idb = null, _idbFalhou = false;
+  function idbAberta(cb){
+    if (_idb) { cb(_idb); return; }
+    if (_idbFalhou || typeof indexedDB === "undefined") { cb(null); return; }
+    try {
+      var req = indexedDB.open(IDB_NOME, 1);
+      req.onupgradeneeded = function(){ try { req.result.createObjectStore(IDB_LOJA); } catch(e){} };
+      req.onsuccess = function(){ _idb = req.result; cb(_idb); };
+      req.onerror = function(){ _idbFalhou = true; cb(null); };   // navegação privada, por exemplo
+    } catch(e){ _idbFalhou = true; cb(null); }
+  }
+  function idbGuardar(ref, texto, cb){
+    idbAberta(function(db){
+      if(!db){ if(cb) cb(false); return; }
+      try {
+        var tx = db.transaction(IDB_LOJA, "readwrite");
+        tx.objectStore(IDB_LOJA).put(texto, ref);
+        tx.oncomplete = function(){ if(cb) cb(true); };
+        tx.onerror = tx.onabort = function(){ if(cb) cb(false); };
+      } catch(e){ if(cb) cb(false); }
+    });
+  }
+  function idbLer(ref, cb){
+    idbAberta(function(db){
+      if(!db){ cb(null); return; }
+      try {
+        var r = db.transaction(IDB_LOJA, "readonly").objectStore(IDB_LOJA).get(ref);
+        r.onsuccess = function(){ cb(typeof r.result === "string" ? r.result : null); };
+        r.onerror = function(){ cb(null); };
+      } catch(e){ cb(null); }
+    });
+  }
+  function idbApagar(refs){
+    if(!refs || !refs.length) return;
+    idbAberta(function(db){
+      if(!db) return;
+      try {
+        var lj = db.transaction(IDB_LOJA, "readwrite").objectStore(IDB_LOJA);
+        for (var i=0;i<refs.length;i++) lj.delete(refs[i]);
+      } catch(e){}
+    });
+  }
+  // Pedir ao navegador para NÃO apagar estes dados. O Safari limpa sozinho o armazenamento de
+  // sites que não são usados durante uns dias — e isso já se aplicava ao orçamento, sem nada
+  // que o impedisse. O pedido é concedido com base em critérios que incluem a aplicação estar
+  // instalada no ecrã principal, que é o caso de quem a usa a sério.
+  (function pedirPersistencia(){
+    try {
+      if (navigator.storage && navigator.storage.persisted && navigator.storage.persist) {
+        navigator.storage.persisted().then(function(ja){
+          if (!ja) { try { navigator.storage.persist(); } catch(e){} }
+        })["catch"](function(){});
+      }
+    } catch(e){}
+  })();
+
   var SNAP_KEY = "meu-orcamento-snaps-v1";
   var SNAP_MAX = 5;
   var SEG_MAX = 3;   // pontos de segurança guardados além dos diários
   function snapKey(){ return SNAP_KEY + "::" + _bindex.active; }
   function loadSnaps(){ try { return JSON.parse(localStorage.getItem(snapKey())) || []; } catch(e){ return []; } }
+  // Guarda a LISTA (leve) no sítio simples e manda cada CÓPIA nova para o armazém grande.
+  // Uma entrada pode trazer `data` (acabada de criar) ou já só `ref` (a morada da cópia).
   function saveSnaps(arr){
+    var refsVivas = {};
+    for (var i=0;i<arr.length;i++){
+      var s = arr[i];
+      if (s.data != null && !s.ref){
+        s.ref = "s-" + _bindex.active + "-" + Date.now() + "-" + Math.random().toString(36).slice(2,8);
+        idbGuardar(s.ref, s.data);
+        // A cópia sai da lista: é ela que pesa. Fica em memória durante esta sessão para o
+        // caso de se repor logo a seguir, mas não é gravada no sítio simples.
+        try { Object.defineProperty(s, "data", { value:s.data, enumerable:false, writable:true, configurable:true }); } catch(e){}
+      }
+      if (s.ref) refsVivas[s.ref] = true;
+    }
+    // As cópias das entradas que saíram da lista deixam de fazer falta.
+    var antes = [];
+    try { antes = JSON.parse(localStorage.getItem(snapKey())) || []; } catch(e){}
+    var orfas = [];
+    for (var j=0;j<antes.length;j++) if (antes[j].ref && !refsVivas[antes[j].ref]) orfas.push(antes[j].ref);
+    if (orfas.length) idbApagar(orfas);
     try { localStorage.setItem(snapKey(), JSON.stringify(arr)); return true; }
-    catch(e){ // sem espaço: descarta os mais antigos e tenta de novo
+    catch(e){ // a lista é minúscula; se nem ela couber, o armazenamento está mesmo cheio
       while(arr.length>1){ arr.shift(); try{ localStorage.setItem(snapKey(), JSON.stringify(arr)); return true; }catch(_e){} }
       return false; }
+  }
+  // Vai buscar a cópia de um ponto, esteja ela onde estiver: em memória (acabada de criar),
+  // ainda dentro da lista (versões anteriores da aplicação) ou no armazém grande.
+  function lerCopia(s, cb){
+    if (!s) { cb(null); return; }
+    if (s.data != null) { cb(s.data); return; }
+    if (s.ref) { idbLer(s.ref, cb); return; }
+    cb(null);
+  }
+  // Passagem única das cópias antigas — que viviam dentro da lista — para o armazém grande.
+  // Corre uma vez por orçamento, em silêncio, na primeira abertura desta versão.
+  function migrarHistorico(){
+    try {
+      var chaves = [];
+      for (var k in localStorage) if (localStorage.hasOwnProperty(k) && k.indexOf(SNAP_KEY)===0) chaves.push(k);
+      for (var i=0;i<chaves.length;i++){
+        var lista; try { lista = JSON.parse(localStorage.getItem(chaves[i])) || []; } catch(e){ continue; }
+        var mexeu = false;
+        for (var j=0;j<lista.length;j++){
+          var s = lista[j];
+          if (s && s.data != null && !s.ref){
+            s.ref = "s-mig-" + Date.now() + "-" + i + "-" + j;
+            idbGuardar(s.ref, s.data);
+            delete s.data; mexeu = true;
+          }
+        }
+        if (mexeu) { try { localStorage.setItem(chaves[i], JSON.stringify(lista)); } catch(e){} }
+      }
+    } catch(e){}
   }
   function takeDailySnapshot(){
     if(!state.transactions.length && !state.categories.length) return;   // nada de útil para guardar
@@ -5279,23 +5452,30 @@
     // Por isso o «s» já foi lido ACIMA e é esse objeto que se usa daqui para a frente —
     // reler pelo índice depois de guardar traria a entrada errada.
     pontoDeSeguranca("antes de voltar atrás no histórico");
-    try {
-      var obj = JSON.parse(s.data);
-      if(!obj.accounts || !obj.transactions) throw new Error("formato");
-      obj.settings = obj.settings || {locale:"pt-PT",currency:"EUR"};
-      obj.collapsed = obj.collapsed || {}; obj.assignments = obj.assignments || {};
-      // Mesma normalização do loadBudgetRaw: um snapshot de uma versão antiga pode não ter estes
-      // campos, e depois state.recurring.push()/state.backup.at rebentavam ao usá-los.
-      obj.recurring = obj.recurring || []; obj.backup = obj.backup || { at:null, sig:null, autoDay:null };
-      obj.groups = obj.groups || []; obj.categories = obj.categories || [];
-      obj.ui = { view:"budget", month: nowMonthKey() };
-      state = obj; _undo=[]; hideUndo(); _idx=null; save(); closeModal(); render();
-      toast("Voltou ao orçamento "+comoEstava+". Se sincroniza, envie para atualizar os outros aparelhos.");
-    } catch(e){ toast("Esse ponto do histórico está inválido."); }
+    // A cópia vem do armazém grande, por isso há uma espera curta. Só aqui e no descarregar.
+    lerCopia(s, function(texto){
+      if (texto == null) { toast("Não foi possível ler esse ponto do histórico."); return; }
+      try {
+        var obj = JSON.parse(texto);
+        if(!obj.accounts || !obj.transactions) throw new Error("formato");
+        obj.settings = obj.settings || {locale:"pt-PT",currency:"EUR"};
+        obj.collapsed = obj.collapsed || {}; obj.assignments = obj.assignments || {};
+        // Mesma normalização do loadBudgetRaw: um snapshot de uma versão antiga pode não ter estes
+        // campos, e depois state.recurring.push()/state.backup.at rebentavam ao usá-los.
+        obj.recurring = obj.recurring || []; obj.backup = obj.backup || { at:null, sig:null, autoDay:null };
+        obj.groups = obj.groups || []; obj.categories = obj.categories || [];
+        obj.ui = { view:"budget", month: nowMonthKey() };
+        state = obj; _undo=[]; hideUndo(); _idx=null; save(); closeModal(); render();
+        toast("Voltou ao orçamento "+comoEstava+". Se sincroniza, envie para atualizar os outros aparelhos.");
+      } catch(e){ toast("Esse ponto do histórico está inválido."); }
+    });
   }
   function downloadSnapshot(idx){
     var snaps = loadSnaps(), s = snaps[idx]; if(!s) return;
-    guardarFicheiro("orcamento-"+s.day+".json", s.data, "application/json", function(){ toast("Histórico de "+fmtDate(s.day)+" guardado em ficheiro."); });
+    lerCopia(s, function(texto){
+      if (texto == null) { toast("Não foi possível ler esse ponto do histórico."); return; }
+      guardarFicheiro("orcamento-"+s.day+".json", texto, "application/json", function(){ toast("Histórico de "+fmtDate(s.day)+" guardado em ficheiro."); });
+    });
   }
   function snapshotsHtml(){
     var snaps = loadSnaps();
@@ -5486,7 +5666,7 @@
       lista.push({ id:b.id, name:b.name });
     }
     // limpa os orçamentos que a nuvem já não tem
-    for (var j=0;j<antigos.length;j++){ if(!lista.some(function(x){return x.id===antigos[j];})){ try{ localStorage.removeItem(budKey(antigos[j])); localStorage.removeItem(SNAP_KEY+"::"+antigos[j]); }catch(e){} } }
+    for (var j=0;j<antigos.length;j++){ if(!lista.some(function(x){return x.id===antigos[j];})){ try{ var lv=[]; try{ lv=JSON.parse(localStorage.getItem(SNAP_KEY+"::"+antigos[j]))||[]; }catch(_e){} idbApagar(lv.map(function(x){return x.ref;}).filter(Boolean)); localStorage.removeItem(budKey(antigos[j])); localStorage.removeItem(SNAP_KEY+"::"+antigos[j]); }catch(e){} } }
     var act = _bindex.active;
     if (!lista.some(function(x){return x.id===act;})) act = remoto.active;
     if (!lista.some(function(x){return x.id===act;})) act = lista[0].id;
@@ -6100,6 +6280,8 @@
   }
   window.addEventListener("scroll", escondeDica, true);
   window.addEventListener("resize", escondeDica);
+  window.addEventListener("resize", medirTopo);
+  window.addEventListener("orientationchange", function(){ setTimeout(medirTopo, 120); });
   document.addEventListener("focusout", function(e){
     if (e.target && e.target.classList && e.target.classList.contains("money")) fechaConta(e.target);
   });
@@ -6600,6 +6782,7 @@
   // Instantâneo diário DENTRO da aplicação (últimos 5 dias) — sem transferir ficheiros,
   // por isso funciona igual no iPhone e no PC. A exportação para ficheiro é manual.
   (function(){
+    try { migrarHistorico(); } catch(e){}     // passa as cópias antigas para o armazém grande
     if (state.settings.autoBackup !== false) { try { takeDailySnapshot(); } catch(e){} }
     setTimeout(maybeShowBackupReminder, 1200);
   })();
