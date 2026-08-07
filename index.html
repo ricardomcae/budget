@@ -6,7 +6,7 @@
      o Safari continua a permitir o zoom com os dedos, por isso não se perde acessibilidade. -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>O Meu Orçamento — Base-Zero (com sincronização)</title>
+<title>O Meu Orçamento</title>
 <meta name="theme-color" content="#0d9488">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -834,7 +834,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.46";
+  var APP_VERSION = "1.47";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -3278,7 +3278,7 @@
         (sub?'<div class="hint" style="margin-top:3px;">'+sub+'</div>':'')+'</div>';
     }
     openModal(
-      '<div class="modal-head"><h2>💾 Dados e cópias de segurança</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>💾 Dados e cópias</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
 
         seccao("Onde vivem os seus dados",
@@ -3395,7 +3395,7 @@
           '<div style="font-weight:700;">☁️ Ligado ao GitHub</div>'+
           '<div class="hint" id="syncStatus" style="margin-top:4px;">'+esc(_syncStatus || ("Gist: "+(_sync.gistId||"(por criar no 1.º envio)")))+'</div>'+
           (_sync.lastSyncAt?'<div class="hint" style="margin-top:6px;">Última sincronização: <b>'+esc(fmtDateTime(_sync.lastSyncAt))+'</b></div>':'')+
-          (_sync.gistId?'<div class="hint" style="margin-top:6px;">ID deste gist (cole no outro dispositivo):<br><code style="user-select:all;word-break:break-all;font-size:12px;">'+esc(_sync.gistId)+'</code></div>':'')+
+          (_sync.gistId?'<div class="hint" style="margin-top:6px;">ID deste gist (cole no outro aparelho):<br><code style="user-select:all;word-break:break-all;font-size:12px;">'+esc(_sync.gistId)+'</code></div>':'')+
           '<div class="hint" style="margin-top:6px;">Se apagar este gist no GitHub, a aplicação avisa-o e pergunta o que fazer — nunca cria outro sozinho.</div>'+
         '</div>'+
         '<div class="field"><label class="opcao" style="display:flex;align-items:center;gap:8px;cursor:pointer;">'+
@@ -3406,7 +3406,7 @@
           '<input id="syncNewToken" maxlength="255" type="password" placeholder="cole aqui o token novo do GitHub">'+
           '<button class="btn" data-action="sync-update-token" style="width:100%;justify-content:center;margin-top:8px;">🔑 Atualizar token</button>'+
           '<div class="hint">Mantém o mesmo gist e a mesma palavra-passe — só troca a chave de acesso ao GitHub. Não pede para escolher versão.</div></div>'+
-        '<div class="field"><button class="btn danger" data-action="sync-disconnect" style="width:100%;justify-content:center;">Desligar neste dispositivo</button>'+
+        '<div class="field"><button class="btn danger" data-action="sync-disconnect" style="width:100%;justify-content:center;">Desligar neste aparelho</button>'+
           '<div class="hint">Apaga o token e a palavra-passe deste aparelho. Os seus dados locais e o gist ficam intactos.</div></div>';
     } else {
       body = '<p class="muted" style="margin-top:0;">Guarda uma cópia <b>cifrada</b> do seu orçamento num <b>gist privado</b> do GitHub. Assim, o telemóvel e o PC partilham os mesmos dados. O GitHub <b>nunca</b> vê nada em claro.</p>'+
@@ -3414,17 +3414,17 @@
           '<div class="hint">GitHub → Settings → Developer settings → <b>Personal access tokens</b>, com permissão <b>Gists</b>. '+
           'Prefira um token <b>fine-grained</b> só com <b>Gists</b>: se algum dia lhe for parar às mãos erradas, não dá acesso a mais nada da sua conta.</div></div>'+
         '<div class="field"><label>2 · Palavra-passe de cifra</label><input id="syncPass" maxlength="255" type="password" placeholder="uma frase forte só sua">'+
-          '<div class="hint">⚠️ Guarde-a bem: se a esquecer, a cópia na nuvem fica <b>irrecuperável</b>. Use a <b>mesma</b> em todos os dispositivos.</div></div>'+
+          '<div class="hint">⚠️ Guarde-a bem: se a esquecer, a cópia na nuvem fica <b>irrecuperável</b>. Use a <b>mesma</b> em todos os aparelhos.</div></div>'+
         '<div class="hint" style="border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin:-2px 0 14px;background:var(--surface);">'+
           '<b>🔐 O que fica guardado neste aparelho</b><br>'+
           'Para não ter de escrever tudo outra vez a cada arranque, o token <b>e</b> a palavra-passe ficam gravados <b>neste</b> navegador, em texto simples — é assim que a aplicação consegue sincronizar sozinha.<br><br>'+
           'Na nuvem nada disto muda: o gist leva só texto cifrado e o GitHub nunca vê os seus dados. Mas <b>quem tiver acesso a este aparelho desbloqueado</b> tem as duas peças, e com as duas chega-se ao orçamento.<br><br>'+
           'Na prática: proteja o aparelho com código/biometria, e num computador <b>partilhado ou de outra pessoa</b> use antes <b>Desligar sincronização</b> ao terminar — apaga daqui o token e a palavra-passe, sem tocar nos dados nem no gist.</div>'+
         '<div class="field"><label>3 · ID de um gist existente <span class="muted">(opcional)</span></label><input id="syncGist" maxlength="100" placeholder="deixe vazio para criar um novo" value="'+esc(_sync.gistId||"")+'">'+
-          '<div class="hint">No <b>1.º</b> dispositivo deixe vazio (cria um novo). No <b>2.º</b>, cole aqui o ID que apareceu no 1.º.</div></div>';
+          '<div class="hint">No <b>1.º</b> aparelho deixe vazio (cria um novo). No <b>2.º</b>, cole aqui o ID que apareceu no 1.º.</div></div>';
     }
     openModal(
-      '<div class="modal-head"><h2>☁️ Sincronização entre dispositivos</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>☁️ Sincronização entre aparelhos</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+body+'</div>'+
       '<div class="modal-foot">'+
         (on ? '<span></span><button class="btn" data-action="close">Fechar</button>'
@@ -3480,12 +3480,12 @@
     }
     openModal(
       '<div class="modal-head"><h2>⚠️ Conflito de sincronização</h2><button class="x" data-action="close">×</button></div>'+
-      '<div class="modal-body"><p>Este dispositivo tem alterações <b>e</b> a versão na nuvem também mudou desde a última sincronização.</p>'+
+      '<div class="modal-body"><p>Este aparelho tem alterações <b>e</b> a versão na nuvem também mudou desde a última sincronização.</p>'+
         linhaDatas+ linhaDif +
         '<div class="hint">Não é possível juntar as duas automaticamente sem risco de perder dados. Escolha qual manter — a outra é substituída.</div></div>'+
       '<div class="modal-foot" style="gap:8px;">'+
         '<button class="btn" data-action="sync-use-remote" style="flex:1;flex-direction:column;line-height:1.3;">Usar a versão da nuvem<span class="muted" style="font-size:11px;">descarta as deste aparelho</span></button>'+
-        '<button class="btn primary" data-action="sync-keep-local" style="flex:1;flex-direction:column;line-height:1.3;">Manter este dispositivo<span style="font-size:11px;opacity:.85;">sobrepõe a nuvem</span></button>'+
+        '<button class="btn primary" data-action="sync-keep-local" style="flex:1;flex-direction:column;line-height:1.3;">Manter este aparelho<span style="font-size:11px;opacity:.85;">sobrepõe a nuvem</span></button>'+
       '</div>');
   }
 
@@ -3869,9 +3869,10 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.38 – 1.46", "agosto 2026", [
+      ver("1.38 – 1.47", "agosto 2026", [
         '<b>«Dados e cópias» reorganizado:</b> passou a ter três blocos — <b>onde vivem os seus dados</b> (no navegador, em ficheiro, na nuvem), <b>trazer e levar</b> (importar do banco, exportar para folha de cálculo) e <b>manutenção</b>. Guardar e repor uma cópia ficaram juntos, que é onde se procuram.',
         'Os ficheiros <b>.csv</b> passaram a dizer de que orçamento são, e o ecrã avisa que exportam só o orçamento aberto e não repõem nada.',
+        'Textos revistos em toda a aplicação: <b>aparelho</b> passou a ser sempre «aparelho» (dizia-se «dispositivo» a meio), os títulos das janelas passaram a ser iguais aos botões que as abrem, e o separador do browser deixou de dizer «Base-Zero (com sincronização)».',
         '<b>Novo filtro 😴 Adiadas</b> no orçamento. As categorias adiadas não são «abaixo do alvo» nem «cumpridas», por isso não apareciam em filtro nenhum — só percorrendo a lista toda.',
         '<b>Barra de filtros repensada:</b> a contagem está sempre encostada à direita e o <b>✕ Limpar</b> só aparece quando há filtros ligados. Se a janela apertar, os nomes vão saindo por ordem — e nunca parte em duas linhas.',
         '<b>Separadores de mês nas recorrentes:</b> a lista passa a ser cortada por «Agosto 2026», «Setembro 2026»… para se ver de relance onde acaba um mês e começa o outro.'
@@ -3994,7 +3995,7 @@
         '<b>Data e hora da última sincronização</b> visível no ecrã de sincronização.',
         '<b>Barra do cartão de crédito</b> desaparece quando não há dívida a pagar.',
         'A lista de <b>«Movimentos recentes»</b> limpa-se ao trocar de orçamento.',
-        '<b>Manual de instalação e sincronização</b> (documento à parte) para configurar noutro dispositivo ou para outra pessoa.'
+        '<b>Manual de instalação e sincronização</b> (documento à parte) para configurar noutro aparelho ou para outra pessoa.'
       ])+
 
       ver("1.2", "agosto 2026", [
@@ -4016,7 +4017,7 @@
       ver("1.0", "versão base", [
         'Orçamento base-zero com <b>alvos</b>: mensal, semanal, trimestral, semestral, anual ou até uma data.',
         'Contas de <b>orçamento</b>, <b>cartões de crédito</b> e de <b>acompanhamento</b>.',
-        '<b>Sincronização cifrada</b> entre dispositivos (gist do GitHub) e <b>cópias de segurança</b> em ficheiro.'
+        '<b>Sincronização cifrada</b> entre aparelhos (gist do GitHub) e <b>cópias de segurança</b> em ficheiro.'
       ])+
 
       '</div></div>'+
@@ -5263,7 +5264,7 @@
       _sync.syncedSig = vazio ? allSig() : undefined;
       saveSyncCfg(); closeModal(); toast("A ligar…"); syncNow();
     },
-    "sync-disconnect": function(){ if(!confirm("Desligar a sincronização neste dispositivo? O token e a palavra-passe são apagados daqui (os dados e o gist mantêm-se).")) return; _sync={auto:false}; _gistPerdido=null; saveSyncCfg(); closeModal(); toast("Sincronização desligada."); },
+    "sync-disconnect": function(){ if(!confirm("Desligar a sincronização neste aparelho? O token e a palavra-passe são apagados daqui (os dados e o gist mantêm-se).")) return; _sync={auto:false}; _gistPerdido=null; saveSyncCfg(); closeModal(); toast("Sincronização desligada."); },
     "gist-use-id": function(){
       var v = el("glId") ? el("glId").value.trim() : "";
       if(!v){ toast("Cole o ID do gist que quer usar."); return; }
@@ -5286,7 +5287,7 @@
         } catch(e){ toast("Não foi possível criar: "+e.message); }
       })();
     },
-    "sync-keep-local": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ await pushLocal(pc.remoteRev+1); setSyncStatus("Guardado na nuvem ✓"); toast("Mantido este dispositivo — enviado para a nuvem."); }catch(e){ setSyncStatus("Não foi possível guardar ⚠️"); toast(msgSync(e)); } _pendingConflict=null; })(); },
+    "sync-keep-local": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ await pushLocal(pc.remoteRev+1); setSyncStatus("Guardado na nuvem ✓"); toast("Mantido este aparelho — enviado para a nuvem."); }catch(e){ setSyncStatus("Não foi possível guardar ⚠️"); toast(msgSync(e)); } _pendingConflict=null; })(); },
     "sync-use-remote": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ adoptRemote(await decEnvelope(pc.enc, _sync.pass), pc.remoteRev); toast("Adotada a versão da nuvem."); }catch(e){ setSyncStatus("Não foi possível adotar ⚠️"); toast(msgSync(e)); } _pendingConflict=null; })(); },
     "load-sample": function(){ if(temDados() && !confirm("Atenção: os dados atuais serão substituídos pelos dados de exemplo. Esta ação não pode ser anulada. Pretende continuar?")) return; pontoDeSeguranca("antes de carregar os dados de exemplo"); loadSample(); },
     "reset-data": function(){ if(confirm("Apagar TODOS os dados definitivamente? Esta ação não pode ser anulada.")){ pontoDeSeguranca("antes de apagar todos os dados"); state=JSON.parse(JSON.stringify(DEFAULT_STATE)); state.ui.month=nowMonthKey(); _undo=[]; hideUndo(); closeModal(); save(); render(); toast("Dados apagados."); } }
