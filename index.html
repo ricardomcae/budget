@@ -158,9 +158,6 @@
   .rta-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 20px 26px 0; padding: 16px 22px; border-radius: 14px; background: var(--primary); color: #fff; box-shadow: var(--shadow); flex-wrap: wrap; }
   .rta-banner.zero { background: linear-gradient(135deg, var(--primary), var(--accent2)); }
   .rta-banner.over { background: linear-gradient(135deg, #b91c1c, #dc2626); }
-  /* Tudo atribuído, mas com categorias excedidas: nem verde de festa nem vermelho de erro —
-     o rendimento está todo distribuído, só que há contas por acertar entre categorias. */
-  .rta-banner.atencao { background: linear-gradient(135deg, #b45309, #d97706); }
   .rta-amount { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
   .rta-label { font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
   .rta-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -2150,18 +2147,19 @@
     var rta = readyToAssign(state.ui.month);
     var excedente = surplusPlan(state.ui.month, !!state.ui.surplusSemAlvo).total;
     var temAtribuido = clearPlan(state.ui.month).entries.length > 0;
-    // Categorias excedidas (disponível negativo). Contadas ANTES do balão porque mudam o que
-    // ele diz: com contas por acertar, «cada euro tem uma função 🎉» seria uma boa notícia a
-    // tapar uma má. O número (0,00) está certo e não se mexe — o rendimento ESTÁ todo
-    // atribuído; o que falha é que gastou em certas categorias mais do que lhes tinha dado, e
-    // isso resolve-se movendo dinheiro ENTRE categorias, não atribuindo mais.
+    // Categorias excedidas (disponível negativo). Contadas ANTES do balão, mas só para lhe
+    // TIRAR a festa: com contas por acertar, «cada euro tem uma função 🎉» era uma boa notícia a
+    // tapar uma má. Dizer QUANTAS é trabalho da barra vermelha logo por baixo, que tem o
+    // «Ver quais» — repeti-lo aqui punha o mesmo alarme duas vezes, em duas cores.
+    // O número (0,00) está certo e não se mexe: o rendimento ESTÁ todo atribuído. O que falha
+    // é ter gasto em certas categorias mais do que lhes deu, e isso resolve-se movendo dinheiro
+    // ENTRE categorias, não atribuindo mais.
     var excedidas = 0;
     for (var oc=0; oc<state.categories.length; oc++) if (catStatus(state.categories[oc], state.ui.month) === "neg") excedidas++;
-    var cls = rta > 0.005 ? "" : (rta < -0.005 ? "over" : (excedidas ? "atencao" : "zero"));
+    var cls = rta > 0.005 ? "" : (rta < -0.005 ? "over" : "zero");
     var msg = rta > 0.005 ? "Pronto a atribuir"
             : (rta < -0.005 ? "Atribuiu mais do que tinha"
-            : (excedidas ? ("Tudo atribuído, mas há "+excedidas+(excedidas===1?" categoria excedida":" categorias excedidas"))
-                         : "Tudo atribuído — cada euro tem uma função 🎉"));
+            : (excedidas ? "Tudo atribuído" : "Tudo atribuído — cada euro tem uma função 🎉"));
     var undoBtn = '';   // o anular/refazer é agora só pelos botões ↩ ↪ do topo (sistema único)
     var dv = integrityDelta(state.ui.month);
     var aviso = "";
@@ -2184,9 +2182,10 @@
     // Aviso de categorias excedidas: só visual + atalho para as filtrar (já contadas acima).
     var over = "";
     if (excedidas > 0) {
+      // «gastou mais do que tinha disponível» é a definição de «excedida» — dizia duas vezes a
+      // mesma coisa. Fica o número, e o «Ver quais» para quem quiser agir.
       over = '<div class="overspent-bar"><span>🔴</span><span class="grow"><b>'+excedidas+'</b> '+
-        (excedidas===1 ? 'categoria excedida' : 'categorias excedidas')+
-        ' — gastou mais do que tinha disponível.</span>'+
+        (excedidas===1 ? 'categoria excedida' : 'categorias excedidas')+'</span>'+
         '<button data-action="show-overspent">Ver quais</button></div>';
     }
     var up = upcomingTotals(state.ui.month);
@@ -4029,7 +4028,7 @@
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
       ver("1.52", "agosto 2026", [
-        '<b>O balão do orçamento deixou de dar os parabéns quando há categorias excedidas.</b> Com o «Pronto a atribuir» a zero dizia «cada euro tem uma função 🎉» mesmo com contas por acertar. O valor continua certo — o rendimento <i>está</i> todo atribuído — mas o balão passa a âmbar e diz quantas categorias estão excedidas.',
+        '<b>O balão do orçamento deixou de dar os parabéns quando há categorias excedidas.</b> Com o «Pronto a atribuir» a zero dizia «cada euro tem uma função 🎉» mesmo com contas por acertar; agora diz apenas <b>Tudo atribuído</b>, e é a barra vermelha por baixo que conta quantas e leva ao «Ver quais». O valor continua certo — o rendimento <i>está</i> todo atribuído; o que falta é acertar contas entre categorias.',
         '<b>Notas compridas</b> deixaram de esmagar as outras colunas: cortam com «…» e o texto todo aparece ao passar o rato (ou abrindo a transação). A frase das <b>alterações por guardar</b> passou também a ler-se como uma frase: «também 2 em «Ricardo» e 5 em «Família»», em vez dos números entre parênteses.',
         '<b>Correção importante — eliminar um grupo estragava o «Pronto a atribuir».</b> O dinheiro atribuído às categorias do grupo ficava para trás, invisível, e continuava a ser descontado para sempre. Agora volta ao «Pronto a atribuir», e a confirmação diz quantas categorias vão dentro — incluindo as arquivadas, que antes eram apagadas sem perguntar.',
         '<b>Correção — cartão de crédito:</b> a linha do cartão contava a dívida de todos os tempos e o «Libertar excedente» só até ao mês em vista, o que os fazia discordar. Contam agora os dois até ao mês que está a ver.',
