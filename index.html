@@ -322,7 +322,18 @@
   /* Campo de dinheiro em "só leitura" no telemóvel: quem escreve é o teclado próprio. Não pode
      parecer desativado nem mostrar o cursor de texto — é um campo normal que se toca. */
   .money[readonly] { opacity: 1; cursor: pointer; caret-color: transparent; }
-  .calc-hint { display: block; margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--primary); font-variant-numeric: tabular-nums; }
+  /* Pontinho de estado de uma conta: verde = a par do banco; âmbar = há coisas por confirmar
+     (informação, não aviso). Tamanho fixo e pequeno para não roubar largura à tabela. */
+  .pt-conf { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-inline-end: 6px;
+    vertical-align: baseline; flex: 0 0 auto; }
+  .pt-conf.ok { background: var(--positive); }
+  .pt-conf.pend { background: #d9a441; }
+  .side-acc .pt-conf { margin-inline-end: 7px; }
+  .t-curto { display: none; }
+  .calc-hint { position: fixed; z-index: 260; pointer-events: none; white-space: nowrap;
+    background: var(--surface); border: 1px solid var(--primary); border-radius: 7px; padding: 3px 8px;
+    font-size: 12.5px; font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums;
+    box-shadow: var(--shadow-lg); }
   .money.kp-active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
   /* Espaço no fundo das janelas para o teclado não tapar o campo que se está a preencher. */
   body.kp-aberto .modal-overlay { padding-bottom: 300px; }
@@ -532,6 +543,13 @@
     /* Lista de transações: a nota vai quase sempre vazia e roubava largura, e o texto
        a partir em duas linhas deixava as alturas das linhas todas diferentes. */
     .col-nota { display: none !important; }
+    /* Na tabela das contas de ORÇAMENTO a coluna Tipo diz sempre «Orçamento» — o mesmo que o
+       título da secção. Esconde-se, e nas outras contas fica a forma curta: o espaço ganho é
+       muito maior do que o pontinho de estado ocupa, por isso a vista continua a caber sem
+       deslizar para o lado. */
+    .sem-tipo .col-tipo { display: none !important; }
+    .t-longo { display: none; }
+    .t-curto { display: inline; }
     table.data { min-width: 520px; }
     /* Área de toque maior nas caixas de seleção (a caixa continua com o mesmo tamanho, o que
        cresce é a zona sensível à volta) — 16px são difíceis de acertar com o dedo. */
@@ -758,7 +776,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.26";
+  var APP_VERSION = "1.28";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -1038,6 +1056,20 @@
     var s=0;
     for (var i=0;i<state.accounts.length;i++) s += accountBalance(state.accounts[i].id) - accountBalance(state.accounts[i].id, true);
     return round2(s);
+  }
+  // Pontinho de estado de uma conta. VERDE = nada por confirmar, a conta está a par do banco.
+  // ÂMBAR = há coisas lançadas que o banco ainda não processou — é informação, não um aviso:
+  // é o estado normal de quem lança as despesas no dia em que as faz. Por isso o sinal que
+  // importa é o verde (aparece pouco) e não o âmbar (apareceria quase sempre).
+  function pontoConta(accId){
+    var pend = porConfirmar(accId), ok = Math.abs(pend) <= 0.005, n = 0;
+    if (!ok) for (var i=0;i<state.transactions.length;i++){
+      var t = state.transactions[i];
+      if (t.accountId===accId && !t.cleared) n++;
+    }
+    var tit = ok ? "Tudo confirmado — esta conta está a par do banco"
+                 : (n + (n===1?" transação":" transações") + " por confirmar · " + fmt(pend));
+    return '<span class="pt-conf '+(ok?"ok":"pend")+'" title="'+esc(tit)+'" aria-label="'+esc(tit)+'"></span>';
   }
   function netWorth() { var s=0; for (var i=0;i<state.accounts.length;i++) s += accountBalance(state.accounts[i].id); return round2(s); }
   // Há algo no orçamento? Serve para esconder o «carregar dados de exemplo» assim que houver dados
@@ -1956,7 +1988,7 @@
       wrap.innerHTML = accs.map(function (a) {
         var bal = accountBalance(a.id);
         return '<button class="side-acc" data-action="open-account" data-id="' + a.id + '" draggable="true" data-drag="acc" data-drag-id="' + a.id + '">' +
-          '<span class="nm">' + esc(a.name) + '</span>' +
+          '<span class="nm">' + pontoConta(a.id) + esc(a.name) + '</span>' +
           '<span class="bal ' + (bal < 0 ? "neg" : "") + '">' + fmt(bal) + '</span></button>';
       }).join("");
     }
@@ -2259,14 +2291,19 @@
     }
     var budgetAccs = visible.filter(function(a){return a.type==="budget";});
     var trackAccs = visible.filter(function(a){return a.type!=="budget";});
-    function accTable(list, title) {
+    // Na tabela das contas de orçamento a coluna Tipo diz «Orçamento» em todas as linhas — é
+    // exatamente o que o título da secção já diz. No telemóvel esconde-se, e o espaço ganho
+    // paga com folga o pontinho de estado.
+    function accTable(list, title, soOrcamento) {
       if (!list.length) return "";
       var rows = list.map(function(a){
         var bal = accountBalance(a.id), cl = accountBalance(a.id, true);
         return '<tr class="hoverable" draggable="true" data-drag="acc" data-drag-id="'+a.id+'"><td><button class="btn ghost" data-action="open-account" data-id="'+a.id+'" style="font-weight:700;padding:2px 4px;">'+esc(a.name)+'</button>'+
           (a.note?'<div class="tag">'+esc(a.note)+'</div>':'')+'</td>'+
-          '<td><span class="pill '+(a.type==="budget"?"budget":(a.type==="credit"?"credit":"tracking"))+'">'+(a.type==="budget"?"Orçamento":(a.type==="credit"?"Cartão de crédito":"Acompanhamento"))+'</span></td>'+
-          '<td class="num muted">'+fmt(cl)+'</td>'+
+          '<td class="col-tipo"><span class="pill '+(a.type==="budget"?"budget":(a.type==="credit"?"credit":"tracking"))+'">'+
+            '<span class="t-longo">'+(a.type==="budget"?"Orçamento":(a.type==="credit"?"Cartão de crédito":"Acompanhamento"))+'</span>'+
+            '<span class="t-curto">'+(a.type==="budget"?"Orç.":(a.type==="credit"?"Cartão":"Acomp."))+'</span></span></td>'+
+          '<td class="num muted">'+pontoConta(a.id)+fmt(cl)+'</td>'+
           '<td class="num" style="font-weight:700;'+(bal<0?"color:var(--negative)":"")+'">'+fmt(bal)+'</td>'+
           '<td class="row-actions">'+
           (a.type!=="budget" && bal<-0.005 ? '<button data-action="pay-card" data-id="'+a.id+'" title="Pagar / abater">💳</button>' : '')+
@@ -2274,14 +2311,14 @@
           '<button data-action="delete-account" data-id="'+a.id+'" title="Eliminar">🗑</button></td></tr>';
       }).join("");
       return '<h3 style="margin:18px 2px 10px;font-size:14px;">'+title+'</h3>'+
-        '<div class="data-card"><table class="data"><thead><tr><th>Conta</th><th>Tipo</th><th class="num">Confirmado</th><th class="num">Saldo</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+        '<div class="data-card'+(soOrcamento?' sem-tipo':'')+'"><table class="data"><thead><tr><th>Conta</th><th class="col-tipo">Tipo</th><th class="num">Confirmado</th><th class="num">Saldo</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
     }
     content.innerHTML =
       '<div class="toolbar"><button class="btn primary" data-action="add-account">+ Adicionar conta</button>'+
       '<button class="btn" data-action="transfer">↔ Transferir</button>'+
       '<div class="spacer"></div>'+
       '<span class="muted" style="font-size:12.5px;">Património líquido: <b>'+fmt(netWorth())+'</b></span></div>'+
-      accTable(budgetAccs, "🏦 Contas de orçamento") + accTable(trackAccs, "💳 Cartões e outras contas");
+      accTable(budgetAccs, "🏦 Contas de orçamento", true) + accTable(trackAccs, "💳 Cartões e outras contas");
   }
 
   function renderRegister(accId) {
@@ -2307,7 +2344,7 @@
         '<button class="btn" data-action="transfer">↔ Transferir</button>'+
         (acc.type!=="budget" && bal<-0.005 ? '<button class="btn" data-action="pay-card" data-id="'+accId+'">💳 Pagar</button>' : '')+
         '<div class="spacer"></div>'+
-        '<span class="muted" style="font-size:12.5px;">Confirmado: <b>'+fmt(cl)+'</b> &nbsp;·&nbsp; Saldo: <b style="'+(bal<0?"color:var(--negative)":"")+'">'+fmt(bal)+'</b>'+
+        '<span class="muted" style="font-size:12.5px;">'+pontoConta(accId)+'Confirmado: <b>'+fmt(cl)+'</b> &nbsp;·&nbsp; Saldo: <b style="'+(bal<0?"color:var(--negative)":"")+'">'+fmt(bal)+'</b>'+
           (Math.abs(pend)>0.005 ? ' &nbsp;·&nbsp; <b class="pend" title="Registado mas ainda não confirmado no banco">Por confirmar: '+fmt(pend)+'</b>' : '')+'</span>'+
       '</div>'+
       '<h3 style="margin:4px 2px 12px;">'+esc(acc.name)+' <span class="pill '+(acc.type==="budget"?"budget":(acc.type==="credit"?"credit":"tracking"))+'">'+(acc.type==="budget"?"Orçamento":(acc.type==="credit"?"Cartão de crédito":"Acompanhamento"))+'</span></h3>'+
@@ -2750,7 +2787,7 @@
     el("modalOverlay").classList.add("open");
     var f=el("modal").querySelector("input,select,textarea"); if(f) setTimeout(function(){f.focus();},50);
   }
-  function closeModal() { el("modalOverlay").classList.remove("open"); el("modal").innerHTML=""; }
+  function closeModal() { escondeDica(); el("modalOverlay").classList.remove("open"); el("modal").innerHTML=""; }
 
   function accountModal(acc) {
     var editing = !!acc;
@@ -3567,6 +3604,7 @@
 
       sec("No ecrã e no teclado")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
+        '<li><b>O pontinho ao lado de cada conta:</b> <b>verde</b> quer dizer que não há nada por confirmar — a conta está a par do banco. <b>Âmbar</b> quer dizer que há lançamentos que o banco ainda não processou; é o estado normal de quem regista as despesas no próprio dia, não um aviso. No computador, o rato por cima diz quantas são e quanto valem.</li>'+
         '<li><b>O ✓ e o «Por confirmar»:</b> o ✓ marca que o banco já processou a transação. Mexe no <b>Confirmado</b>, não no <b>Saldo</b> — um café pago ontem está pago, tenha o banco lançado ou não, e o orçamento tem de contar com isso. A diferença entre os dois é o <b>Por confirmar</b>, que aparece no cabeçalho da conta e no ecrã das transações: quando chega a zero, a app bate certo com o extrato.</li>'+
         '<li><b>Total do mês:</b> por cima das colunas, a soma do <b>Atribuído</b>, da <b>Atividade</b> e do <b>Disponível</b>. As categorias de <b>pagamento de cartão</b> ficam de fora das três: a atividade delas é o espelho positivo do que se gastou — 50 € de mercearia no cartão dão −50 na Mercearia e +50 no cartão — e somá-las daria zero, como se não se tivesse gasto nada. Os valores do cartão continuam na linha do grupo dele.</li>'+
         '<li><b>Vários orçamentos</b> (📚, no cabeçalho): pode ter um <b>Pessoal</b> e um <b>Família</b>, por exemplo. Cada um é <b>completamente separado</b> — contas, categorias e transações próprias — e troca-se com um toque. Se sincroniza, vão <b>todos no mesmo gist</b>; só há uma coisa a saber: se editar orçamentos <b>diferentes</b> em aparelhos diferentes antes de sincronizar, a aplicação pergunta qual manter, como faria com qualquer conflito.</li>'+
@@ -3627,11 +3665,17 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.25 – 1.26", "agosto 2026", [
+      ver("1.28", "agosto 2026", [
+        '<b>Pontinho de estado em cada conta</b> (na barra lateral, na lista de Contas e no cabeçalho de uma conta aberta): <b>verde</b> = nada por confirmar, está a par do banco; <b>âmbar</b> = há lançamentos que o banco ainda não processou. É informação, não um aviso.',
+        'No telemóvel, a coluna <b>Tipo</b> deixou de repetir o título da secção — a lista de contas ficou mais folgada do que estava, mesmo com o pontinho.'
+      ])+
+
+      ver("1.25 – 1.27", "agosto 2026", [
         '<b>Contas em qualquer campo de dinheiro:</b> escreva <b>23,45+11,90+7,15</b> em vez de somar de cabeça. O resultado aparece por baixo do campo e fica lá assim que sai dele. Serve para saída, entrada, divisão de transação, mover dinheiro, transferências, saldo inicial, valor do alvo e recorrentes.',
         '<b>No telemóvel, o teclado com + e −</b> — que só existia no orçamento — passou a abrir em todos esses campos.',
         'Num par Saída/Entrada, o <b>−</b> escrito no princípio continua a passar o valor para o outro lado; depois de números, é uma subtração.',
-        'No iPhone, o teclado do sistema ainda aparecia por cima do nosso ao tocar num campo que já tinha valor. Corrigido.'
+        'No iPhone, o teclado do sistema ainda aparecia por cima do nosso ao tocar num campo que já tinha valor. Corrigido.',
+        'O resultado da conta passou a ser uma etiqueta solta junto ao campo: nas linhas da transação dividida entrava no meio da linha, ficava cortado e empurrava o 🗑 para baixo.'
       ])+
 
       ver("1.23 – 1.24", "agosto 2026", [
@@ -6006,22 +6050,37 @@
   // carregar em Enter) a conta é substituída pelo resultado, para ficar à vista o que vai ser
   // gravado. Ler o valor já funcionaria de qualquer forma — o parseAmount avalia a conta — mas
   // ver o número final antes de gravar evita a dúvida de saber se a app percebeu a conta.
+  // A dica NÃO entra no fluxo da página: é uma etiqueta solta, colocada por cima, junto ao campo.
+  // Metê-la ao lado do campo partia qualquer disposição em colunas — nas linhas da transação
+  // dividida, por exemplo, ia ocupar a coluna do 🗑 (ficando cortada) e empurrava-o para baixo.
+  // Sendo solta, serve qualquer campo, esteja ele dentro do que estiver.
+  var _dica = null;
+  function escondeDica(){ if(_dica && _dica.parentNode) _dica.parentNode.removeChild(_dica); _dica = null; }
   function pintaConta(inp){
-    var pai = inp.parentNode; if(!pai) return;
-    var h = pai.querySelector(":scope > .calc-hint");
-    var v = /[+\-]/.test(inp.value.slice(1)) ? avaliaExpr(inp.value) : null;
-    if (v === null){ if(h) pai.removeChild(h); return; }
-    if (!h){ h = document.createElement("span"); h.className = "calc-hint"; inp.insertAdjacentElement("afterend", h); }
-    h.textContent = "= " + fmt(v);
+    var v = /[+\-]/.test(String(inp.value).slice(1)) ? avaliaExpr(inp.value) : null;
+    if (v === null){ escondeDica(); return; }
+    if (!_dica){ _dica = document.createElement("div"); _dica.className = "calc-hint"; document.body.appendChild(_dica); }
+    _dica.textContent = "= " + fmt(v);
+    try {
+      var r = inp.getBoundingClientRect();
+      var w = _dica.offsetWidth || 90;
+      // Alinhada pela direita do campo, sem sair do ecrã; por cima se não houver espaço em baixo.
+      var esq = Math.max(6, Math.min(r.right - w, (window.innerWidth||360) - w - 6));
+      var abaixo = r.bottom + 4;
+      var cabe = abaixo + (_dica.offsetHeight||22) < (window.innerHeight||640) - 6;
+      _dica.style.left = esq + "px";
+      _dica.style.top = (cabe ? abaixo : (r.top - (_dica.offsetHeight||22) - 4)) + "px";
+    } catch(e){}
   }
   function fechaConta(inp){
     if (!inp || !inp.classList || !inp.classList.contains("money")) return;
     var v = avaliaExpr(inp.value);
     if (v !== null) inp.value = amtStr(v);
-    var pai = inp.parentNode, h = pai && pai.querySelector(":scope > .calc-hint");
-    if (h) pai.removeChild(h);
+    escondeDica();
     if (inp.getAttribute("data-par") && inp.value) { var op = el(inp.getAttribute("data-par")); if (op) op.value = ""; }
   }
+  window.addEventListener("scroll", escondeDica, true);
+  window.addEventListener("resize", escondeDica);
   document.addEventListener("focusout", function(e){
     if (e.target && e.target.classList && e.target.classList.contains("money")) fechaConta(e.target);
   });
