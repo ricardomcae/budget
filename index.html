@@ -782,7 +782,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.30";
+  var APP_VERSION = "1.31";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -3671,10 +3671,10 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.30", "agosto 2026", [
+      ver("1.30 – 1.31", "agosto 2026", [
         '<b>O teclado de cálculo só aceita pelo ✓.</b> Antes, tocar em qualquer sítio fora dele dava o valor por bom e fechava — bastava um toque a esmo para gravar uma conta por acabar. Agora, com o teclado aberto, os toques fora dele não fazem nada: confirma-se no <b>✓</b> ou desiste-se no <b>×</b>.',
         'O resto do ecrã escurece ligeiramente enquanto o teclado está aberto, para se perceber que é ali que se decide.',
-        'Tocar noutro campo de dinheiro continua a passar para lá — é o que permite descer a coluna do orçamento campo a campo.'
+        'Dentro de uma janela de edição a regra é uma só, sem exceções. No <b>Orçamento</b> tocar na categoria seguinte continua a aceitar e a avançar — ali vê-se logo a linha e o «por atribuir» mudarem.'
       ])+
 
       ver("1.28 – 1.29", "agosto 2026", [
@@ -6270,7 +6270,16 @@
     // teclado ficou órfão. Sem esta saída, o guarda continuava a engolir todos os toques e a
     // aplicação ficava presa. Fecha-se em silêncio e deixa-se o toque seguir.
     if (document.body && !document.body.contains(_kpEl)) { _kpHide(); kpDeactivate(); return false; }
-    return !(e.target.closest("#calcPad") || e.target.closest(".money"));
+    if (e.target.closest("#calcPad")) return false;                    // o próprio teclado
+    var outro = e.target.closest(".money");
+    if (!outro) return true;                                           // qualquer outro sítio: bloqueado
+    // Saltar para outro campo de dinheiro só passa à frente NO ORÇAMENTO, onde o campo é o
+    // próprio dado: assim que se passa à frente vê-se a linha e o «por atribuir» mudarem, e
+    // descer a coluna categoria a categoria é o gesto normal do mês.
+    // Num FORMULÁRIO o valor fica escrito num campo que só é gravado no fim — aceitá-lo por
+    // se ter tocado no campo do lado seria aceitar em silêncio um gesto que era só navegação,
+    // e tirava ao × o poder de desfazer. Aqui vale a mesma regra que em todo o lado: só o ✓.
+    return !(_kpEl.hasAttribute("data-assign") && outro.hasAttribute("data-assign"));
   }
   ["pointerdown","mousedown","touchstart","click"].forEach(function(ev){
     document.addEventListener(ev, function(e){
