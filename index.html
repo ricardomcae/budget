@@ -834,7 +834,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.49";
+  var APP_VERSION = "1.50";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -3288,8 +3288,18 @@
         caixa("1 · No navegador &nbsp;<span class=\"muted\" style=\"font-weight:600;font-size:11.5px;\">neste aparelho</span>",
           '<label class="opcao" style="margin-top:8px;">'+
             '<input type="checkbox" data-action="toggle-autobackup" '+(state.settings.autoBackup!==false?"checked":"")+' style="width:auto;"> Guardar um ponto de histórico por dia</label>'+
-          '<div class="hint" style="margin-top:4px;">Os <b>5 dias</b> mais recentes, mais um ponto <b>🛟</b> antes de cada ação que não se pode anular. Servem para <b>corrigir enganos</b>, mas desaparecem com o aparelho — se o perder, se o trocar, ou se limpar os dados do navegador.</div>'+
-          snapshotsHtml())+
+          '<div class="hint" style="margin-top:4px;">Os <b>'+SNAP_MAX+' dias</b> mais recentes, mais os <b>'+SEG_MAX+'</b> últimos pontos <b>🛟</b> — guardados antes de cada ação que não se pode anular. Servem para <b>corrigir enganos</b>, mas desaparecem com o aparelho: se o perder, se o trocar, ou se limpar os dados do navegador.</div>'+
+          // A lista pode ter até 8 pontos e empurrava o resto do ecrã para baixo. Fechada por
+          // omissão, com a contagem à vista para se saber o que lá está sem ter de abrir.
+          (function(){
+            var sn = loadSnaps(), nd = 0, ns = 0;
+            for (var i=0;i<sn.length;i++){ if(sn[i].motivo) ns++; else nd++; }
+            if (!sn.length) return '<div class="hint" style="margin-top:8px;">Ainda não há histórico guardado — aparece da próxima vez que abrir a aplicação.</div>';
+            var resumo = nd + (nd===1?" dia":" dias") + (ns ? (" · "+ns+" ponto"+(ns===1?"":"s")+" 🛟") : "");
+            return '<details style="margin-top:10px;">'+
+              '<summary style="cursor:pointer;font-weight:600;font-size:12.5px;">🕘 Ver o histórico <span class="muted" style="font-weight:500;">('+resumo+')</span></summary>'+
+              snapshotsHtml()+'</details>';
+          })())+
 
         // ---- 2 · Em ficheiro ----
         caixa("2 · Em ficheiro &nbsp;<span class=\"muted\" style=\"font-weight:600;font-size:11.5px;\">fora da aplicação</span>",
@@ -3853,7 +3863,7 @@
 
       sec("Os seus dados")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
-        '<li><b>Onde vivem os seus dados.</b> Não há servidor nenhum: o orçamento está dentro do navegador deste aparelho. Em <b>Dados e cópias</b> há três lugares possíveis — <b>1 no navegador</b>: o histórico dos 5 últimos dias, mais um ponto 🛟 antes de cada ação que não se pode anular, para corrigir enganos (desaparece com o aparelho); <b>2 em ficheiro</b>: a única cópia que sobrevive a perdê-lo; <b>3 na nuvem</b>: uma cópia cifrada que mantém os seus aparelhos iguais.</li>'+
+        '<li><b>Onde vivem os seus dados.</b> Não há servidor nenhum: o orçamento está dentro do navegador deste aparelho. Em <b>Dados e cópias</b> há três lugares possíveis — <b>1 no navegador</b>: o histórico dos 5 últimos dias, mais os 3 últimos pontos 🛟 guardados antes de cada ação que não se pode anular, para corrigir enganos (desaparecem com o aparelho); <b>2 em ficheiro</b>: a única cópia que sobrevive a perdê-lo; <b>3 na nuvem</b>: uma cópia cifrada que mantém os seus aparelhos iguais.</li>'+
         '<li><b>Folha de cálculo não é cópia de segurança.</b> Os <b>.csv</b> de <b>Trazer e levar</b> servem para abrir no Excel ou no Sheets e olhar para os dados de outra maneira — exportam <b>só o orçamento aberto</b> e <b>não repõem</b> nada. Quem repõe é sempre o <b>.json</b> do <b>2</b>.</li>'+
         '<li><b>Os dois ficheiros .json não são a mesma coisa.</b> O <b>⬇</b> de um ponto do histórico (<code>historico-…</code>) traz <b>um</b> orçamento tal como estava <b>nesse dia</b>. O botão <b>Guardar cópia de segurança</b> (<code>orcamentos-…</code>) traz <b>todos</b> os orçamentos no estado <b>atual</b>. Ambos se voltam a abrir pelo mesmo sítio — <b>Importar cópia</b> —, e o do histórico substitui só o orçamento a que pertence.</li>'+
         '<li><b>O navegador pode apagar-lhe os dados.</b> Para não servirem de rasto, os navegadores — o do iPhone em particular — limpam sozinhos o que guardam de um site que passe uns dias sem ser usado. A aplicação <b>pede</b> para ser poupada, e o pedido costuma ser aceite em quem a tem instalada no ecrã principal. No fim de <b>Dados e cópias</b> vê se está <b>🔒 Protegido</b> — e, se estiver, é mais uma razão para ter também a cópia em ficheiro: essa não depende de navegador nenhum.</li>'+
@@ -3876,7 +3886,8 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.38 – 1.49", "agosto 2026", [
+      ver("1.38 – 1.50", "agosto 2026", [
+        'O histórico passou a estar dentro de uma secção que se abre, com a contagem à vista («5 dias · 3 pontos 🛟») para não ocupar meio ecrã.',
         '<b>Importar um ficheiro passou a perguntar antes.</b> Quando o ficheiro tinha um só orçamento, os dados eram substituídos em silêncio, sem pergunta nem forma de voltar atrás. Agora pergunta e guarda um ponto 🛟 primeiro.',
         '<b>«Dados e cópias» reorganizado:</b> <b>onde vivem os seus dados</b> (no navegador, em ficheiro, na nuvem), <b>trazer e levar</b> (importar do banco, exportar para folha de cálculo) e depois <b>definições</b>, <b>arrumação</b> e <b>recomeçar</b>. Guardar e repor uma cópia ficaram juntos, que é onde se procuram.',
         'Os ficheiros <b>.csv</b> passaram a dizer de que orçamento são, e o ecrã avisa que exportam só o orçamento aberto e não repõem nada.',
