@@ -834,7 +834,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.50";
+  var APP_VERSION = "1.51";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -3339,15 +3339,19 @@
         acao('<button class="btn" data-action="import-csv" style="width:100%;justify-content:center;">📥 Importar transações do banco (.csv)</button>'+
           '<div class="hint">Acrescenta transações às existentes, no orçamento aberto.</div>')+
 
-        '<details class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">'+
-          '<summary style="cursor:pointer;font-weight:700;font-size:13px;">⬆ Exportar para folha de cálculo (.csv)</summary>'+
-          '<div class="hint" style="margin:8px 0 10px;">Para abrir no Excel ou no Sheets e analisar à sua maneira. Exportam <b>só o orçamento aberto</b> («'+esc(budgetName(_bindex.active)||"")+'») e <b>não</b> repõem nada — para isso é a cópia <b>.json</b>.</div>'+
+        // Sem caixa, como o botão de importar mesmo ao lado. A caixa fica reservada aos três
+        // LUGARES onde os dados podem viver — é o que os distingue de uma ação qualquer.
+        '<details class="field">'+
+          '<summary style="cursor:pointer;font-weight:600;font-size:13px;">⬆ Exportar para folha de cálculo (.csv)</summary>'+
+          '<div style="padding-inline-start:4px;border-inline-start:2px solid var(--border);margin-top:8px;padding-top:2px;">'+
+          '<div class="hint" style="margin:0 0 10px 8px;">Para abrir no Excel ou no Sheets e analisar à sua maneira. Exportam <b>só o orçamento aberto</b> («'+esc(budgetName(_bindex.active)||"")+'») e <b>não</b> repõem nada — para isso é a cópia <b>.json</b>.</div>'+
           '<button class="btn" data-action="export-csv" style="width:100%;justify-content:center;">Transações</button>'+
           '<div class="hint" style="margin:4px 0 8px;">Todas as transações, uma por linha.</div>'+
           '<button class="btn" data-action="export-budget-csv" style="width:100%;justify-content:center;">Orçamento do mês em vista</button>'+
           '<div class="hint" style="margin:4px 0 8px;">Os montantes de <b>'+monthLabel(state.ui.month)+'</b>, categoria a categoria.</div>'+
           '<button class="btn" data-action="export-config-csv" style="width:100%;justify-content:center;">Configuração dos alvos</button>'+
           '<div class="hint" style="margin-top:4px;">A «planta» do orçamento: que alvo tem cada categoria, e de que tipo.</div>'+
+          '</div>'+
         '</details>'+
 
         // «Manutenção» era um saco para o que sobrava. Cada uma destas coisas é de natureza
@@ -3886,7 +3890,8 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.38 – 1.50", "agosto 2026", [
+      ver("1.38 – 1.51", "agosto 2026", [
+        'Em <b>Dados e cópias</b>, a moldura passou a distinguir só os <b>três lugares</b> onde os dados podem viver. Tudo o resto são ações, e ficaram todas com o mesmo aspeto.',
         'O histórico passou a estar dentro de uma secção que se abre, com a contagem à vista («5 dias · 3 pontos 🛟») para não ocupar meio ecrã.',
         '<b>Importar um ficheiro passou a perguntar antes.</b> Quando o ficheiro tinha um só orçamento, os dados eram substituídos em silêncio, sem pergunta nem forma de voltar atrás. Agora pergunta e guarda um ponto 🛟 primeiro.',
         '<b>«Dados e cópias» reorganizado:</b> <b>onde vivem os seus dados</b> (no navegador, em ficheiro, na nuvem), <b>trazer e levar</b> (importar do banco, exportar para folha de cálculo) e depois <b>definições</b>, <b>arrumação</b> e <b>recomeçar</b>. Guardar e repor uma cópia ficaram juntos, que é onde se procuram.',
