@@ -319,6 +319,9 @@
   .assign-input.kp-active { border-color: var(--primary); background: var(--surface); box-shadow: 0 0 0 3px var(--primary-soft); }
   /* Mini-teclado de cálculo próprio */
   /* Resultado da conta escrita no próprio campo ("120+35" mostra "= 155,00" por baixo). */
+  /* Campo de dinheiro em "só leitura" no telemóvel: quem escreve é o teclado próprio. Não pode
+     parecer desativado nem mostrar o cursor de texto — é um campo normal que se toca. */
+  .money[readonly] { opacity: 1; cursor: pointer; caret-color: transparent; }
   .calc-hint { display: block; margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--primary); font-variant-numeric: tabular-nums; }
   .money.kp-active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
   /* Espaço no fundo das janelas para o teclado não tapar o campo que se está a preencher. */
@@ -755,7 +758,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.25";
+  var APP_VERSION = "1.26";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -3624,10 +3627,11 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.25", "agosto 2026", [
+      ver("1.25 – 1.26", "agosto 2026", [
         '<b>Contas em qualquer campo de dinheiro:</b> escreva <b>23,45+11,90+7,15</b> em vez de somar de cabeça. O resultado aparece por baixo do campo e fica lá assim que sai dele. Serve para saída, entrada, divisão de transação, mover dinheiro, transferências, saldo inicial, valor do alvo e recorrentes.',
         '<b>No telemóvel, o teclado com + e −</b> — que só existia no orçamento — passou a abrir em todos esses campos.',
-        'Num par Saída/Entrada, o <b>−</b> escrito no princípio continua a passar o valor para o outro lado; depois de números, é uma subtração.'
+        'Num par Saída/Entrada, o <b>−</b> escrito no princípio continua a passar o valor para o outro lado; depois de números, é uma subtração.',
+        'No iPhone, o teclado do sistema ainda aparecia por cima do nosso ao tocar num campo que já tinha valor. Corrigido.'
       ])+
 
       ver("1.23 – 1.24", "agosto 2026", [
@@ -6125,10 +6129,39 @@
     if (!TOQUE || !e.target.closest) return;
     var inp = e.target.closest(".money");
     if (!inp || inp.classList.contains("assign-input")) return;
-    e.preventDefault();                            // não dá foco -> não abre o teclado do sistema
+    e.preventDefault();
     try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch(_e){}
-    kpOpen(inp);
+    // Válvula de segurança: os campos ficam em "só leitura" para o iPhone não abrir o teclado
+    // do sistema. Se por alguma razão o nosso teclado não abrisse, o campo ficaria impossível
+    // de preencher — por isso, se falhar, devolve-se o campo ao teclado normal.
+    try { kpOpen(inp); }
+    catch(err){ inp.readOnly = false; inp.setAttribute("inputmode","decimal"); try{ inp.focus(); }catch(_f){} }
   }, true);
+  // O preventDefault no toque NÃO chega no Safari do iPhone: o campo recebe foco à mesma e o
+  // teclado do sistema sobe por cima do nosso. A única coisa que o iOS respeita sempre é o
+  // campo estar em "só leitura" — nunca abre teclado para um campo assim, mas continua a
+  // receber toques. Quem escreve é o nosso teclado, por isso o campo não perde nada.
+  // Vai-se marcando à medida que as janelas nascem (são criadas ao abrir, não existem no início).
+  function soLeituraNoToque(raiz){
+    if (!TOQUE) return;
+    var ms = (raiz||document).querySelectorAll ? (raiz||document).querySelectorAll(".money") : [];
+    for (var i=0;i<ms.length;i++){
+      if (ms[i].classList.contains("assign-input")) continue;   // esse tem caminho próprio
+      ms[i].readOnly = true;
+      ms[i].setAttribute("inputmode","none");
+    }
+  }
+  if (TOQUE) {
+    soLeituraNoToque(document);
+    try {
+      new MutationObserver(function(muts){
+        for (var i=0;i<muts.length;i++){
+          var ns = muts[i].addedNodes;
+          for (var j=0;j<ns.length;j++) if (ns[j].nodeType===1) soLeituraNoToque(ns[j]);
+        }
+      }).observe(document.body, { childList:true, subtree:true });
+    } catch(e){}
+  }
   // Botões do teclado — mousedown + preventDefault para NÃO tirar o foco ao campo.
   el("calcPad").addEventListener("mousedown", function(e){
     var b = e.target.closest && e.target.closest("[data-calc]");
