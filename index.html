@@ -2737,14 +2737,23 @@
       balOf = {}; var run = 0;
       for (var bi=0; bi<asc.length; bi++){ run = round2(run + (asc[bi].inflow||0) - (asc[bi].outflow||0)); balOf[asc[bi].id] = run; }
     }
-    var body = list.length ? visiveis.map(function(t){ return txRow(t, balOf?balOf[t.id]:undefined, !soConta); }).join("")
-                           : ('<tr><td colspan="9" class="empty">'+(soConta ? 'Esta conta ainda não tem transações.' : 'Nada corresponde ao filtro.')+'</td></tr>');
-    if (list.length > LIM) body += '<tr><td colspan="9" style="text-align:center;padding:14px;">'+
+    // A coluna CONTA depende de haver ou não uma conta escolhida — e só disso. Com uma conta
+    // escolhida, todas as linhas são dela: repetir o nome em cada uma é gastar a coluna mais
+    // larga da tabela a dizer o que o chapéu já diz em cima. (Antes dependia do soConta, por
+    // isso bastava juntar um período ou uma categoria para o nome da conta voltar a aparecer
+    // em todas as linhas.)
+    // A coluna SALDO é outra história e continua presa ao soConta: um saldo acumulado com
+    // movimentos escondidos pelo meio não é um saldo, é um número errado.
+    var mostraConta = !f.account;
+    var nCols = 8 + (mostraConta?1:0) + (soConta?1:0);
+    var body = list.length ? visiveis.map(function(t){ return txRow(t, balOf?balOf[t.id]:undefined, mostraConta); }).join("")
+                           : ('<tr><td colspan="'+nCols+'" class="empty">'+(soConta ? 'Esta conta ainda não tem transações.' : 'Nada corresponde ao filtro.')+'</td></tr>');
+    if (list.length > LIM) body += '<tr><td colspan="'+nCols+'" style="text-align:center;padding:14px;">'+
       '<button class="btn" data-action="show-more-tx">Mostrar mais '+PAGINA+' (a ver '+LIM+' de '+list.length+')</button></td></tr>';
 
     el("content").innerHTML = head + resumoPayee +
       '<div class="data-card"><table class="data"><thead><tr>'+
-      '<th>'+thSelTodas()+'Data</th>'+(soConta?'':'<th>Conta</th>')+'<th>Beneficiário</th><th>Categoria</th><th class="col-nota">Nota</th>'+
+      '<th>'+thSelTodas()+'Data</th>'+(mostraConta?'<th>Conta</th>':'')+'<th>Beneficiário</th><th>Categoria</th><th class="col-nota">Nota</th>'+
       '<th class="num">Saída</th><th class="num">Entrada</th>'+(soConta?'<th class="num">Saldo</th>':'')+
       '<th style="text-align:center;">✓</th><th></th></tr></thead><tbody>'+body+'</tbody></table></div>';
   }
@@ -4000,6 +4009,63 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
+      // As Novidades são para se LEREM. Passado o início, o que interessa é o que a app faz
+      // hoje, não a cronologia de como lá chegou — por isso o recente fica ao pormenor e o
+      // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
+      // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
+      ver("1.52", "agosto 2026", [
+        '<b>Correção importante — eliminar um grupo estragava o «Pronto a atribuir».</b> O dinheiro atribuído às categorias do grupo ficava para trás, invisível, e continuava a ser descontado para sempre. Agora volta ao «Pronto a atribuir», e a confirmação diz quantas categorias vão dentro — incluindo as arquivadas, que antes eram apagadas sem perguntar.',
+        '<b>Correção — cartão de crédito:</b> a linha do cartão contava a dívida de todos os tempos e o «Libertar excedente» só até ao mês em vista, o que os fazia discordar. Contam agora os dois até ao mês que está a ver.',
+        '<b>Abrir uma conta deixou de ser um ecrã à parte.</b> Contas → uma conta leva ao ecrã <b>Transações</b> já filtrado, com um chapéu por cima (nome, saldo e as ações da conta). Eram dois ecrãs com a mesma lista, e o da conta nem deixava procurar nem filtrar por período.',
+        '<b>Os filtros das Transações fazem o que se espera:</b> o «✕ Limpar» mantém a conta onde está, há um <b>✕</b> dentro da caixa de procura para apagar só o texto (ou a tecla Esc), a coluna «Conta» deixou de reaparecer quando se junta outro filtro, e tocar no separador <b>Transações</b> volta à lista inteira.',
+        '<b>Exportar para folha de cálculo segue o que está no ecrã:</b> o <b>⬇ Exportar o que vejo</b> (no computador) respeita os filtros; o antigo botão parecia fazê-lo mas exportava sempre tudo. A exportação completa continua em <b>Dados e cópias</b>.',
+        '<b>No telemóvel:</b> as barras de filtros passaram a caber numa linha, as contagens dizem quantas categorias ou transações estão à vista, e o botão de trocar de orçamento diz o nome do orçamento aberto em vez de um ícone. A letra deixou também de variar de orçamento para orçamento no iPhone (o Safari aumentava-a sozinho).',
+        '<b>Mais rápida a cada toque:</b> cada ação gravava o orçamento inteiro duas vezes e percorria-o uma terceira. Agora só grava quando algo mudou.'
+      ])+
+
+      ver("1.33 – 1.51", "agosto 2026", [
+        '<b>«Dados e cópias» reorganizado</b> à volta de onde os dados vivem (navegador, ficheiro, nuvem), do que se traz e leva, e das definições. <b>Importar um ficheiro passou a perguntar antes</b> — substituía tudo em silêncio — e guarda um ponto 🛠 primeiro.',
+        '<b>O histórico de cópias deixou de ter limite prático:</b> passou para uma zona do navegador com espaço de sobra. Antes, num orçamento grande, iam-se perdendo até sobrar uma.',
+        '<b>Dados protegidos:</b> o Safari limpa sozinho o que não é usado durante uns dias — a aplicação passou a pedir para ser poupada, e diz-lhe se está protegida.',
+        '<b>Novo filtro 😴 Adiadas</b> e barra de filtros do orçamento repensada; <b>separadores de mês</b> na lista de recorrentes; <b>cabeçalho fixo</b> nas listas de transações.'
+      ])+
+
+      ver("1.13 – 1.32", "agosto 2026", [
+        '<b>Contas em qualquer campo de dinheiro:</b> escreva <b>23,45+11,90</b> em vez de somar de cabeça. No telemóvel, o teclado com <b>+</b> e <b>−</b> passou a abrir em todos esses campos, e só aceita pelo <b>✓</b>.',
+        '<b>A categoria passou a ser obrigatória</b> em contas de orçamento e cartões — sem ela o movimento ficava de fora do orçamento. Continuam sem categoria o saldo inicial, as transferências entre contas suas e as contas de acompanhamento.',
+        '<b>Resumo por beneficiário</b> (📊 em 🏷 Beneficiários): quanto gastou nesse sítio, quantas vezes, média e categorias — e pode cruzar com um período.',
+        '<b>Cada ecrã novo começa no princípio</b>, e tocar num separador onde já está serve de «voltar ao topo». <b>Pontinho de estado</b> em cada conta: verde = a par do banco, âmbar = há lançamentos por processar.',
+        '<b>Sincronização mais calma:</b> acabaram os conflitos falsos, o que se edita durante uma sincronização segue logo a seguir, e as mensagens explicam o que aconteceu. Antes das ações que não se anulam fica guardado um ponto 🛠.',
+        '<b>Regra recorrente diária</b>, <b>selecionar todas</b> para somar à pressa, e várias correções (categoria eliminada deixava recorrentes a lançar para o vazio; conta com saldo negativo dava aviso sem razão).'
+      ])+
+
+      ver("1.1 – 1.12", "agosto 2026", [
+        '<b>🩹 Cobrir</b> (trazer a zero) e <b>🎯 Financiar</b> (levar ao alvo) deixaram de se confundir, e o 🎯 avisa antes de deixar o «Pronto a atribuir» negativo. <b>😴 Adiar</b> põe um alvo em pausa só neste mês.',
+        '<b>Anular / Refazer</b> as últimas ações, com um painel de <b>«Movimentos recentes»</b>, cobrindo também transferências, pagamentos de cartão e recorrentes.',
+        '<b>Filtros</b> por estado (🟢🟡🔴), com saldo, com excedente e prioridade. <b>Vários orçamentos</b> no mesmo aparelho, com uma sincronização única.',
+        '<b>Saber o que falta guardar:</b> data da última cópia e quantas alterações fez desde então, também no botão 💾.',
+        '<b>Correções de cálculo</b> nos alvos com data e no modo Repor, e nas recorrentes do dia 29–31 depois de fevereiro.'
+      ])+
+
+      ver("1.0", "versão base", [
+        'Orçamento base-zero com <b>alvos</b> (mensal, semanal, trimestral, semestral, anual ou até uma data), contas de <b>orçamento</b>, <b>cartões de crédito</b> e de <b>acompanhamento</b>, <b>sincronização cifrada</b> entre aparelhos e <b>cópias de segurança</b> em ficheiro.'
+      ])+
+
+      '</div></div>'+
+      '<div class="modal-foot"><span></span><button class="btn primary" data-action="close">Entendido</button></div>');
+  }
+
+  function changelogModal() {
+    function ver(v, data, itens){
+      return '<div style="font-weight:700;color:var(--text);margin:16px 0 6px;font-size:13px;">Versão '+v+
+        ' <span class="muted" style="font-weight:400;">· '+data+'</span></div>'+
+        '<ul style="margin:0;padding-inline-start:18px;">'+itens.map(function(i){return '<li>'+i+'</li>';}).join("")+'</ul>';
+    }
+    openModal(
+      '<div class="modal-head"><h2>📋 Novidades</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body"><div class="help-list">'+
+      '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
+
       // O historico e longo por natureza, mas quem o le quer saber O QUE MUDOU, nao em que
       // versao. Por isso: o recente fica ao pormenor, o antigo agrupa-se por temas em blocos
       // maiores, e o que ficou para tras por ter sido substituido depois sai de vez.
@@ -4007,6 +4073,7 @@
         '<b>A letra deixou de variar de orçamento para orçamento no iPhone.</b> O Safari aumentava sozinho a letra de blocos largos com pouco texto — era por isso que a linha do mês nas recorrentes («AGOSTO 2026») aparecia maior num orçamento do que noutro: dependia da largura da tabela. Aumentar o texto nas definições do telemóvel continua a funcionar.',
         '<b>As barras de filtros passaram a caber numa linha no telemóvel.</b> No <b>Orçamento</b> sai o ✕ Limpar (desliga-se cada filtro tocando-lhe outra vez); nas <b>Transações</b> ele fica, mas só com o ✕, porque ali os filtros são caixas de seleção. As contagens dizem agora <b>quantas categorias / transações estão à vista</b>, em vez de «3 de 24».',
         '<b>Exportar para folha de cálculo passou a seguir o que está no ecrã.</b> O antigo ⬇ CSV das Transações parecia exportar o que estava à vista mas exportava sempre tudo. No lugar dele, e só no computador, há agora <b>⬇ Exportar o que vejo</b> nas Transações (respeita os filtros todos) e <b>⬇ Exportar esta conta</b> no registo de cada conta. Os três recortes possíveis passam a ter um botão cada: <b>uma conta</b>, <b>o que está filtrado</b> e <b>o orçamento inteiro</b> — este último em <b>Dados e cópias</b>, como sempre. Nenhum deles sai do orçamento aberto.',
+        '<b>A coluna «Conta» deixou de reaparecer sem razão.</b> Dentro de uma conta ela está escondida (todas as linhas são da mesma conta), mas bastava juntar uma categoria, um período ou uma procura para o nome da conta voltar a aparecer, repetido em todas as linhas. Agora depende só de haver ou não uma conta escolhida. A coluna <b>Saldo</b> mantém a regra que tinha — só aparece sem outros filtros, porque um saldo acumulado com movimentos escondidos pelo meio seria um número errado.',
         '<b>A conta deixou de ser tratada como «mais um filtro».</b> Dentro de Contas → uma conta, carregar em <b>✕ Limpar filtros</b> limpava tudo e atirava-o para fora da conta que estava a ver. Agora limpa os outros filtros e <b>mantém a conta</b> — para sair dela há o «‹ Contas» e a própria caixa da conta, em «Todas as contas».',
         '<b>✕ dentro da caixa de procura</b>, para apagar <b>só</b> o texto sem mexer nos outros filtros. A tecla <b>Esc</b> faz o mesmo, e o cursor fica no sítio para escrever logo outra coisa.',
         '<b>Correção importante — eliminar um grupo dava cabo do «Pronto a atribuir».</b> As categorias do grupo desapareciam, mas o dinheiro que lhes estava atribuído ficava para trás, invisível: continuava a ser descontado do «Pronto a atribuir» <b>para sempre</b>, e a verificação de integridade acusava uma diferença sem conseguir apontar nenhuma transação culpada. Agora eliminar um grupo faz a mesma limpeza que eliminar uma categoria: o dinheiro volta ao «Pronto a atribuir», as transações ficam sem categoria e as regras recorrentes afetadas ficam em pausa. A confirmação passou também a dizer quantas categorias vão dentro, incluindo as <b>arquivadas</b> — que antes eram apagadas sem sequer perguntar.',
