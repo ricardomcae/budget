@@ -917,9 +917,6 @@
   // Ambos são invalidados no mesmo sítio: quando se escreve algo diferente.
   var _ultimoJSON = null, _sigCache = null;
   function save() {
-    // Qualquer gravação normal (não uma navegação no histórico) invalida o "Refazer":
-    // depois de uma ação nova, deixa de fazer sentido refazer o que se tinha anulado.
-    if (!_navHist) _redo = [];
     _idx = null; _payees = null;
     var guardou = true;
     // Uma ação normal chama save() e a seguir render(), que volta a chamar save(). Sem isto,
@@ -993,7 +990,11 @@
   var _idx = null;
   var _split = null; // estado de trabalho da transação dividida (não é guardado)
   var _rec = null;   // estado de trabalho da regra recorrente (não é guardado)
-  var _undo = [], _redo = [], _navHist = false, _undoTimer = null, UNDO_MAX = 5; // histórico de anular/refazer (até 5 passos cada)
+  var _undo = [], _redo = [], _undoTimer = null, UNDO_MAX = 5; // histórico de anular/refazer (até 5 passos cada)
+  // Esvaziar o histórico é SEMPRE das duas pilhas. Em separado nunca: um «Refazer» sobrevivente
+  // a uma troca de orçamento (ou a repor uma cópia) aplicaria por cima um estado que pertence a
+  // outro sítio — e o utilizador via os dados de outro orçamento a aparecer no que tem aberto.
+  function limparHistorico(){ _undo = []; _redo = []; }
   // Registo leve das últimas movimentações de dinheiro do orçamento (só desta sessão, não é
   // gravado nem sincronizado) — alimenta o painel "Movimentos recentes" no topo, à YNAB.
   var _moves = [], MOVES_MAX = 20;
@@ -1787,7 +1788,7 @@
     if (!state.ui) state.ui = { view:"budget", month:nowMonthKey() };
     _ultimoJSON = null; _sigCache = null;   // outro orçamento: as caches do anterior não servem
     reporVistaInicial();          // aterra no Orçamento do mês corrente, sem filtros do outro orçamento
-    _idx=null; _payees=null; _undo=[]; _moves=[]; hideUndo();
+    _idx=null; _payees=null; limparHistorico(); _moves=[]; hideUndo();
     var posted = processRecurring();
     closeModal(); render();
     toast("Orçamento: "+budgetName(id)+(posted>0?(" · lançadas "+posted+" recorrentes"):""));
@@ -1801,7 +1802,7 @@
     if (!save()) { toast("Não foi possível guardar o orçamento atual — o novo não foi aberto, para não perder alterações."); return; }
     _bindex.list.push({ id:id, name:nome });
     _bindex.active = id; saveIndex(_bindex);
-    state = vazio; _ultimoJSON=null; _sigCache=null; _idx=null; _payees=null; _undo=[]; _moves=[]; hideUndo();
+    state = vazio; _ultimoJSON=null; _sigCache=null; _idx=null; _payees=null; limparHistorico(); _moves=[]; hideUndo();
     closeModal(); render(); toast("Orçamento «"+nome+"» criado.");
   }
   function renameBudget(id, nome){
@@ -1825,7 +1826,7 @@
     _bindex.list = _bindex.list.filter(function(b){ return b.id!==id; });
     if (_bindex.active===id) {
       _bindex.active = _bindex.list[0].id; saveIndex(_bindex);
-      state = loadBudgetRaw(_bindex.active); _idx=null; _payees=null; _undo=[]; _moves=[]; hideUndo();
+      state = loadBudgetRaw(_bindex.active); _idx=null; _payees=null; limparHistorico(); _moves=[]; hideUndo();
     } else saveIndex(_bindex);
     if (salvo) pontoDeSeguranca("antes de eliminar «"+nome+"»", salvo);
     scheduleAutoSync(); render(); budgetsModal();
@@ -4059,6 +4060,8 @@
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
       ver("1.52", "agosto 2026", [
+        '<b>Correção — o ↪ Refazer desaparecia sozinho.</b> Bastava mudar de mês, mexer num filtro ou carregar em «Ver quais» depois de anular alguma coisa, e o Refazer ficava apagado sem nada ter mudado nos dados. Agora só uma alteração <i>a sério</i> fecha essa porta — navegar não é alterar.',
+        '<b>O ↩ Anular passou a cobrir mais nove coisas</b> que ficavam de fora e não tinham volta: confirmar/desconfirmar uma transação, mudar a prioridade de uma categoria, reordenar categorias, grupos e contas, arquivar e repor categorias e contas, e ativar ou desativar uma regra recorrente.',
         '<b>Nova forma de escolher de onde tirar, no 🩹 Cobrir:</b> <b>primeiro de quem precisa do dinheiro mais tarde</b>. As que já havia olham para o que é <i>importante</i> (prioridade) ou para onde há <i>mais</i> parado (folga); esta olha para o <i>tempo</i> que há para repor — tira antes das férias do próximo verão do que do seguro que vence para o mês.',
         '<b>O balão do orçamento deixou de dar os parabéns quando há categorias excedidas.</b> Com o «Pronto a atribuir» a zero dizia «cada euro tem uma função 🎉» mesmo com contas por acertar; agora diz apenas <b>Tudo atribuído</b>, e é a barra vermelha por baixo que conta quantas e leva ao «Ver quais». O valor continua certo — o rendimento <i>está</i> todo atribuído; o que falta é acertar contas entre categorias.',
         '<b>Notas compridas</b> deixaram de esmagar as outras colunas: cortam com «…» e o texto todo aparece ao passar o rato (ou abrindo a transação). A frase das <b>alterações por guardar</b> passou também a ler-se como uma frase: «também 2 em «Ricardo» e 5 em «Família»», em vez dos números entre parênteses.',
@@ -4837,10 +4840,10 @@
     // cruzar com um período ou uma categoria sem ter de mudar de sítio.
     "open-account": function(id){ state.ui.view="transactions"; state.ui.txFilter={account:id}; state.ui.txLimit=PAGINA; render(); aoTopo(); },
     "back-accounts": function(){ state.ui.view="accounts"; state.ui.txFilter=null; render(); aoTopo(); },
-    "archive-account": function(id){ var a=accountById(id); if(a){ a.hidden=true; if(state.ui.txFilter && state.ui.txFilter.account===id) state.ui.txFilter=null; closeModal(); save(); render(); toast("Conta arquivada — reponha em Dados e cópias → Arquivados."); } },
-    "restore-account": function(id){ var a=accountById(id); if(a){ a.hidden=false; save(); render(); archivedModal(); } },
-    "archive-category": function(id){ var c=categoryById(id); if(c){ c.hidden=true; closeModal(); save(); render(); toast("Categoria arquivada — reponha em Dados e cópias → Arquivados."); } },
-    "restore-category": function(id){ var c=categoryById(id); if(c){ c.hidden=false; save(); render(); archivedModal(); } },
+    "archive-account": function(id){ var a=accountById(id); if(a){ pushUndo("Conta arquivada."); a.hidden=true; if(state.ui.txFilter && state.ui.txFilter.account===id) state.ui.txFilter=null; closeModal(); save(); render(); toast("Conta arquivada — reponha em Dados e cópias → Arquivados."); } },
+    "restore-account": function(id){ var a=accountById(id); if(a){ pushUndo("Conta reposta."); a.hidden=false; save(); render(); archivedModal(); } },
+    "archive-category": function(id){ var c=categoryById(id); if(c){ pushUndo("Categoria arquivada."); c.hidden=true; closeModal(); save(); render(); toast("Categoria arquivada — reponha em Dados e cópias → Arquivados."); } },
+    "restore-category": function(id){ var c=categoryById(id); if(c){ pushUndo("Categoria reposta."); c.hidden=false; save(); render(); archivedModal(); } },
     "archived-menu": function(){ archivedModal(); },
 
     "add-tx": function(_id, ds){ txModal(null, ds && ds.account); },
@@ -4888,7 +4891,8 @@
       else state.transactions = state.transactions.filter(function(x){return x.id!==id;});
       closeModal(); save(); render(); showUndo();
     },
-    "toggle-clear": function(id){ var t=txById(id); if(t){ t.cleared=!t.cleared; save(); render(); } },
+    // Confirmar/desconfirmar é uma alteração aos dados como outra qualquer: entra no Anular.
+    "toggle-clear": function(id){ var t=txById(id); if(t){ pushUndo(t.cleared?"Marcou por confirmar.":"Confirmou uma transação."); t.cleared=!t.cleared; save(); render(); } },
     "duplicate-tx": function(id){
       var t=txById(id); if(!t) return;
       // Duplicar copia tudo tal e qual — incluindo a falta de categoria. Seria a porta das traseiras
@@ -5238,16 +5242,19 @@
 
     "cycle-prio": function(id){
       var c=categoryById(id); if(!c || c.cardId) return;
+      pushUndo("Prioridade alterada.");
       var i=PRIO_CICLO.indexOf(c.priority||"normal");
       c.priority=PRIO_CICLO[(i+1)%PRIO_CICLO.length];
       save(); render(); toast("Prioridade "+PRIO_LABEL[c.priority].toLowerCase()+" — "+c.name);
     },
-    "move-acc-up": function(id){ if(moveAccount(id,-1)){ save(); render(); accountModal(accountById(id)); } },
-    "move-acc-down": function(id){ if(moveAccount(id, 1)){ save(); render(); accountModal(accountById(id)); } },
-    "move-cat-up": function(id){ moveCategory(id,-1); save(); render(); },
-    "move-cat-down": function(id){ moveCategory(id, 1); save(); render(); },
-    "move-group-up": function(id){ moveGroup(id,-1); save(); render(); },
-    "move-group-down": function(id){ moveGroup(id, 1); save(); render(); },
+    "move-acc-up": function(id){ pushUndo("Conta reordenada."); if(moveAccount(id,-1)){ save(); render(); accountModal(accountById(id)); } else _undo.pop(); },
+    "move-acc-down": function(id){ pushUndo("Conta reordenada."); if(moveAccount(id, 1)){ save(); render(); accountModal(accountById(id)); } else _undo.pop(); },
+    // Reordenar também se anula: com listas grandes, um clique a mais na seta é fácil e
+    // reencontrar a posição original à mão é chato.
+    "move-cat-up": function(id){ pushUndo("Categoria reordenada."); moveCategory(id,-1); save(); render(); },
+    "move-cat-down": function(id){ pushUndo("Categoria reordenada."); moveCategory(id, 1); save(); render(); },
+    "move-group-up": function(id){ pushUndo("Grupo reordenado."); moveGroup(id,-1); save(); render(); },
+    "move-group-down": function(id){ pushUndo("Grupo reordenado."); moveGroup(id, 1); save(); render(); },
 
     "add-recurring": function(){ recurringModal(null); },
     "edit-recurring": function(id){ recurringModal(recById(id)); },
@@ -5299,7 +5306,7 @@
       state.recurring=state.recurring.filter(function(r){return r.id!==id;});
       closeModal(); save(); render(); showUndo();
     },
-    "toggle-recurring": function(id){ var r=recById(id); if(r){ r.active=!r.active; save(); render(); } },
+    "toggle-recurring": function(id){ var r=recById(id); if(r){ pushUndo(r.active?"Recorrente desativada.":"Recorrente ativada."); r.active=!r.active; save(); render(); } },
     "post-recurring-now": function(id){
       var r=recById(id); if(!r) return;
       if(!recValida(r)){ toast("As contas desta regra já não existem."); return; }
@@ -5418,7 +5425,7 @@
     "sync-keep-local": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ await pushLocal(pc.remoteRev+1); setSyncStatus("Guardado na nuvem ✓"); toast("Mantido este aparelho — enviado para a nuvem."); }catch(e){ setSyncStatus("Não foi possível guardar ⚠️"); toast(msgSync(e)); } _pendingConflict=null; })(); },
     "sync-use-remote": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ adoptRemote(await decEnvelope(pc.enc, _sync.pass), pc.remoteRev); toast("Adotada a versão da nuvem."); }catch(e){ setSyncStatus("Não foi possível adotar ⚠️"); toast(msgSync(e)); } _pendingConflict=null; })(); },
     "load-sample": function(){ if(temDados() && !confirm("Atenção: os dados atuais serão substituídos pelos dados de exemplo. Esta ação não pode ser anulada. Pretende continuar?")) return; pontoDeSeguranca("antes de carregar os dados de exemplo"); loadSample(); },
-    "reset-data": function(){ if(confirm("Apagar TODOS os dados definitivamente? Esta ação não pode ser anulada.")){ pontoDeSeguranca("antes de apagar todos os dados"); state=JSON.parse(JSON.stringify(DEFAULT_STATE)); state.ui.month=nowMonthKey(); _undo=[]; hideUndo(); closeModal(); save(); render(); toast("Dados apagados."); } }
+    "reset-data": function(){ if(confirm("Apagar TODOS os dados definitivamente? Esta ação não pode ser anulada.")){ pontoDeSeguranca("antes de apagar todos os dados"); state=JSON.parse(JSON.stringify(DEFAULT_STATE)); state.ui.month=nowMonthKey(); limparHistorico(); hideUndo(); closeModal(); save(); render(); toast("Dados apagados."); } }
   };
 
   function txById(id){ for(var i=0;i<state.transactions.length;i++) if(state.transactions[i].id===id) return state.transactions[i]; return null; }
@@ -5764,7 +5771,7 @@
         obj.recurring = obj.recurring || []; obj.backup = obj.backup || { at:null, sig:null, autoDay:null };
         obj.groups = obj.groups || []; obj.categories = obj.categories || [];
         obj.ui = { view:"budget", month: nowMonthKey() };
-        state = obj; _undo=[]; hideUndo(); _idx=null; save(); closeModal(); render();
+        state = obj; limparHistorico(); hideUndo(); _idx=null; save(); closeModal(); render();
         toast("Voltou ao orçamento "+comoEstava+". Se sincroniza, envie para atualizar os outros aparelhos.");
       } catch(e){ toast("Esse ponto do histórico está inválido."); }
     });
@@ -6406,7 +6413,7 @@
           obj.ui = { view:"budget", month: nowMonthKey() };
           state = obj; qtd = 1;
         } else throw new Error("formato");
-        _undo=[]; hideUndo(); _idx=null; _payees=null; save(); closeModal(); render();
+        limparHistorico(); hideUndo(); _idx=null; _payees=null; save(); closeModal(); render();
         toast(qtd>1 ? ("Importados "+qtd+" orçamentos.") : "Cópia de segurança importada com sucesso.");
       } catch(err){ toast("Ficheiro inválido."); }
     };
@@ -6474,14 +6481,24 @@
   function toast(msg){ var t=el("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.classList.remove("show");},2200); }
   // Guarda uma fotografia do estado ANTES de uma alteração. Chamado por eliminações E edições
   // (categoria, transação, grupo, recorrente), por isso o Anular cobre tudo isso, não só apagar.
-  // A gravação que se segue invalida o Refazer (ver save()) — uma ação nova fecha o "futuro".
-  function pushUndo(desc){ _undo.push({ desc:desc, json:JSON.stringify(state) }); if(_undo.length>UNDO_MAX) _undo.shift(); if(state.backup) state.backup.pend=(state.backup.pend||0)+1; }
-  // Aplica um estado já lido, preservando a vista/mês deste aparelho. _navHist evita que o save()
-  // interno limpe a pilha oposta a meio da navegação.
+  function pushUndo(desc){
+    // Uma ação NOVA fecha o "futuro": o que se tinha anulado deixa de poder ser refeito, porque
+    // a partir daqui a história seguiu outro caminho. Isto vivia no save() — mas o save() corre
+    // a CADA desenho do ecrã, por isso bastava mudar de mês, mexer num filtro ou carregar em
+    // «Ver quais» para o Refazer se apagar sem nada ter mudado nos dados.
+    // Aqui é o sítio certo: todas as alterações reais passam por aqui (é o que as torna
+    // anuláveis), e as navegações no histórico (anular/refazer) não passam.
+    _redo = [];
+    _undo.push({ desc:desc, json:JSON.stringify(state) });
+    if(_undo.length>UNDO_MAX) _undo.shift();
+    if(state.backup) state.backup.pend=(state.backup.pend||0)+1;
+  }
+  // Aplica um estado já lido, preservando a vista/mês deste aparelho. Não precisa de proteger
+  // as pilhas: quem as fecha é o pushUndo, e uma navegação no histórico não passa por lá.
   function aplicarEstado(obj){
     var ui = state.ui;
     state = obj; state.ui = ui; _idx = null; _payees = null;
-    _navHist = true; try { save(); render(); } finally { _navHist = false; }
+    save(); render();
   }
   function doUndo(){
     if(!_undo.length){ toast("Nada para anular."); return; }
