@@ -782,7 +782,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.31";
+  var APP_VERSION = "1.32";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -1662,6 +1662,7 @@
     state.ui.txFilter = null;         // filtros da lista de transações
     state.ui.txLimit = PAGINA;        // volta à primeira página
     state.ui.openAccount = null;      // fecha o registo de uma conta
+    aoTopo();                         // é outro orçamento: começa-se do princípio
   }
   function switchBudget(id){
     if (id === _bindex.active) { closeModal(); return; }
@@ -2786,11 +2787,17 @@
     for (var i=0;i<n.length;i++) if (!n[i].disabled && n[i].offsetParent !== null) out.push(n[i]);
     return out;
   }
+  // Toda a página volta ao topo. Usa-se quando o que está no ecrã passa a ser OUTRA coisa —
+  // outra lista, outro ecrã — e não faz sentido aterrar a meio de conteúdo que já não é o mesmo.
+  function aoTopo(){ try { window.scrollTo(0,0); } catch(e){} }
   function openModal(html) {
     el("modal").innerHTML = html;
     var h = el("modal").querySelector("h2");
     el("modal").setAttribute("aria-label", h ? h.textContent : "Janela");
     el("modalOverlay").classList.add("open");
+    // Quem faz o deslize das janelas é o fundo escuro, e ele guarda a posição de onde estava.
+    // Sem isto, abrir as «Novidades» depois de se ter descido noutra janela mostrava-as a meio.
+    try { el("modalOverlay").scrollTop = 0; } catch(e){}
     var f=el("modal").querySelector("input,select,textarea"); if(f) setTimeout(function(){f.focus();},50);
   }
   function closeModal() { escondeDica(); el("modalOverlay").classList.remove("open"); el("modal").innerHTML=""; }
@@ -3671,28 +3678,31 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
+      ver("1.32", "agosto 2026", [
+        '<b>Cada ecrã novo começa no princípio:</b> abrir uma janela, abrir uma conta, mexer num filtro ou saltar para as transações de uma categoria já não o deixa a meio da lista onde estava.'
+      ])+
+
       ver("1.30 – 1.31", "agosto 2026", [
-        '<b>O teclado de cálculo só aceita pelo ✓.</b> Antes, tocar em qualquer sítio fora dele dava o valor por bom e fechava — bastava um toque a esmo para gravar uma conta por acabar. Agora, com o teclado aberto, os toques fora dele não fazem nada: confirma-se no <b>✓</b> ou desiste-se no <b>×</b>.',
-        'O resto do ecrã escurece ligeiramente enquanto o teclado está aberto, para se perceber que é ali que se decide.',
-        'Dentro de uma janela de edição a regra é uma só, sem exceções. No <b>Orçamento</b> tocar na categoria seguinte continua a aceitar e a avançar — ali vê-se logo a linha e o «por atribuir» mudarem.'
+        '<b>O teclado de cálculo só aceita pelo ✓.</b> Antes bastava tocar fora dele para o valor entrar; agora confirma-se no <b>✓</b> ou desiste-se no <b>×</b>. O ecrã escurece enquanto ele está aberto.',
+        'No <b>Orçamento</b> tocar na categoria seguinte continua a aceitar e a avançar, para descer a coluna sem interrupções.'
       ])+
 
       ver("1.28 – 1.29", "agosto 2026", [
-        '<b>Pontinho de estado em cada conta:</b> <b>verde</b> = nada por confirmar, está a par do banco; <b>âmbar</b> = há lançamentos que o banco ainda não processou. É informação, não um aviso.',
-        'No telemóvel, a coluna <b>Tipo</b> deixou de repetir o título da secção — a lista de contas ficou mais folgada do que estava, mesmo com o pontinho.'
+        '<b>Pontinho de estado em cada conta:</b> <b>verde</b> = a par do banco; <b>âmbar</b> = há lançamentos ainda não processados. É informação, não um aviso.',
+        'No telemóvel, a coluna <b>Tipo</b> deixou de repetir o título da secção: a lista de contas ficou mais folgada do que estava.'
       ])+
 
       ver("1.25 – 1.27", "agosto 2026", [
-        '<b>Contas em qualquer campo de dinheiro:</b> escreva <b>23,45+11,90+7,15</b> em vez de somar de cabeça. O resultado aparece junto ao campo e fica lá assim que sai dele.',
+        '<b>Contas em qualquer campo de dinheiro:</b> escreva <b>23,45+11,90+7,15</b> em vez de somar de cabeça. O resultado aparece junto ao campo.',
         '<b>No telemóvel, o teclado com + e −</b> — que só existia no orçamento — passou a abrir em todos esses campos.',
-        'Num par Saída/Entrada, o <b>−</b> escrito no princípio continua a passar o valor para o outro lado; depois de números, é uma subtração.'
+        'Num par Saída/Entrada, o <b>−</b> no princípio continua a passar o valor para o outro lado; depois de números, é uma subtração.'
       ])+
 
       ver("1.23 – 1.24", "agosto 2026", [
-        '<b>Rede de segurança antes do que não se anula:</b> adotar a nuvem, eliminar um orçamento, carregar exemplos, voltar atrás ou apagar tudo passam a guardar primeiro um ponto 🛟 com o estado anterior, em <b>Dados e cópias</b>, com o motivo escrito.',
+        '<b>Rede de segurança antes do que não se anula:</b> adotar a nuvem, eliminar um orçamento, carregar exemplos ou apagar tudo guardam primeiro um ponto 🛟 com o estado anterior, em <b>Dados e cópias</b>.',
         '<b>Avisos de sincronização em português corrente:</b> mensagens como «corrida» deram lugar a explicações do que aconteceu e do que fazer.',
-        '<b>Fim dos avisos de conflito falsos:</b> ao gravar na nuvem pelo telemóvel, a confirmação do GitHub chega por vezes atrasada e a aplicação julgava estar em conflito consigo própria. Agora reconhece a sua própria gravação e não pergunta nada.',
-        '<b>Nada fica por enviar:</b> as alterações feitas enquanto a sincronização decorre passam a seguir logo a seguir, em vez de esperarem pela edição seguinte.'
+        '<b>Fim dos avisos de conflito falsos:</b> ao gravar pelo telemóvel a aplicação chegava a julgar-se em conflito consigo própria. Agora reconhece a sua própria gravação.',
+        '<b>Nada fica por enviar:</b> as alterações feitas durante uma sincronização seguem logo a seguir, em vez de esperarem pela edição seguinte.'
       ])+
 
       ver("1.21 – 1.22", "agosto 2026", [
@@ -4404,7 +4414,7 @@
       closeModal();
       state.ui.view="transactions"; state.ui.openAccount=null;
       state.ui.txFilter={ payee:k }; state.ui.txLimit=PAGINA;
-      save(); render();
+      save(); render(); aoTopo();
     },
     "save-payee": function(k){
       var idx=payeeIndex(), e=idx[k]; if(!e) return;
@@ -4502,8 +4512,8 @@
       if (state.ui.openAccount===id) state.ui.openAccount=null;
       closeModal(); save(); render(); showUndo();
     },
-    "open-account": function(id){ state.ui.view="accounts"; state.ui.openAccount=id; render(); },
-    "back-accounts": function(){ state.ui.openAccount=null; render(); },
+    "open-account": function(id){ state.ui.view="accounts"; state.ui.openAccount=id; render(); aoTopo(); },
+    "back-accounts": function(){ state.ui.openAccount=null; render(); aoTopo(); },
     "archive-account": function(id){ var a=accountById(id); if(a){ a.hidden=true; if(state.ui.openAccount===id) state.ui.openAccount=null; closeModal(); save(); render(); toast("Conta arquivada — reponha em Dados e cópias → Arquivados."); } },
     "restore-account": function(id){ var a=accountById(id); if(a){ a.hidden=false; save(); render(); archivedModal(); } },
     "archive-category": function(id){ var c=categoryById(id); if(c){ c.hidden=true; closeModal(); save(); render(); toast("Categoria arquivada — reponha em Dados e cópias → Arquivados."); } },
@@ -4619,8 +4629,8 @@
         toast(pair ? ("Transação dividida em "+lines.length+" categorias.") : "Transação registada.");
       }
     },
-    "cat-activity": function(id){ state.ui.view="transactions"; state.ui.txFilter={category:id}; state.ui.openAccount=null; state.ui.txLimit=PAGINA; render(); },
-    "tx-filter-clear": function(){ state.ui.txFilter=null; state.ui.txLimit=PAGINA; save(); render(); },
+    "cat-activity": function(id){ state.ui.view="transactions"; state.ui.txFilter={category:id}; state.ui.openAccount=null; state.ui.txLimit=PAGINA; render();  aoTopo(); },
+    "tx-filter-clear": function(){ state.ui.txFilter=null; state.ui.txLimit=PAGINA; save(); render(); aoTopo(); },
     "show-more-tx": function(){ state.ui.txLimit=(state.ui.txLimit||PAGINA)+PAGINA; save(); render(); },
     "report-toggle-cat": function(id){ var arr=(state.ui.reportCats||[]).slice(); var i=arr.indexOf(id); if(i>=0) arr.splice(i,1); else arr.push(id); state.ui.reportCats=arr; save(); render(); },
     "report-months": function(id){ state.ui.reportMonths=parseInt(id,10)||6; state.ui.reportFrom=null; state.ui.reportTo=null; save(); render(); },
@@ -6306,7 +6316,7 @@
       // Clicar num separador começa sempre no topo — quer se mude de ecrã, quer se toque no
       // separador onde já se está (serve de "voltar ao início" numa lista longa). Só aqui: a
       // cada render seria pior, porque editar uma transação a meio da lista saltava para cima.
-      try { window.scrollTo(0,0); } catch(e){}
+      aoTopo();
       return;
     }
     var a = e.target.closest("[data-action]");
@@ -6446,6 +6456,9 @@
   document.addEventListener("change", function(e){
     var inp = e.target.closest("[data-assign]");
     if (inp) { applyAssign(inp.getAttribute("data-assign"), parseAmount(inp.value)); return; }
+    // Mexer num filtro dá outra lista: ficar a meio da altura da lista anterior costuma deixar
+    // o ecrã em branco (a nova é mais curta) ou a olhar para o meio de uma coisa nova.
+    if (/^txFilter(Acc|Cat|From|To|Per)$/.test(e.target.id||"")) setTimeout(aoTopo, 0);
     if (e.target.id==="txFilterAcc"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.account=e.target.value||null; render(); }
     if (e.target.id==="txFilterCat"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.category=e.target.value||null; render(); }
     if (e.target.id==="txFilterFrom"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.from=ptParaIso(e.target.value)||null; render(); }
