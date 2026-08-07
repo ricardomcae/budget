@@ -318,6 +318,11 @@
   .assign-input:focus { border-color: var(--primary); background: var(--surface); outline: none; box-shadow: 0 0 0 3px var(--primary-soft); }
   .assign-input.kp-active { border-color: var(--primary); background: var(--surface); box-shadow: 0 0 0 3px var(--primary-soft); }
   /* Mini-teclado de cálculo próprio */
+  /* Resultado da conta escrita no próprio campo ("120+35" mostra "= 155,00" por baixo). */
+  .calc-hint { display: block; margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--primary); font-variant-numeric: tabular-nums; }
+  .money.kp-active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  /* Espaço no fundo das janelas para o teclado não tapar o campo que se está a preencher. */
+  body.kp-aberto .modal-overlay { padding-bottom: 300px; }
   .calcpad { position: fixed; left: 50%; bottom: 0; transform: translateX(-50%) translateY(110%); width: 100%; max-width: 420px; background: var(--surface); border: 1px solid var(--border); border-bottom: 0; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.22); z-index: 250; transition: transform .2s ease; padding: 10px 10px calc(12px + env(safe-area-inset-bottom)); }
   .calcpad.show { transform: translateX(-50%) translateY(0); }
   .calc-head { display: flex; align-items: center; gap: 10px; padding: 4px 6px 10px; }
@@ -750,7 +755,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.24";
+  var APP_VERSION = "1.25";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -3562,6 +3567,7 @@
         '<li><b>O ✓ e o «Por confirmar»:</b> o ✓ marca que o banco já processou a transação. Mexe no <b>Confirmado</b>, não no <b>Saldo</b> — um café pago ontem está pago, tenha o banco lançado ou não, e o orçamento tem de contar com isso. A diferença entre os dois é o <b>Por confirmar</b>, que aparece no cabeçalho da conta e no ecrã das transações: quando chega a zero, a app bate certo com o extrato.</li>'+
         '<li><b>Total do mês:</b> por cima das colunas, a soma do <b>Atribuído</b>, da <b>Atividade</b> e do <b>Disponível</b>. As categorias de <b>pagamento de cartão</b> ficam de fora das três: a atividade delas é o espelho positivo do que se gastou — 50 € de mercearia no cartão dão −50 na Mercearia e +50 no cartão — e somá-las daria zero, como se não se tivesse gasto nada. Os valores do cartão continuam na linha do grupo dele.</li>'+
         '<li><b>Vários orçamentos</b> (📚, no cabeçalho): pode ter um <b>Pessoal</b> e um <b>Família</b>, por exemplo. Cada um é <b>completamente separado</b> — contas, categorias e transações próprias — e troca-se com um toque. Se sincroniza, vão <b>todos no mesmo gist</b>; só há uma coisa a saber: se editar orçamentos <b>diferentes</b> em aparelhos diferentes antes de sincronizar, a aplicação pergunta qual manter, como faria com qualquer conflito.</li>'+
+        '<li><b>Contas nos campos de dinheiro:</b> em qualquer campo de valor pode escrever a conta em vez do total — <b>23,45+11,90+7,15</b>. O resultado aparece por baixo enquanto escreve e substitui a conta assim que sai do campo. No <b>telemóvel</b> aparece um <b>teclado próprio</b> com <b>+</b> e <b>−</b>, sem letras nem risco de enganos. Num par <b>Saída/Entrada</b>, um <b>−</b> escrito no princípio do campo continua a passar o valor para o outro lado; depois de números, é uma subtração.</li>'+
         '<li><b>Datas e teclado:</b> as datas escrevem-se sempre em <b>dd/mm/aaaa</b>, mesmo que tenha o browser noutro idioma — pode escrever só os números, que as barras aparecem sozinhas, ou usar o 📅 para as escolher no calendário. Dentro de qualquer janela, o <b>Enter</b> vale por carregar no botão principal.</li>'+
         '<li><b>Esc</b> dentro de um campo desfaz o que estava a escrever e larga o campo, sem gravar. Dentro de uma janela, é preciso carregar duas vezes: a primeira sai do campo, a segunda fecha a janela.</li>'+
       '</ul>'+
@@ -3617,6 +3623,12 @@
       '<div class="modal-head"><h2>📋 Novidades</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
+
+      ver("1.25", "agosto 2026", [
+        '<b>Contas em qualquer campo de dinheiro:</b> escreva <b>23,45+11,90+7,15</b> em vez de somar de cabeça. O resultado aparece por baixo do campo e fica lá assim que sai dele. Serve para saída, entrada, divisão de transação, mover dinheiro, transferências, saldo inicial, valor do alvo e recorrentes.',
+        '<b>No telemóvel, o teclado com + e −</b> — que só existia no orçamento — passou a abrir em todos esses campos.',
+        'Num par Saída/Entrada, o <b>−</b> escrito no princípio continua a passar o valor para o outro lado; depois de números, é uma subtração.'
+      ])+
 
       ver("1.23 – 1.24", "agosto 2026", [
         '<b>Rede de segurança antes do que não se anula:</b> ao adotar a versão da nuvem, eliminar um orçamento, carregar dados de exemplo, voltar atrás no histórico ou apagar tudo, a aplicação guarda primeiro um ponto 🛟 com o estado anterior. Aparece no histórico, em <b>Dados e cópias</b>, com o motivo escrito.',
@@ -4213,10 +4225,30 @@
 
   // ---------- Ações ----------
   // Aceita vírgula OU ponto como separador de cêntimos (sem separador de milhares).
+  // Uma conta escrita à mão no campo ("120+35-10") vale o seu resultado. Exige dígitos dos DOIS
+  // lados de cada sinal — é o que impede a colisão com as convenções de sinal dos extratos:
+  // "-45,90", "45,90-" (sinal à direita, como alguns bancos escrevem) e "(45,90)" continuam a
+  // ser lidos como valores negativos, e não como contas por acabar.
+  function avaliaExpr(s){
+    s = String(s==null?"":s).replace(/\s+/g, "");
+    if (!/^[0-9.,]+(?:[+\-][0-9.,]+)+$/.test(s)) return null;
+    var partes = s.match(/[+\-]?[0-9.,]+/g);
+    if (!partes) return null;
+    var total = 0;
+    for (var i=0;i<partes.length;i++){
+      var v = parseAmount(partes[i]);          // reaproveita a leitura pt-PT de cada parcela
+      if (isNaN(v)) return null;
+      total += v;
+    }
+    if (!isFinite(total) || Math.abs(total) > MAX_VALOR) return null;
+    return round2(total);
+  }
   function parseAmount(s){
     if (typeof s === "number") return s;
     s = String(s==null?"":s).trim();
     if (!s) return NaN;
+    var exp = avaliaExpr(s);                   // "120+35" vale 155 em qualquer campo de dinheiro
+    if (exp !== null) return exp;
     // Negativo pode vir como "-45,90", "45,90-" (alguns bancos põem o sinal à direita) ou entre
     // parênteses, "(45,90)" — a convenção contabilística que o Excel e vários extratos usam. Sem
     // reconhecer os parênteses, uma despesa era importada como ENTRADA de dinheiro.
@@ -4263,6 +4295,18 @@
     intp = intp.slice(0, LIM_INT);
     if (frac !== null) frac = frac.slice(0, LIM_DEC);
     return (neg?"-":"") + intp + (frac===null ? "" : sep+frac);
+  }
+  // Como limpaValor, mas deixa passar os sinais + e − para se poder escrever a conta no campo.
+  // Cada parcela é limitada como um valor normal; sinais repetidos ficam reduzidos a um só.
+  function limpaExpr(txt, permiteNegativo){
+    var s = String(txt==null?"":txt).replace(/[^0-9.,+\-]/g, "");
+    // Sinais seguidos: vale o ÚLTIMO, que é o que a pessoa acabou de escrever ao corrigir-se.
+    // "5++3" -> "5+3"; "5+-3" -> "5-3" (trocou a soma por subtração).
+    s = s.replace(/[+\-]{2,}/g, function(m){ return m.charAt(m.length-1); });
+    s = permiteNegativo ? s.replace(/^\+/, "") : s.replace(/^[+\-]+/, "");
+    var toks = s.split(/([+\-])/), out = "";
+    for (var i=0;i<toks.length;i++) out += (toks[i]==="+"||toks[i]==="-") ? toks[i] : limpaValor(toks[i], false);
+    return out;
   }
   function mb(bytes){ return (bytes/1048576).toFixed(1).replace(".", ",")+" MB"; }
 
@@ -5953,6 +5997,45 @@
     return atual;
   }
 
+  // ---- Contas escritas no próprio campo (sobretudo no computador, onde se escreve depressa) ----
+  // Enquanto se escreve "120+35" mostra-se "= 155,00" por baixo do campo; ao sair do campo (ou ao
+  // carregar em Enter) a conta é substituída pelo resultado, para ficar à vista o que vai ser
+  // gravado. Ler o valor já funcionaria de qualquer forma — o parseAmount avalia a conta — mas
+  // ver o número final antes de gravar evita a dúvida de saber se a app percebeu a conta.
+  function pintaConta(inp){
+    var pai = inp.parentNode; if(!pai) return;
+    var h = pai.querySelector(":scope > .calc-hint");
+    var v = /[+\-]/.test(inp.value.slice(1)) ? avaliaExpr(inp.value) : null;
+    if (v === null){ if(h) pai.removeChild(h); return; }
+    if (!h){ h = document.createElement("span"); h.className = "calc-hint"; inp.insertAdjacentElement("afterend", h); }
+    h.textContent = "= " + fmt(v);
+  }
+  function fechaConta(inp){
+    if (!inp || !inp.classList || !inp.classList.contains("money")) return;
+    var v = avaliaExpr(inp.value);
+    if (v !== null) inp.value = amtStr(v);
+    var pai = inp.parentNode, h = pai && pai.querySelector(":scope > .calc-hint");
+    if (h) pai.removeChild(h);
+    if (inp.getAttribute("data-par") && inp.value) { var op = el(inp.getAttribute("data-par")); if (op) op.value = ""; }
+  }
+  document.addEventListener("focusout", function(e){
+    if (e.target && e.target.classList && e.target.classList.contains("money")) fechaConta(e.target);
+  });
+  // Enter fecha a conta em vez de submeter com a expressão ainda por resolver.
+  document.addEventListener("keydown", function(e){
+    if (e.key!=="Enter" || _kp) return;
+    var t = e.target;
+    if (t && t.classList && t.classList.contains("money") && avaliaExpr(t.value)!==null){
+      fechaConta(t); e.preventDefault(); e.stopPropagation();
+    }
+  }, true);
+  // Última rede: qualquer campo de dinheiro ainda com uma conta por resolver é resolvido antes
+  // de se ler o formulário. Assim nenhum caminho de gravação depende de o campo ter perdido o foco.
+  function fecharContasTodas(){
+    var ms = document.querySelectorAll(".money");
+    for (var i=0;i<ms.length;i++) fechaConta(ms[i]);
+  }
+
   // ---- Camada DOM do teclado ----
   // NÃO escreve no campo enquanto se digita — o visor do pad (#calcDisp) é o que mostra o que se
   // está a fazer. O campo só muda quando se CONFIRMA (✓). Assim, cancelar (×) mantém o valor antigo.
@@ -5963,11 +6046,37 @@
   function openPad(input){
     _kpEl = input; _kp = calcInit(parseAmount(input.value)||0);
     input.classList.add("kp-active"); _kpShow(); kpPaint();
+    // Numa janela de edição o teclado sobe do fundo e podia tapar o próprio campo: dá-se espaço
+    // por baixo e traz-se o campo para o meio do ecrã.
+    if (input.closest && input.closest(".modal-overlay")) {
+      document.body.classList.add("kp-aberto");
+      setTimeout(function(){ try{ input.scrollIntoView({block:"center", behavior:"smooth"}); }catch(e){} }, 60);
+    }
   }
-  function kpDeactivate(){ if(_kpEl) _kpEl.classList.remove("kp-active"); _kpEl=null; _kp=null; }
+  function kpDeactivate(){
+    if(_kpEl) _kpEl.classList.remove("kp-active");
+    document.body.classList.remove("kp-aberto");
+    _kpEl=null; _kp=null;
+  }
   // Aplica o valor calculado à atribuição da categoria (o MESMO caminho da edição à mão, via
   // applyAssign → guarda para o Anular, regista o movimento, grava e re-desenha).
-  function kpApplyToField(){ if(_kpEl && _kp) applyAssign(_kpEl.getAttribute("data-assign"), calcValue(_kp)); }
+  // No campo do orçamento o valor é APLICADO (guarda, regista o movimento, re-desenha). Em
+  // qualquer outro campo de dinheiro é só escrito lá dentro — quem grava é o botão do formulário.
+  function kpApplyToField(){
+    if(!_kpEl || !_kp) return;
+    var v = calcValue(_kp);
+    if (_kpEl.hasAttribute("data-assign")) { applyAssign(_kpEl.getAttribute("data-assign"), v); return; }
+    _kpEl.value = v ? amtStr(v) : "";
+    var par = _kpEl.getAttribute("data-par");                 // Saída/Entrada: só um dos dois lados
+    if (par && _kpEl.value) { var op = el(par); if (op) op.value = ""; }
+    try { _kpEl.dispatchEvent(new Event("change", {bubbles:true})); } catch(e){}
+    var tot = document.getElementById("splitTotal");          // total da divisão de transação
+    if (tot && _kpEl.id && _kpEl.id.indexOf("spAmt")===0){
+      var els=document.querySelectorAll("[id^='spAmt']"), t=0;
+      for(var i=0;i<els.length;i++){ var vv=parseAmount(els[i].value); if(!isNaN(vv)) t+=vv; }
+      tot.textContent = fmt(t);
+    }
+  }
   function kpDone(){                              // ✓ ou tocar fora: aplica e fecha
     kpApplyToField(); _kpHide(); kpDeactivate();
     _kpSuppress = Date.now()+400;                 // o toque/foco que sobra após o re-desenho não reabre o pad
@@ -5986,20 +6095,40 @@
   function kpOpen(input){
     if (Date.now() < _kpSuppress){ try{ input.blur(); }catch(e){} return; }   // ignora a reabertura logo após ✓
     if (_kpEl === input) return;
-    if (_kpEl){                                    // troca de campo: aplica o anterior e abre o novo (recriado)
+    if (_kpEl){                                    // troca de campo: aplica o anterior e abre o novo
       var novoId = input.getAttribute("data-assign");
+      var eraAssign = _kpEl.hasAttribute("data-assign");
       kpApplyToField(); kpDeactivate();
-      var fresh = novoId ? document.querySelector('.assign-input[data-assign="'+novoId+'"]') : null;
+      // Aplicar no campo do orçamento re-desenha a página: o elemento seguinte tem de ser
+      // procurado outra vez, porque o que se recebeu já não está no ecrã. Nos outros campos
+      // não há re-desenho e o elemento continua bom.
+      var fresh = (eraAssign && novoId) ? document.querySelector('.assign-input[data-assign="'+novoId+'"]')
+                                        : (eraAssign ? null : input);
       if (fresh) openPad(fresh); else _kpHide();
       return;
     }
     openPad(input);
   }
+  // Num ecrã de toque não há teclado físico e as contas fazem falta em qualquer campo de dinheiro,
+  // por isso o teclado próprio serve-os a todos. No computador só o campo do orçamento o usa: os
+  // restantes escrevem-se à mão (e aceitam a conta escrita no próprio campo).
+  var TOQUE = false;
+  try { TOQUE = window.matchMedia && window.matchMedia("(pointer: coarse)").matches; } catch(e){}
   // Abrir ao focar/tocar num campo de atribuição (o inputmode="none" evita o teclado nativo).
   document.addEventListener("focusin", function(e){
     var inp = e.target.closest && e.target.closest(".assign-input");
     if (inp) kpOpen(inp);
   });
+  // Nos restantes campos de dinheiro num ecrã de toque: apanha-se o toque ANTES de o campo
+  // receber o foco. Sem isto o teclado do sistema abria e ficavam os dois a disputar o ecrã.
+  document.addEventListener("pointerdown", function(e){
+    if (!TOQUE || !e.target.closest) return;
+    var inp = e.target.closest(".money");
+    if (!inp || inp.classList.contains("assign-input")) return;
+    e.preventDefault();                            // não dá foco -> não abre o teclado do sistema
+    try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch(_e){}
+    kpOpen(inp);
+  }, true);
   // Botões do teclado — mousedown + preventDefault para NÃO tirar o foco ao campo.
   el("calcPad").addEventListener("mousedown", function(e){
     var b = e.target.closest && e.target.closest("[data-calc]");
@@ -6022,7 +6151,7 @@
   // Tocar fora do teclado e fora de um campo de atribuição = confirmar e fechar.
   document.addEventListener("mousedown", function(e){
     if (!_kpEl) return;
-    if (e.target.closest && (e.target.closest("#calcPad") || e.target.closest(".assign-input"))) return;
+    if (e.target.closest && (e.target.closest("#calcPad") || e.target.closest(".money"))) return;
     kpDone();
   });
 
@@ -6051,6 +6180,7 @@
     // um método herdado do Object e era invocado. Não é explorável (os data-action são todos
     // gerados pela aplicação), mas é barato fechar a porta.
     if (!Object.prototype.hasOwnProperty.call(actions, action)) return;
+    fecharContasTodas();   // nenhuma ação lê um campo com uma conta por resolver
     var id = a.getAttribute("data-id");
     var ds = { account: a.getAttribute("data-account") };
     // Evita que o clique na linha dispare quando se carrega num botão lá dentro
@@ -6199,21 +6329,27 @@
     if (alvo.classList && alvo.classList.contains("money")) {
       var par = alvo.getAttribute("data-par");
       var bruto = alvo.value;
-      // Num par Saída/Entrada o "-" não é um sinal: passa o valor para o outro lado.
-      if (par && bruto.indexOf("-") >= 0) {
+      // Num par Saída/Entrada, um "-" À CABEÇA não é um sinal: passa o valor para o outro lado.
+      // (Só à cabeça: depois de dígitos o "-" é uma subtração — "50-12,50" vale 37,50.)
+      if (par && bruto.indexOf("-") === 0) {
         var outro = el(par), limpo = limpaValor(bruto.replace(/-/g, ""), false);
         alvo.value = "";
         if (outro) { outro.value = limpo; try { outro.focus(); outro.setSelectionRange(limpo.length, limpo.length); } catch(err){} }
         toast(/In$/.test(par) ? "Passou para Entrada." : "Passou para Saída.");
         return;
       }
-      var limpo2 = limpaValor(bruto, alvo.hasAttribute("data-neg"));
+      // O campo do orçamento tem teclado próprio (o visor dele já mostra a conta); os restantes
+      // aceitam a conta escrita no próprio campo.
+      var ehAssign = alvo.classList.contains("assign-input");
+      var limpo2 = ehAssign ? limpaValor(bruto, alvo.hasAttribute("data-neg"))
+                            : limpaExpr(bruto, alvo.hasAttribute("data-neg"));
       if (limpo2 !== bruto) {
         var pos = alvo.selectionStart, delta = bruto.length - limpo2.length;
         alvo.value = limpo2;
         try { var np = Math.max(0, Math.min(limpo2.length, (pos==null?limpo2.length:pos) - delta)); alvo.setSelectionRange(np, np); } catch(err){}
       }
       if (par && alvo.value) { var op = el(par); if (op) op.value = ""; }   // só um dos dois lados
+      pintaConta(alvo);
     }
 
     if (_id && _id.indexOf("spAmt")===0){ var _els=document.querySelectorAll("[id^='spAmt']"), _tot=0; for(var _qi=0;_qi<_els.length;_qi++){ var _vv=parseAmount(_els[_qi].value); if(!isNaN(_vv)) _tot+=_vv; } var _h=el("splitTotal"); if(_h) _h.textContent=fmt(_tot); }
