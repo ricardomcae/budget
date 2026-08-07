@@ -614,7 +614,10 @@
     /* No telemóvel nem um bloco inteiro cabe numa linha: aqui deixa-se partir por dentro,
        senão transbordava para fora do ecrã. */
     .toolbar .tb-bloco { flex-wrap: wrap; }
-    .toolbar .tb-fim .sep:first-child { display: none; }   /* barra vertical a abrir uma linha */
+    .toolbar .tb-fim .sep { display: none; }   /* barras verticais: não há espaço para separadores */
+    /* No telemóvel o «Limpar» é o que faz a barra partir em duas linhas. Sai — desliga-se cada
+       filtro com um segundo toque no próprio botão, que é o gesto que já se faz. Só no telemóvel. */
+    .btn-limpar { display: none !important; }
     .btn.f-filtro { padding: 6px 9px; font-size: 13px; }
     .rot { display: none; }          /* rótulo longo: fica só o símbolo ou a forma curta */
 
@@ -2302,7 +2305,7 @@
       '<tr><td colspan="4" class="empty" style="padding:34px 20px;">'+
         '<div class="big" style="font-size:30px;">🔍</div>'+
         '<h3>Nada corresponde aos filtros</h3>'+
-        '<p style="max-width:360px;margin:0 auto;">Está a pedir categorias que sejam ao mesmo tempo de um dos estados <b>e</b> de uma das prioridades escolhidas. Desligue algum filtro, ou use <b>Limpar</b>.</p>'+
+        '<p style="max-width:360px;margin:0 auto;">Está a pedir categorias que sejam ao mesmo tempo de um dos estados <b>e</b> de uma das prioridades escolhidas. Desligue algum filtro<span class="hide-phone">, ou use <b>Limpar</b></span>.</p>'+
       '</td></tr>';
 
     // No telemóvel o rótulo esconde-se e fica só o símbolo, para os seis filtros
@@ -2344,7 +2347,10 @@
         // A contagem está SEMPRE lá, encostada à direita — não aparece e desaparece conforme
         // se filtra, que era o que fazia a barra saltar a cada clique.
         '<span class="muted" style="font-size:12.5px;white-space:nowrap;">' +
-          (filtering ? (nShown+' de '+nTotal+' categorias') : (nTotal+' categorias')) + '</span>' +
+          // Diz sempre quantas categorias ESTÃO À VISTA: sem filtros é o total, com filtros é o
+          // que sobrou. O «N de M» ocupava o dobro do espaço e era o que, no telemóvel, empurrava
+          // a barra para uma segunda linha.
+          (nShown+(nShown===1?' categoria':' categorias')) + '</span>' +
         '</div>' +
       '</div>' +
       '<div class="budget-card"><table class="budget"><thead><tr>' +
