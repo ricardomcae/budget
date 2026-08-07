@@ -238,6 +238,17 @@
   /* Só durante a medição: sem quebra e sem encolher, para a largura natural ser a verdadeira. */
   .toolbar.medindo { flex-wrap: nowrap; }
   .toolbar.medindo .tb-bloco, .toolbar.medindo .tb-bloco > * { flex-shrink: 0; }
+  /* Chapeu da conta, por cima da barra de filtros: identifica a conta e junta as accoes que
+     so existem dentro de uma. Sem margem em baixo — cola-se à barra de filtros, para se ler
+     como um bloco só. */
+  /* Os três andares do ecrã Transações colam-se uns aos outros: lidos de cima a baixo são
+     um bloco só (que conta → o que posso fazer → o que estou a ver), e não três barras soltas. */
+  .toolbar.acc-head { margin-bottom: 10px; }
+  .toolbar.acc-head h3 { margin: 0; font-size: 17px; font-weight: 700; }
+  .toolbar.acc-acoes { margin-bottom: 10px; }
+  /* A procura cresce para o espaço que sobra: o texto do campo estava a ser cortado a meio
+     («Procurar beneficiário ou n»), e um campo que não cabe não consegue dizer o que faz. */
+  .toolbar.tx-filtros .search { flex: 1 1 240px; min-width: 150px; max-width: 380px; }
   .toolbar .tb-bloco { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
   .toolbar .tb-fim { flex: 1 1 auto; }   /* cresce para empurrar a contagem para a direita */
   .toolbar .spacer { flex: 1; }
@@ -468,7 +479,6 @@
   .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; z-index: 100; overflow-y: auto; }
   .modal-overlay.open { display: flex; }
   .modal { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-lg); width: 100%; max-width: 460px; overflow: hidden; animation: pop .16s ease; }
-  .modal.wide { max-width: 560px; }
   @keyframes pop { from { transform: translateY(10px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
   .modal-head { padding: 18px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
   .modal-head h2 { margin: 0; font-size: 16.5px; }
@@ -528,6 +538,9 @@
 
   .hidden { display: none !important; }
   .mobile-only { display: none; }
+  /* No computador o nome do orçamento vive na barra lateral («Trocar orçamento ▾»), por isso o
+     chip do cabeçalho é só de telemóvel — como o resto do bloco .topbar-actions. */
+  .bud-chip #budNameM, .bud-chip .caret { display: inline; }
   .so-fone { display: none; }
   button { -webkit-tap-highlight-color: transparent; }
 
@@ -559,6 +572,18 @@
     .topbar-actions { order: 2; margin-inline-start: auto; gap: 6px; }
     .theme-toggle { order: 2; }
     .topbar-actions .btn { padding: 8px 11px; }
+    /* O botão de trocar de orçamento diz o nome do orçamento aberto, com seta: um ícone sozinho
+       não se percebia. O nome encolhe até caber e corta com «vâo…» — são os outros botões, de
+       largura fixa, que mandam. Assim a barra nunca parte por causa de um nome comprido. */
+    .topbar-actions .bud-chip {
+      display: inline-flex; align-items: center; gap: 5px; min-width: 0; flex: 0 1 auto;
+      max-width: 42vw; padding-inline: 9px; font-weight: 600;
+    }
+    .topbar-actions .bud-chip #budNameM {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+    }
+    .topbar-actions .bud-chip .caret { opacity: .55; flex: none; }
+    .topbar-actions .btn:not(.bud-chip) { flex: none; }
     .month-nav { order: 3; width: 100%; justify-content: center; margin-top: 8px; }
     .month-nav .month-label { min-width: 120px; }
 
@@ -611,7 +636,6 @@
     .sem-tipo .col-tipo { display: none !important; }
     .t-longo { display: none; }
     .t-curto { display: inline; }
-    table.data { min-width: 520px; }
     /* Área de toque maior nas caixas de seleção (a caixa continua com o mesmo tamanho, o que
        cresce é a zona sensível à volta) — 16px são difíceis de acertar com o dedo. */
     /* Mesma ideia: a área de toque continua grande (o padding fica), mas a margem negativa
@@ -621,6 +645,11 @@
     /* No telemóvel nem um bloco inteiro cabe numa linha: aqui deixa-se partir por dentro,
        senão transbordava para fora do ecrã. */
     .toolbar .tb-bloco { flex-wrap: wrap; }
+    /* Sem uma conta aberta, nesta fila só há o «Nova transação» e o exportar — e ambos são
+       de computador (no telemóvel o ➕ está no cabeçalho). Ficava uma fila vazia a ocupar
+       altura, por isso só aparece quando tem de facto botões: dentro de uma conta. */
+    .toolbar.acc-acoes { display: none; }
+    .toolbar.acc-acoes.tem-conta { display: flex; }
     .toolbar .tb-fim .sep { display: none; }   /* barras verticais: não há espaço para separadores */
     /* No telemóvel o «Limpar» é o que faz a barra partir em duas linhas. Sai — desliga-se cada
        filtro com um segundo toque no próprio botão, que é o gesto que já se faz. Só no telemóvel. */
@@ -697,7 +726,7 @@
         <button class="today-btn" data-action="this-month">Hoje</button>
       </div>
       <div class="topbar-actions mobile-only">
-        <button class="btn sm" data-action="budgets" aria-label="Trocar orçamento">📚</button>
+        <button class="btn sm bud-chip" data-action="budgets" aria-label="Trocar ou gerir orçamentos" title="Trocar ou gerir orçamentos">💰<span id="budNameM">Orçamento</span><span class="caret">▾</span></button>
         <button class="btn sm" data-action="add-tx" aria-label="Nova transação">➕</button>
         <button class="btn sm" data-action="payees" aria-label="Beneficiários">🏷️</button>
         <button class="btn sm" id="btnDataM" data-action="data-menu" aria-label="Dados e cópias de segurança" style="position:relative;">💾</button>
@@ -785,7 +814,6 @@
     saveIndex(_bindex);
   }
   function budgetName(id){ for(var i=0;i<_bindex.list.length;i++) if(_bindex.list[i].id===id) return _bindex.list[i].name; return ""; }
-  function activeId(){ return _bindex.active; }
   var INCOME = "__income__"; // identificador da categoria especial do «Pronto a atribuir»
   // Transação de "Saldo inicial": é gerada pela app ao criar uma conta com saldo. Continua a
   // financiar o orçamento e a contar no património, mas — como as transferências — não é uma
@@ -844,7 +872,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.51";
+  var APP_VERSION = "1.52";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -876,13 +904,23 @@
   // Se o armazenamento encher, o estado fica só em memória — perde-se ao fechar o separador.
   // Por isso isto não pode ser um aviso que desaparece em dois segundos.
   var _semEspaco = false;
+  // Último conteúdo escrito, para não reescrever o mesmo, e a assinatura correspondente.
+  // Ambos são invalidados no mesmo sítio: quando se escreve algo diferente.
+  var _ultimoJSON = null, _sigCache = null;
   function save() {
     // Qualquer gravação normal (não uma navegação no histórico) invalida o "Refazer":
     // depois de uma ação nova, deixa de fazer sentido refazer o que se tinha anulado.
     if (!_navHist) _redo = [];
     _idx = null; _payees = null;
     var guardou = true;
-    try { localStorage.setItem(budKey(_bindex.active), JSON.stringify(state)); }
+    // Uma ação normal chama save() e a seguir render(), que volta a chamar save(). Sem isto,
+    // cada toque serializava o estado inteiro duas vezes e escrevia-o duas vezes no disco —
+    // e a assinatura para o aviso de «por guardar» serializava-o uma terceira. Serializa-se
+    // uma vez por save (barato), mas só se escreve quando o conteúdo MUDOU de facto.
+    var json;
+    try { json = JSON.stringify(state); } catch(e0){ json = null; }
+    if (json !== null && json === _ultimoJSON) { scheduleAutoSync(); return true; }
+    try { localStorage.setItem(budKey(_bindex.active), json); _ultimoJSON = json; _sigCache = null; }
     catch (e) { guardou = false; }
     if (guardou) _semEspaco = false;
     else if (!_semEspaco) { _semEspaco = true; try { storageFullModal(); } catch(e2){ toast("Não foi possível guardar — armazenamento cheio."); } }
@@ -956,14 +994,15 @@
   var _searchTimer = null;  // atraso da caixa de procura (não é guardado)
   var _tmpAccType = null;   // tipo escolhido no modal de conta (não é guardado)
   function buildIndex(m){
-    var cm={}, cc={}, km={}, kc={}, sumAll=0;
+    var cm={}, cc={}, km={}, kc={};
     var bal={}, balCl={}, balUp={};   // saldo por conta: total, só confirmado, e até ao mês m
+    var npend={};                     // quantas transações por confirmar tem cada conta
     for(var i=0;i<state.transactions.length;i++){
       var t=state.transactions[i], mm=monthOf(t.date), net=(t.inflow||0)-(t.outflow||0);
-      sumAll += net;
       var inM=(mm===m), up=(mm<=m);
       bal[t.accountId]=(bal[t.accountId]||0)+net;
       if(t.cleared) balCl[t.accountId]=(balCl[t.accountId]||0)+net;
+      else npend[t.accountId]=(npend[t.accountId]||0)+1;
       if(up) balUp[t.accountId]=(balUp[t.accountId]||0)+net;
       if(t.categoryId){
         if(inM) cm[t.categoryId]=(cm[t.categoryId]||0)+net;
@@ -986,8 +1025,8 @@
       var cid=k.slice(0,bar), v=state.assignments[k];
       ac[cid]=(ac[cid]||0)+v; aTot+=v;
     }
-    _idx={month:m, cm:cm, cc:cc, km:km, kc:kc, sumAll:round2(sumAll),
-          bal:bal, balCl:balCl, balUp:balUp, ac:ac, aTot:round2(aTot)};
+    _idx={month:m, cm:cm, cc:cc, km:km, kc:kc,
+          bal:bal, balCl:balCl, balUp:balUp, npend:npend, ac:ac, aTot:round2(aTot)};
     buildLookup();
   }
   // Tabelas de consulta directa — evitam percorrer listas para cada linha apresentada.
@@ -1032,12 +1071,6 @@
   }
   function payeeIndex(){ if(!_payees) buildPayees(); return _payees; }
   // Lista para o <datalist>, dos mais usados para os menos usados.
-  function payeeListHTML(){
-    var m=payeeIndex(), arr=[];
-    for(var k in m) if(m.hasOwnProperty(k)) arr.push(m[k]);
-    arr.sort(function(a,b){ return b.count-a.count || (a.lastDate<b.lastDate?1:-1); });
-    return arr.slice(0,300).map(function(e){ return '<option value="'+esc(e.name)+'">'; }).join("");
-  }
   // Categoria que usou da última vez neste beneficiário — só se ainda existir.
   function payeeCategoria(nome){
     var e=payeeIndex()[payeeKey(nome)];
@@ -1134,9 +1167,14 @@
   // importa é o verde (aparece pouco) e não o âmbar (apareceria quase sempre).
   function pontoConta(accId){
     var pend = porConfirmar(accId), ok = Math.abs(pend) <= 0.005, n = 0;
-    if (!ok) for (var i=0;i<state.transactions.length;i++){
-      var t = state.transactions[i];
-      if (t.accountId===accId && !t.cleared) n++;
+    // Quantas faltam confirmar: vem da única passagem do índice. Contar aqui obrigava a
+    // percorrer TODAS as transações por cada conta, a cada desenho da barra lateral.
+    if (!ok) {
+      if (_idx && _idx.npend) n = _idx.npend[accId] || 0;
+      else for (var i=0;i<state.transactions.length;i++){
+        var t = state.transactions[i];
+        if (t.accountId===accId && !t.cleared) n++;
+      }
     }
     var tit = ok ? "Tudo confirmado — esta conta está a par do banco"
                  : (n + (n===1?" transação":" transações") + " por confirmar · " + fmt(pend));
@@ -1726,16 +1764,19 @@
     state.ui.prioFilters = {};        // ▲ ● ▼
     state.ui.txFilter = null;         // filtros da lista de transações
     state.ui.txLimit = PAGINA;        // volta à primeira página
-    state.ui.openAccount = null;      // fecha o registo de uma conta
     aoTopo();                         // é outro orçamento: começa-se do princípio
   }
   function switchBudget(id){
     if (id === _bindex.active) { closeModal(); return; }
     if (!budgetName(id)) return;
-    save();                                  // grava o que está aberto
+    // Se a gravação falhar (armazenamento cheio), o que está em memória é a ÚNICA cópia do
+    // trabalho recente. Trocar de orçamento substitui a memória — e essas edições morriam ali,
+    // em silêncio. Antes de deitar fora a memória, exige-se que ela esteja em disco.
+    if (!save()) { toast("Não foi possível guardar este orçamento — a troca foi cancelada para não perder as alterações."); return; }
     _bindex.active = id; saveIndex(_bindex);
     state = loadBudgetRaw(id);
     if (!state.ui) state.ui = { view:"budget", month:nowMonthKey() };
+    _ultimoJSON = null; _sigCache = null;   // outro orçamento: as caches do anterior não servem
     reporVistaInicial();          // aterra no Orçamento do mês corrente, sem filtros do outro orçamento
     _idx=null; _payees=null; _undo=[]; _moves=[]; hideUndo();
     var posted = processRecurring();
@@ -1747,9 +1788,11 @@
     var id = novoId();
     var vazio = JSON.parse(JSON.stringify(DEFAULT_STATE)); vazio.ui = { view:"budget", month:nowMonthKey() };
     try { localStorage.setItem(budKey(id), JSON.stringify(vazio)); } catch(e){ toast("Sem espaço para outro orçamento."); return; }
+    // Mesma regra da troca: o orçamento novo só abre depois de o atual estar a salvo em disco.
+    if (!save()) { toast("Não foi possível guardar o orçamento atual — o novo não foi aberto, para não perder alterações."); return; }
     _bindex.list.push({ id:id, name:nome });
-    save(); _bindex.active = id; saveIndex(_bindex);
-    state = vazio; _idx=null; _payees=null; _undo=[]; _moves=[]; hideUndo();
+    _bindex.active = id; saveIndex(_bindex);
+    state = vazio; _ultimoJSON=null; _sigCache=null; _idx=null; _payees=null; _undo=[]; _moves=[]; hideUndo();
     closeModal(); render(); toast("Orçamento «"+nome+"» criado.");
   }
   function renameBudget(id, nome){
@@ -2059,6 +2102,9 @@
 
   function renderSidebar() {
     var bn = el("budName"); if (bn) bn.textContent = budgetName(_bindex.active) || "Orçamento";
+    // O mesmo nome no cabeçalho do telemóvel, onde a barra lateral não existe: sem ele, um ícone
+    // sozinho não dizia nem o que fazia nem em que orçamento se estava.
+    var bnm = el("budNameM"); if (bnm) bnm.textContent = budgetName(_bindex.active) || "Orçamento";
     var wrap = el("sideAccounts");
     var accs = state.accounts.filter(function(a){return !a.hidden;});
     if (!accs.length) { wrap.innerHTML = '<div style="padding:8px 12px;font-size:12px;color:#64748b;">Sem contas ainda</div>'; }
@@ -2184,7 +2230,11 @@
     var avail = availableFor(cat.id, m);
     if (avail < -0.005) return "neg";
     if (cat.cardId){
-      var debt = round2(-accountBalance(cat.cardId));
+      // Até ao mês EM VISTA, e não o saldo de todos os tempos: uma compra datada de um mês
+      // à frente não é dívida deste. Com o saldo total, a linha dizia «dívida coberta» ao mesmo
+      // tempo que o «Libertar excedente» (que já contava até ao mês) se oferecia para devolver
+      // esse mesmo dinheiro — dois números a discordar sobre a mesma pergunta.
+      var debt = round2(-accountBalanceUpto(cat.cardId, m));
       if (debt <= 0.005) return "ok";
       return avail >= debt-0.005 ? "ok" : "warn";
     }
@@ -2251,7 +2301,8 @@
         var avail = availableFor(cat.id, m);
         var pillCls = avail > 0.005 ? "pos" : (avail < -0.005 ? "neg" : "zero");
         if (cat.cardId) {
-          var debt = round2(-accountBalance(cat.cardId));
+          // Mesma regra do catStatus: a dívida é a que existe até ao mês em vista.
+          var debt = round2(-accountBalanceUpto(cat.cardId, m));
           var pnote = debt<=0.005 ? "Sem dívida a pagar" : (avail>=debt-0.005 ? ("✅ Dívida coberta ("+fmt(debt)+")") : ("Falta "+fmt(round2(debt-avail))+" para cobrir a dívida de "+fmt(debt)));
           if (debt>0.005 && avail<debt-0.005 && pillCls==="pos") pillCls="warn";
           var cstatP = catStatus(cat, m);
@@ -2377,7 +2428,6 @@
 
   function renderAccounts() {
     var content = el("content");
-    if (state.ui.openAccount) { renderRegister(state.ui.openAccount); return; }
     var visible = state.accounts.filter(function(a){return !a.hidden;});
     if (!visible.length) {
       content.innerHTML = emptyState("🏦","Ainda não há contas","Adicione as suas contas bancárias, dinheiro, cartões de crédito ou investimentos.",
@@ -2409,42 +2459,15 @@
         '<div class="data-card'+(soOrcamento?' sem-tipo':'')+'"><table class="data"><thead><tr><th>Conta</th><th class="col-tipo">Tipo</th><th class="num">Confirmado</th><th class="num">Saldo</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
     }
     content.innerHTML =
+      // O «Transferir» mexe em transações, e transações criam-se aqui — faltava o par dele.
+      // Sem o «Nova transação», este ecrã oferecia o caso raro (mover dinheiro entre contas) e
+      // escondia o caso de todos os dias.
       '<div class="toolbar"><button class="btn primary" data-action="add-account">+ Adicionar conta</button>'+
+      '<button class="btn" data-action="add-tx">➕ Nova transação</button>'+
       '<button class="btn" data-action="transfer">↔ Transferir</button>'+
       '<div class="spacer"></div>'+
       '<span class="muted" style="font-size:12.5px;">Património líquido: <b>'+fmt(netWorth())+'</b></span></div>'+
       accTable(budgetAccs, "🏦 Contas de orçamento", true) + accTable(trackAccs, "💳 Cartões e outras contas");
-  }
-
-  function renderRegister(accId) {
-    var acc = accountById(accId);
-    if (!acc) { state.ui.openAccount = null; renderAccounts(); return; }
-    // Ordem cronológica (estável) para acumular o saldo; a apresentação é exatamente o seu inverso,
-    // para que o saldo linha-a-linha seja coerente mesmo com várias transações na MESMA data.
-    var ascAll = state.transactions.filter(function(t){return t.accountId===accId;})
-      .sort(function(a,b){ return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
-    var txs = ascAll.slice().reverse();
-    var bal = accountBalance(accId), cl = accountBalance(accId, true), pend = porConfirmar(accId);
-    var run=0, balOf={};
-    for(var bi=0;bi<ascAll.length;bi++){ run=round2(run+(ascAll[bi].inflow||0)-(ascAll[bi].outflow||0)); balOf[ascAll[bi].id]=run; }
-    var LIMR = state.ui.txLimit || PAGINA;
-    var body = txs.length ? txs.slice(0,LIMR).map(function(t){ return txRow(t, balOf[t.id]); }).join("") :
-      '<tr><td colspan="9" class="empty" style="padding:30px;">Sem transações nesta conta.</td></tr>';
-    if (txs.length > LIMR) body += '<tr><td colspan="9" style="text-align:center;padding:14px;">'+
-      '<button class="btn" data-action="show-more-tx">Mostrar mais '+PAGINA+' (a ver '+LIMR+' de '+txs.length+')</button></td></tr>';
-    el("content").innerHTML =
-      '<div class="toolbar">'+
-        '<button class="btn" data-action="back-accounts">‹ Contas</button>'+
-        '<button class="btn primary" data-action="add-tx" data-account="'+accId+'">➕ Nova transação</button>'+
-        '<button class="btn" data-action="transfer">↔ Transferir</button>'+
-        (acc.type!=="budget" && bal<-0.005 ? '<button class="btn" data-action="pay-card" data-id="'+accId+'">💳 Pagar</button>' : '')+
-        '<div class="spacer"></div>'+
-        '<span class="muted" style="font-size:12.5px;">'+pontoConta(accId)+'Confirmado: <b>'+fmt(cl)+'</b> &nbsp;·&nbsp; Saldo: <b style="'+(bal<0?"color:var(--negative)":"")+'">'+fmt(bal)+'</b>'+
-          (Math.abs(pend)>0.005 ? ' &nbsp;·&nbsp; <b class="pend" title="Registado mas ainda não confirmado no banco">Por confirmar: '+fmt(pend)+'</b>' : '')+'</span>'+
-      '</div>'+
-      '<h3 style="margin:4px 2px 12px;">'+esc(acc.name)+' <span class="pill '+(acc.type==="budget"?"budget":(acc.type==="credit"?"credit":"tracking"))+'">'+(acc.type==="budget"?"Orçamento":(acc.type==="credit"?"Cartão de crédito":"Acompanhamento"))+'</span></h3>'+
-      '<div class="data-card"><table class="data"><thead><tr>'+
-      '<th>'+thSelTodas()+'Data</th><th>Beneficiário</th><th>Categoria</th><th class="col-nota">Nota</th><th class="num">Saída</th><th class="num">Entrada</th><th class="num">Saldo</th><th style="text-align:center;">✓</th><th></th></tr></thead><tbody>'+body+'</tbody></table></div>';
   }
 
   function txRow(t, runBal, withAccount) {
@@ -2533,7 +2556,10 @@
     if (per==="ano")    return { from:mAtual.slice(0,4)+"-01-01", to:hoje };
     return null;
   }
-  function renderTransactions() {
+  // A lista de transações TAL COMO ESTÁ À VISTA: mesma ordem, mesmos filtros. Vive fora do
+  // render para que o «Exportar o que vejo» possa exportar exatamente o que se está a ver —
+  // se as duas coisas tivessem cópias separadas desta regra, um dia deixavam de bater certo.
+  function txFiltradas() {
     var f = state.ui.txFilter || {};
     // Mesma data: a última transação adicionada aparece primeiro (desempate por ordem de criação).
     var list = state.transactions.map(function(t,i){ return [t,i]; }).sort(function(a,b){
@@ -2550,6 +2576,12 @@
     // Filtro por beneficiário EXATO (vindo do 🏷 Beneficiários). Diferente da procura por texto:
     // ali "Continente" apanharia também "Continente Bom Dia"; aqui é só aquele beneficiário.
     if (f.payee) list = list.filter(function(t){ return payeeKey(t.payee||"")===f.payee; });
+    return list;
+  }
+
+  function renderTransactions() {
+    var f = state.ui.txFilter || {};
+    var list = txFiltradas();
 
     var perOpts = PERIODOS.map(function(p){ return '<option value="'+p[0]+'"'+((f.per||"")===p[0]?" selected":"")+'>'+p[1]+'</option>'; }).join("");
     var accOpts = '<option value="">Todas as contas</option>' + state.accounts.map(function(a){return '<option value="'+a.id+'"'+(f.account===a.id?" selected":"")+'>'+esc(a.name)+'</option>';}).join("");
@@ -2605,24 +2637,68 @@
           '<div class="hint" style="margin-top:6px;">Conta só o que os filtros deixam à vista — escolha um período para ver, por exemplo, só este ano.</div>'+
         '</div>';
     }
-    var head = '<div class="toolbar">'+
-      // O «Dividir» e o «Beneficiários» saíram daqui: o primeiro está dentro da nova
-      // transação, o segundo na barra lateral (e no 🏷️ do topo, no telemóvel).
-      '<button class="btn primary hide-phone" data-action="add-tx">➕ Nova transação</button>'+
-      '<input class="search" id="txSearch" placeholder="Procurar beneficiário ou nota…" value="'+esc(f.q||"")+'">'+
-      '<select class="filter" id="txFilterAcc">'+accOpts+'</select>'+
-      '<select class="filter" id="txFilterCat">'+catOpts+'</select>'+
-      '<select class="filter" id="txFilterPer">'+perOpts+'</select>'+
+    // O ecrã tem três andares, do mais fixo para o mais volátil:
+    //   1. QUEM  — só dentro de uma conta: de que conta se trata e quanto tem.
+    //   2. FAZER — as ações. Botões de tamanho normal, com o «Nova transação» na cor da
+    //              aplicação, igual ao do Orçamento: é a mesma ação, deve ter o mesmo aspeto.
+    //   3. VER   — os filtros e as contagens, em letra pequena: são um ajuste, não uma ação.
+    // Antes estava tudo numa barra só, o que obrigava a encolher as ações até ao tamanho dos
+    // filtros — e uma ação encolhida ao pé de uma caixa de seleção deixa de se ler como ação.
+    var accA = f.account ? accountById(f.account) : null;
+
+    var andarConta = "";
+    if (accA) {
+      var balA = accountBalance(f.account), clA = accountBalance(f.account, true);
+      andarConta =
+        '<div class="toolbar acc-head">'+
+          '<button class="btn sm" data-action="back-accounts" title="Voltar à lista de contas">‹ Contas</button>'+
+          '<h3>'+esc(accA.name)+' <span class="pill '+(accA.type==="budget"?"budget":(accA.type==="credit"?"credit":"tracking"))+'">'+
+            (accA.type==="budget"?"Orçamento":(accA.type==="credit"?"Cartão de crédito":"Acompanhamento"))+'</span></h3>'+
+          '<div class="spacer"></div>'+
+          '<span class="muted" style="font-size:12.5px;white-space:nowrap;">'+pontoConta(f.account)+
+            'Confirmado: <b>'+fmt(clA)+'</b>&nbsp; · &nbsp;Saldo: <b style="'+(balA<0?"color:var(--negative)":"")+'">'+fmt(balA)+'</b></span>'+
+        '</div>';
+    }
+
+    // Dentro de uma conta o «Nova transação» já leva a conta preenchida — é por isso que não há
+    // dois botões: é o mesmo, apenas mais bem informado.
+    var andarAcoes =
+      '<div class="toolbar acc-acoes'+(accA?' tem-conta':'')+'">'+
+        // Dentro de uma conta este botão aparece TAMBÉM no telemóvel: o ➕ do cabeçalho abre uma
+        // transação em branco, e a graça de estar dentro de uma conta é ela vir já preenchida.
+        '<button class="btn primary'+(accA?'':' hide-phone')+'" data-action="add-tx"'+(accA?' data-account="'+f.account+'"':'')+'>➕ Nova transação</button>'+
+        (accA ? '<button class="btn" data-action="transfer">↔ Transferir</button>' : '')+
+        (accA && accA.type!=="budget" && accountBalance(f.account)<-0.005
+          ? '<button class="btn" data-action="pay-card" data-id="'+f.account+'">💳 Pagar cartão</button>' : '')+
+        // Um só botão de exportar. Dentro de uma conta sem mais filtros, «o que vejo» É a conta
+        // inteira — dois botões lado a lado a produzir o mesmo ficheiro era só confusão.
+        '<button class="btn hide-phone" data-action="export-view-csv" title="Guardar num .csv exatamente as transações que estão à vista, com os filtros aplicados">⬇ Exportar o que vejo</button>'+
+      '</div>';
+
+    var head = andarConta + andarAcoes + '<div class="toolbar tx-filtros">'+
+      '<span class="muted hide-phone tb-etiq" style="font-size:12.5px;">Mostrar:</span>'+
+      // O que a procura varre está escrito no próprio campo E na dica: sem isso, a única forma
+      // de saber que NÃO varre categorias nem valores era ir experimentar e concluir mal.
+      '<input class="search" id="txSearch" placeholder="Procurar no beneficiário e na nota…" '+
+        'title="Procura no beneficiário e na nota. Para categorias use o filtro de categoria, ao lado." '+
+        'aria-label="Procurar no beneficiário e na nota" value="'+esc(f.q||"")+'">'+
+      '<select class="filter" id="txFilterAcc" title="Conta" aria-label="Filtrar por conta">'+accOpts+'</select>'+
+      '<select class="filter" id="txFilterCat" title="Categoria" aria-label="Filtrar por categoria">'+catOpts+'</select>'+
+      '<select class="filter" id="txFilterPer" title="Período" aria-label="Filtrar por período">'+perOpts+'</select>'+
       (f.per==="custom" ? dateField("txFilterFrom", f.from||"", 'class="date-txt filter" title="De"')+
                           dateField("txFilterTo", f.to||"", 'class="date-txt filter" title="Até"') : '')+
-      (temFiltro ? '<button class="btn sm" data-action="tx-filter-clear" title="Ver todas as transações">✕ Limpar filtros</button>' : '')+
+      // Aqui o «Limpar» FICA no telemóvel (ao contrário do orçamento): estes filtros são caixas
+      // de seleção e um campo de texto — desfazê-los à mão dava quatro gestos. Perde só o rótulo.
+      (temFiltro ? '<button class="btn sm" data-action="tx-filter-clear" title="Ver todas as transações" aria-label="Limpar filtros">✕<span class="rot"> Limpar filtros</span></button>' : '')+
       '<div class="spacer"></div>'+
-      '<button class="btn sm" data-action="export-csv">⬇ CSV</button>'+
       (function(){ var pend = porConfirmar(f.account||null);
         if (Math.abs(pend) <= 0.005) return '';
         var qual = f.account ? "nesta conta" : "em todas as contas";
-        return '<span class="muted" style="font-size:12.5px;"><b class="pend" title="Registado mas ainda não confirmado no banco">Por confirmar: '+fmt(pend)+'</b> '+qual+'</span>'; })()+
-      '<span class="muted" style="font-size:12.5px;">'+list.length+(temFiltro?' de '+state.transactions.length:'')+' transações</span></div>';
+        // No telemóvel fica só o valor: o «nesta conta»/«em todas as contas» já se lê no filtro
+        // de conta, mesmo ali ao lado, e era a peça mais comprida da barra.
+        return '<span class="muted" style="font-size:12.5px;white-space:nowrap;"><b class="pend" title="Registado mas ainda não confirmado no banco">Por confirmar: '+fmt(pend)+'</b><span class="hide-phone"> '+qual+'</span></span>'; })()+
+      // Diz sempre quantas transações ESTÃO À VISTA — como a contagem de categorias no orçamento.
+      '<span class="muted" style="font-size:12.5px;white-space:nowrap;">'+list.length+(list.length===1?' transação':' transações')+'</span></div>';
 
     if (!state.transactions.length) {
       el("content").innerHTML = head + emptyState("🧾","Sem transações","Registe as suas entradas e saídas para ver a atividade no orçamento.",
@@ -2641,7 +2717,7 @@
       for (var bi=0; bi<asc.length; bi++){ run = round2(run + (asc[bi].inflow||0) - (asc[bi].outflow||0)); balOf[asc[bi].id] = run; }
     }
     var body = list.length ? visiveis.map(function(t){ return txRow(t, balOf?balOf[t.id]:undefined, !soConta); }).join("")
-                           : '<tr><td colspan="9" class="empty">Nada corresponde ao filtro.</td></tr>';
+                           : ('<tr><td colspan="9" class="empty">'+(soConta ? 'Esta conta ainda não tem transações.' : 'Nada corresponde ao filtro.')+'</td></tr>');
     if (list.length > LIM) body += '<tr><td colspan="9" style="text-align:center;padding:14px;">'+
       '<button class="btn" data-action="show-more-tx">Mostrar mais '+PAGINA+' (a ver '+LIM+' de '+list.length+')</button></td></tr>';
 
@@ -3359,7 +3435,7 @@
           '<div style="padding-inline-start:4px;border-inline-start:2px solid var(--border);margin-top:8px;padding-top:2px;">'+
           '<div class="hint" style="margin:0 0 10px 8px;">Para abrir no Excel ou no Sheets e analisar à sua maneira. Exportam <b>só o orçamento aberto</b> («'+esc(budgetName(_bindex.active)||"")+'») e <b>não</b> repõem nada — para isso é a cópia <b>.json</b>.</div>'+
           '<button class="btn" data-action="export-csv" style="width:100%;justify-content:center;">Transações</button>'+
-          '<div class="hint" style="margin:4px 0 8px;">Todas as transações, uma por linha.</div>'+
+          '<div class="hint" style="margin:4px 0 8px;">Todas as transações do orçamento aberto, de todas as contas, uma por linha — sem filtros aplicados.</div>'+
           '<button class="btn" data-action="export-budget-csv" style="width:100%;justify-content:center;">Orçamento do mês em vista</button>'+
           '<div class="hint" style="margin:4px 0 8px;">Os montantes de <b>'+monthLabel(state.ui.month)+'</b>, categoria a categoria.</div>'+
           '<button class="btn" data-action="export-config-csv" style="width:100%;justify-content:center;">Configuração dos alvos</button>'+
@@ -3839,7 +3915,7 @@
         '<li><b>O pontinho ao lado de cada conta:</b> <b>verde</b> quer dizer que não há nada por confirmar — a conta está a par do banco. <b>Âmbar</b> quer dizer que há lançamentos que o banco ainda não processou; é o estado normal de quem regista as despesas no próprio dia, não um aviso. No computador, o rato por cima diz quantas são e quanto valem.</li>'+
         '<li><b>O ✓ e o «Por confirmar»:</b> o ✓ marca que o banco já processou a transação. Mexe no <b>Confirmado</b>, não no <b>Saldo</b> — um café pago ontem está pago, tenha o banco lançado ou não, e o orçamento tem de contar com isso. A diferença entre os dois é o <b>Por confirmar</b>, que aparece no cabeçalho da conta e no ecrã das transações: quando chega a zero, a app bate certo com o extrato.</li>'+
         '<li><b>Total do mês:</b> por cima das colunas, a soma do <b>Atribuído</b>, da <b>Atividade</b> e do <b>Disponível</b>. As categorias de <b>pagamento de cartão</b> ficam de fora das três: a atividade delas é o espelho positivo do que se gastou — 50 € de mercearia no cartão dão −50 na Mercearia e +50 no cartão — e somá-las daria zero, como se não se tivesse gasto nada. Os valores do cartão continuam na linha do grupo dele.</li>'+
-        '<li><b>Vários orçamentos</b> (📚, no cabeçalho): pode ter um <b>Pessoal</b> e um <b>Família</b>, por exemplo. Cada um é <b>completamente separado</b> — contas, categorias e transações próprias — e troca-se com um toque. Se sincroniza, vão <b>todos no mesmo gist</b>; só há uma coisa a saber: se editar orçamentos <b>diferentes</b> em aparelhos diferentes antes de sincronizar, a aplicação pergunta qual manter, como faria com qualquer conflito.</li>'+
+        '<li><b>Vários orçamentos</b> (na barra lateral, ou no botão com o nome do orçamento no cabeçalho, no telemóvel): pode ter um <b>Pessoal</b> e um <b>Família</b>, por exemplo. Cada um é <b>completamente separado</b> — contas, categorias e transações próprias — e troca-se com um toque. Se sincroniza, vão <b>todos no mesmo gist</b>; só há uma coisa a saber: se editar orçamentos <b>diferentes</b> em aparelhos diferentes antes de sincronizar, a aplicação pergunta qual manter, como faria com qualquer conflito.</li>'+
         '<li><b>A barra de filtros do Orçamento encolhe com a janela.</b> À medida que o espaço aperta, os nomes dos botões vão desaparecendo pela ordem em que fazem menos falta — fica o símbolo, e o rato por cima diz sempre o que é. Se estreitar mesmo muito, a aplicação passa à vista de telemóvel, com o menu em baixo. É de propósito: assim a barra nunca se parte em duas linhas.</li>'+
         '<li><b>O cabeçalho das listas fica à vista:</b> ao descer uma lista de transações, os nomes das colunas — Data, Beneficiário, Categoria… — ficam colados ao topo, para saber sempre o que está a ler. No telemóvel, como a tabela é mais larga do que o ecrã, é a <b>lista</b> que corre dentro da sua própria área em vez da página inteira.</li>'+
         '<li><b>Contas nos campos de dinheiro:</b> em qualquer campo de valor pode escrever a conta em vez do total — <b>23,45+11,90+7,15</b>. O resultado aparece por baixo enquanto escreve e substitui a conta assim que sai do campo. No <b>telemóvel</b> aparece um <b>teclado próprio</b> com <b>+</b> e <b>−</b>, sem letras nem risco de enganos. Num par <b>Saída/Entrada</b>, um <b>−</b> escrito no princípio do campo continua a passar o valor para o outro lado; depois de números, é uma subtração.</li>'+
@@ -3850,7 +3926,7 @@
       sec("Organizar")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li><b>Filtros</b> no topo do orçamento, para mostrar só as categorias que interessam. Pelo <b>alvo</b>, do mais folgado ao mais apertado: <b>🔵 com excedente</b> (têm <b>mais</b> do que o alvo pede — as candidatas a «🧹 Libertar excedente»), <b>🟢 alvo cumprido</b>, <b>🟡 abaixo do alvo</b> e <b>🔴 excedido</b>. Há ainda <b>💰 com saldo</b> (têm dinheiro disponível) e a <b>prioridade</b> (▲ ● ▼).</li>'+
-        '<li>Dentro do mesmo grupo os filtros somam-se («<b>ou</b>»: 🟡 <i>ou</i> 🔴); entre grupos cruzam-se («<b>e</b>»: 🟡 abaixo do alvo <b>e</b> ▲ alta). O 🔵 é um refinamento do 🟢 — uma categoria cumprida pode ter excedente por cima. O botão <b>Limpar</b> tira todos de uma vez.</li>'+
+        '<li>Dentro do mesmo grupo os filtros somam-se («<b>ou</b>»: 🟡 <i>ou</i> 🔴); entre grupos cruzam-se («<b>e</b>»: 🟡 abaixo do alvo <b>e</b> ▲ alta). O 🔵 é um refinamento do 🟢 — uma categoria cumprida pode ter excedente por cima. O botão <b>Limpar</b> tira todos de uma vez (no telemóvel não aparece, para a barra caber numa linha: desligue cada filtro tocando-lhe outra vez).</li>'+
         '<li><b>Reordenar</b> categorias, grupos e <b>contas</b>: arraste no computador; no telemóvel use <b>▲▼</b> dentro do ✎. As contas reordenam-se dentro do mesmo tipo (orçamento com orçamento, cartões entre si) e a ordem vale na barra lateral e no ecrã Contas.</li>'+
         '<li><b>🗄 Arquivar</b> esconde uma conta ou categoria sem perder o histórico.</li>'+
       '</ul>'+
@@ -3866,7 +3942,7 @@
         '<li>Clique numa transação para a editar. Transferências e divididas editam-se <b>por inteiro</b>, nunca metade.</li>'+
         '<li><b>Somar à pressa:</b> as caixas à esquerda da data selecionam transações e mostram o total em baixo. A caixa no <b>cabeçalho</b> marca todas as que estão à vista. É só uma conta rápida — não altera nada, e a seleção desaparece ao mudar de página.</li>'+
         '<li><b>Campos de valor:</b> algarismos e um separador decimal. Em <b>Saída/Entrada</b>, o «-» troca de lado.</li>'+
-        '<li><b>Procurar:</b> o campo no topo das Transações procura no <b>beneficiário</b> e na <b>nota</b>, e cruza-se com os filtros de conta, categoria e período.</li>'+
+        '<li><b>Procurar:</b> o campo no topo das Transações procura <b>apenas</b> no <b>beneficiário</b> e na <b>nota</b> — não procura em categorias, valores nem datas, que têm filtros próprios ao lado. Basta parte da palavra, e maiúsculas ou minúsculas é igual. Cruza-se com os filtros de conta, categoria e período («Confeitaria» + <i>este ano</i> + conta X).</li>'+
         '<li><b>🏷️ Beneficiários:</b> mudar um nome altera todas as transações; dar-lhe um nome que já existe <b>junta</b> os dois. O <b>📊 Ver</b> mostra tudo o que gastou nesse beneficiário — total, número de vezes, média e em que categorias entrou. Como é a lista de transações normal, pode juntar-lhe um <b>período</b> para ver só um ano, e editar as transações a partir dali.</li>'+
         '<li><b>Importar .csv</b> do banco: as linhas que já existem são detetadas e saltadas.</li>'+
       '</ul>'+
@@ -3903,152 +3979,85 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
+      // O historico e longo por natureza, mas quem o le quer saber O QUE MUDOU, nao em que
+      // versao. Por isso: o recente fica ao pormenor, o antigo agrupa-se por temas em blocos
+      // maiores, e o que ficou para tras por ter sido substituido depois sai de vez.
+      ver("1.52", "agosto 2026", [
+        '<b>A letra deixou de variar de orçamento para orçamento no iPhone.</b> O Safari aumentava sozinho a letra de blocos largos com pouco texto — era por isso que a linha do mês nas recorrentes («AGOSTO 2026») aparecia maior num orçamento do que noutro: dependia da largura da tabela. Aumentar o texto nas definições do telemóvel continua a funcionar.',
+        '<b>As barras de filtros passaram a caber numa linha no telemóvel.</b> No <b>Orçamento</b> sai o ✕ Limpar (desliga-se cada filtro tocando-lhe outra vez); nas <b>Transações</b> ele fica, mas só com o ✕, porque ali os filtros são caixas de seleção. As contagens dizem agora <b>quantas categorias / transações estão à vista</b>, em vez de «3 de 24».',
+        '<b>Exportar para folha de cálculo passou a seguir o que está no ecrã.</b> O antigo ⬇ CSV das Transações parecia exportar o que estava à vista mas exportava sempre tudo. No lugar dele, e só no computador, há agora <b>⬇ Exportar o que vejo</b> nas Transações (respeita os filtros todos) e <b>⬇ Exportar esta conta</b> no registo de cada conta. Os três recortes possíveis passam a ter um botão cada: <b>uma conta</b>, <b>o que está filtrado</b> e <b>o orçamento inteiro</b> — este último em <b>Dados e cópias</b>, como sempre. Nenhum deles sai do orçamento aberto.',
+        '<b>Correção importante — eliminar um grupo dava cabo do «Pronto a atribuir».</b> As categorias do grupo desapareciam, mas o dinheiro que lhes estava atribuído ficava para trás, invisível: continuava a ser descontado do «Pronto a atribuir» <b>para sempre</b>, e a verificação de integridade acusava uma diferença sem conseguir apontar nenhuma transação culpada. Agora eliminar um grupo faz a mesma limpeza que eliminar uma categoria: o dinheiro volta ao «Pronto a atribuir», as transações ficam sem categoria e as regras recorrentes afetadas ficam em pausa. A confirmação passou também a dizer quantas categorias vão dentro, incluindo as <b>arquivadas</b> — que antes eram apagadas sem sequer perguntar.',
+        '<b>Correção — cartão de crédito:</b> a linha do cartão contava a dívida de <b>todos os tempos</b>, mas o «Libertar excedente» contava só até ao mês em vista. Com uma compra datada de um mês à frente, a app dizia «dívida coberta» e ao mesmo tempo oferecia-se para devolver o dinheiro reservado para essa mesma fatura. Passam os dois a contar até ao mês que está a ver.',
+        '<b>Mais rápida a cada toque.</b> Cada ação gravava o orçamento inteiro duas vezes e voltava a percorrê-lo uma terceira para saber se havia alterações por guardar. Agora só grava quando algo mudou de facto. Nota-se sobretudo no telemóvel e com muitas transações.',
+        '<b>Tocar no separador «Transações» volta à lista inteira</b>, sem filtros — tal como «Contas» volta sempre à lista de contas. Antes, o filtro de uma conta ou de uma categoria ficava colado ao separador e não havia forma óbvia de voltar a ver tudo. Os atalhos que abrem a lista já filtrada (uma conta, a atividade de uma categoria, um beneficiário) continuam a funcionar como antes.',
+        'O ecrã <b>Contas</b> ganhou o botão <b>➕ Nova transação</b>: tinha o «↔ Transferir», que é o caso raro, e faltava-lhe o de todos os dias.',
+        '<b>O ecrã Transações passou a ter três andares:</b> a conta (quando está dentro de uma), as <b>ações</b> e os <b>filtros</b>. As ações voltaram ao tamanho normal, com o <b>➕ Nova transação</b> na cor da aplicação, igual ao do Orçamento — estavam encolhidas ao tamanho das caixas de filtro, e uma ação desse tamanho deixa de se ler como ação. O campo de procura passou também a dizer, sem cortes, o que procura: <b>beneficiário e nota</b>.',
+        '<b>Abrir uma conta deixou de ser um ecrã à parte.</b> Contas → uma conta leva agora ao ecrã <b>Transações</b> com o filtro dessa conta ligado, com um chapéu por cima (nome, saldo, confirmado e as ações da conta). Eram dois ecrãs a mostrar a mesma lista, e o da conta não deixava procurar por texto, filtrar por período nem cruzar com uma categoria — agora deixa. A coluna <b>Saldo</b> continua a aparecer enquanto estiver a ver só aquela conta.',
+        '<b>No telemóvel, o botão de trocar de orçamento diz o nome do orçamento aberto</b> («💰 Pessoal ▾») em vez de um 📚 que não se percebia — e assim vê-se sempre em que orçamento se está.'
+      ])+
+
       ver("1.38 – 1.51", "agosto 2026", [
-        'Em <b>Dados e cópias</b>, a moldura passou a distinguir só os <b>três lugares</b> onde os dados podem viver. Tudo o resto são ações, e ficaram todas com o mesmo aspeto.',
-        'O histórico passou a estar dentro de uma secção que se abre, com a contagem à vista («5 dias · 3 pontos 🛟») para não ocupar meio ecrã.',
+        '<b>«Dados e cópias» reorganizado à volta de uma ideia:</b> primeiro <b>onde vivem os seus dados</b> (no navegador, em ficheiro, na nuvem), depois <b>trazer e levar</b> (importar do banco, exportar para folha de cálculo) e por fim <b>definições</b>, <b>arrumação</b> e <b>recomeçar</b>. Guardar e repor uma cópia ficaram juntos, que é onde se procuram, e o histórico passou para uma secção que se abre, com a contagem à vista.',
         '<b>Importar um ficheiro passou a perguntar antes.</b> Quando o ficheiro tinha um só orçamento, os dados eram substituídos em silêncio, sem pergunta nem forma de voltar atrás. Agora pergunta e guarda um ponto 🛟 primeiro.',
-        '<b>«Dados e cópias» reorganizado:</b> <b>onde vivem os seus dados</b> (no navegador, em ficheiro, na nuvem), <b>trazer e levar</b> (importar do banco, exportar para folha de cálculo) e depois <b>definições</b>, <b>arrumação</b> e <b>recomeçar</b>. Guardar e repor uma cópia ficaram juntos, que é onde se procuram.',
-        'Os ficheiros <b>.csv</b> passaram a dizer de que orçamento são, e o ecrã avisa que exportam só o orçamento aberto e não repõem nada.',
-        'Textos revistos em toda a aplicação: <b>aparelho</b> passou a ser sempre «aparelho» (dizia-se «dispositivo» a meio), os títulos das janelas passaram a ser iguais aos botões que as abrem, e o separador do browser deixou de dizer «Base-Zero (com sincronização)».',
         '<b>Novo filtro 😴 Adiadas</b> no orçamento. As categorias adiadas não são «abaixo do alvo» nem «cumpridas», por isso não apareciam em filtro nenhum — só percorrendo a lista toda.',
-        '<b>Barra de filtros repensada:</b> a contagem está sempre encostada à direita e o <b>✕ Limpar</b> só aparece quando há filtros ligados. Se a janela apertar, os nomes vão saindo por ordem — e nunca parte em duas linhas.',
-        '<b>Separadores de mês nas recorrentes:</b> a lista passa a ser cortada por «Agosto 2026», «Setembro 2026»… para se ver de relance onde acaba um mês e começa o outro.'
+        '<b>Separadores de mês nas recorrentes:</b> a lista passa a ser cortada por «Agosto 2026», «Setembro 2026»… para se ver de relance onde acaba um mês e começa o outro.',
+        '<b>Barra de filtros do orçamento repensada:</b> a contagem está sempre encostada à direita e o ✕ Limpar só aparece quando há filtros ligados. Se a janela apertar, os nomes vão saindo por ordem de importância.',
+        'Pormenores: os ficheiros <b>.csv</b> passaram a dizer de que orçamento são e a avisar que não repõem nada; e os textos foram revistos em toda a aplicação, com os títulos das janelas iguais aos botões que as abrem.'
       ])+
 
       ver("1.33 – 1.37", "agosto 2026", [
         '<b>O histórico deixou de ter limite prático:</b> as cópias passaram para uma zona do navegador com espaço de sobra. Antes, num orçamento com milhares de transações não cabiam e iam-se perdendo até sobrar uma — agora ficam as oito, cresça o orçamento o que crescer.',
-        '<b>Cabeçalho fixo nas listas de transações:</b> Data, Beneficiário, Categoria e o resto ficam à vista enquanto desce a lista.',
         '<b>Dados protegidos:</b> o Safari limpa sozinho o que não é usado durante uns dias, e nada o impedia — a aplicação passou a pedir para ser poupada. Em <b>Dados e cópias</b> vê se está protegida e quanto espaço tem.',
-        'As opções com caixa de seleção deixaram de ser escritas em maiúsculas: ocupavam quase o dobro e partiam-se em duas linhas no telemóvel.',
-        'O ficheiro descarregado de um ponto do histórico passou a sair formatado, como a cópia de segurança, e com um nome que já não se confunde com ela.'
+        '<b>Cabeçalho fixo nas listas de transações:</b> Data, Beneficiário, Categoria e o resto ficam à vista enquanto desce a lista.',
+        'As opções com caixa de seleção deixaram de ser escritas em maiúsculas: ocupavam quase o dobro e partiam-se em duas linhas no telemóvel.'
       ])+
 
-      ver("1.32", "agosto 2026", [
-        '<b>Cada ecrã novo começa no princípio:</b> abrir uma janela, abrir uma conta, mexer num filtro ou saltar para as transações de uma categoria já não o deixa a meio da lista onde estava.'
-      ])+
-
-      ver("1.30 – 1.31", "agosto 2026", [
-        '<b>O teclado de cálculo só aceita pelo ✓.</b> Antes bastava tocar fora dele para o valor entrar; agora confirma-se no <b>✓</b> ou desiste-se no <b>×</b>. O ecrã escurece enquanto ele está aberto.',
-        'No <b>Orçamento</b> tocar na categoria seguinte continua a aceitar e a avançar, para descer a coluna sem interrupções.'
-      ])+
-
-      ver("1.28 – 1.29", "agosto 2026", [
+      ver("1.25 – 1.32", "agosto 2026", [
+        '<b>Contas em qualquer campo de dinheiro:</b> escreva <b>23,45+11,90+7,15</b> em vez de somar de cabeça, e o resultado aparece junto ao campo. No telemóvel, o teclado com <b>+</b> e <b>−</b> — que só existia no orçamento — passou a abrir em todos esses campos. Num par Saída/Entrada, o <b>−</b> no princípio continua a passar o valor para o outro lado; depois de números, é uma subtração.',
+        '<b>O teclado de cálculo só aceita pelo ✓.</b> Antes bastava tocar fora dele para o valor entrar; agora confirma-se no <b>✓</b> ou desiste-se no <b>×</b>, e o ecrã escurece enquanto ele está aberto. No Orçamento, tocar na categoria seguinte continua a aceitar e a avançar, para descer a coluna sem interrupções.',
         '<b>Pontinho de estado em cada conta:</b> <b>verde</b> = a par do banco; <b>âmbar</b> = há lançamentos ainda não processados. É informação, não um aviso.',
-        'No telemóvel, a coluna <b>Tipo</b> deixou de repetir o título da secção: a lista de contas ficou mais folgada do que estava.'
+        '<b>Cada ecrã novo começa no princípio:</b> entrar na aplicação, trocar de orçamento, abrir uma janela ou uma conta, mexer num filtro ou saltar para as transações de uma categoria já não o deixam a meio da lista onde estava. E tocar num separador onde já está serve de «voltar ao topo».'
       ])+
 
-      ver("1.25 – 1.27", "agosto 2026", [
-        '<b>Contas em qualquer campo de dinheiro:</b> escreva <b>23,45+11,90+7,15</b> em vez de somar de cabeça. O resultado aparece junto ao campo.',
-        '<b>No telemóvel, o teclado com + e −</b> — que só existia no orçamento — passou a abrir em todos esses campos.',
-        'Num par Saída/Entrada, o <b>−</b> no princípio continua a passar o valor para o outro lado; depois de números, é uma subtração.'
-      ])+
-
-      ver("1.23 – 1.24", "agosto 2026", [
+      ver("1.21 – 1.24", "agosto 2026", [
         '<b>Rede de segurança antes do que não se anula:</b> adotar a nuvem, eliminar um orçamento, carregar exemplos ou apagar tudo guardam primeiro um ponto 🛟 com o estado anterior, em <b>Dados e cópias</b>.',
-        '<b>Avisos de sincronização em português corrente:</b> mensagens como «corrida» deram lugar a explicações do que aconteceu e do que fazer.',
-        '<b>Fim dos avisos de conflito falsos:</b> ao gravar pelo telemóvel a aplicação chegava a julgar-se em conflito consigo própria. Agora reconhece a sua própria gravação.',
-        '<b>Nada fica por enviar:</b> as alterações feitas durante uma sincronização seguem logo a seguir, em vez de esperarem pela edição seguinte.'
-      ])+
-
-      ver("1.21 – 1.22", "agosto 2026", [
-        '<b>Listas mais compactas:</b> as linhas das transações (e do registo de uma conta) ficaram mais baixas, à altura das outras listas.',
+        '<b>Sincronização mais calma:</b> acabaram os avisos de conflito falsos (ao gravar pelo telemóvel a aplicação chegava a julgar-se em conflito consigo própria), as alterações feitas durante uma sincronização seguem logo a seguir em vez de esperarem pela edição seguinte, e as mensagens passaram a explicar o que aconteceu e o que fazer, em português corrente.',
+        '<b>Listas mais compactas</b> nas transações, à altura das outras listas.',
         '<b>Beneficiários por ordem à escolha:</b> dos que mais usa, dos mais recentes, ou por ordem alfabética.',
-        '<b>Tocar num separador volta ao topo</b> — e mudar de ecrã já não o deixa a meio da lista onde estava.',
-        '<b>Correção nas recorrentes diárias:</b> ao espreitar meses muito à frente, uma regra diária deixava de aparecer no «Ainda este mês».',
-        'Se a cópia na nuvem não puder ser aberta por o navegador ser antigo, a aplicação passa a dizê-lo em vez de dar um erro incompreensível.'
+        '<b>Correção nas recorrentes diárias:</b> ao espreitar meses muito à frente, uma regra diária deixava de aparecer no «Ainda este mês».'
       ])+
 
-      ver("1.16 – 1.20", "agosto 2026", [
-        '<b>Resumo por beneficiário:</b> o novo <b>📊</b> em 🏷 Beneficiários mostra quanto gastou nesse sítio — total, número de vezes, média e categorias.',
-        'Abre na lista de transações, por isso pode juntar-lhe um período («este ano») e editar a partir dali.',
-        'O ecrã dos beneficiários ficou mais compacto: cada um numa só linha, com o nome, quantas vezes lá comprou e a data da última.'
-      ])+
-
-      ver("1.15", "agosto 2026", [
-        '<b>Mais rápida</b> a mudar de mês, de separador e de filtro — sobretudo com muitas transações.',
-        '<b>Correção:</b> uma conta criada com <b>saldo negativo</b> dava um aviso vermelho sem nada estar errado.',
-        '<b>Correção:</b> eliminar uma categoria deixava as regras recorrentes a lançar para o vazio. Agora ficam em pausa, com aviso.',
-        '<b>Correções várias</b> ao reordenar categorias arquivadas, a importar cópias antigas e nos avisos do cartão.',
-        '<b>«Como funciona?»</b> explica agora como o <b>excesso transita</b> para o mês seguinte.'
-      ])+
-
-      ver("1.14", "agosto 2026", [
+      ver("1.13 – 1.20", "agosto 2026", [
+        '<b>Resumo por beneficiário:</b> o <b>📊</b> em 🏷 Beneficiários mostra quanto gastou nesse sítio — total, número de vezes, média e categorias. Abre na lista de transações, por isso pode juntar-lhe um período («este ano») e editar a partir dali. O ecrã dos beneficiários ficou também mais compacto, cada um numa só linha.',
+        '<b>A categoria passou a ser obrigatória</b> em contas de orçamento e cartões — sem ela o movimento ficava de fora do orçamento. No <b>cartão</b> vale também para devoluções e cashbacks. Continuam sem categoria o <b>saldo inicial</b>, as <b>transferências</b> entre contas suas e as contas de <b>acompanhamento</b>; e ao <b>importar do banco</b> não se pede, mas a aplicação diz quantas ficaram por classificar.',
         '<b>Regra recorrente diária</b> — junta-se à semanal, quinzenal, mensal, semestral e anual.',
         '<b>Selecionar todas</b> na lista de transações: a caixa no cabeçalho marca as que estão à vista, para as somar de uma vez.',
-        '<b>Cópia de segurança:</b> diz agora se a última foi feita <b>neste aparelho</b> ou noutro — o ficheiro pode estar no outro.',
-        '<b>Conflito de sincronização:</b> mostra quantas transações existem só na nuvem e quantas só aqui, para ajudar a escolher.'
+        '<b>Mais rápida</b> a mudar de mês, de separador e de filtro — sobretudo com muitas transações.',
+        '<b>Correções:</b> uma conta criada com saldo negativo dava um aviso vermelho sem nada estar errado; eliminar uma categoria deixava as regras recorrentes a lançar para o vazio (agora ficam em pausa, com aviso); e mais algumas ao reordenar categorias arquivadas e a importar cópias antigas.'
       ])+
 
-      ver("1.13", "agosto 2026", [
-        '<b>A categoria passou a ser obrigatória</b> em contas de orçamento e cartões. Sem ela o movimento ficava de fora do orçamento.',
-        'No <b>cartão</b> vale também para devoluções e cashbacks: indique a categoria onde tinha feito a despesa.',
-        'Continuam sem categoria: o <b>saldo inicial</b>, as <b>transferências</b> entre contas suas e as contas de <b>acompanhamento</b>.',
-        'Ao <b>importar do banco</b> não se pede (são muitas de uma vez), mas a aplicação diz quantas ficaram por classificar.'
-      ])+
-
-      ver("1.12", "agosto 2026", [
-        '<b>Correção nas recorrentes:</b> uma regra do dia 29, 30 ou 31 ficava presa no dia mais curto depois de fevereiro. Agora recupera (31 jan → 28 fev → <b>31</b> mar).',
+      ver("1.9 – 1.12", "agosto 2026", [
+        '<b>🩹 Cobrir</b> e <b>🎯 Financiar</b> deixaram de se confundir: o 🩹 <i>traz a categoria a zero</i>, o 🎯 <i>leva-a ao alvo</i> — e avisa antes de deixar o «Pronto a atribuir» negativo.',
+        '<b>Correções de cálculo:</b> nos alvos «até uma data» e trimestral/semestral/anual (modo Repor), ter tirado dinheiro da categoria a meio do mês fazia a mensalidade vir a dobrar; e uma regra recorrente do dia 29, 30 ou 31 ficava presa no dia mais curto depois de fevereiro (31 jan → 28 fev → <b>31</b> mar).',
         '<b>Importação do banco:</b> valores entre parênteses — <i>(50,00)</i> — passam a ser lidos como despesa, não como receita.',
         '<b>Aviso novo</b> no ecrã do Orçamento para compras no cartão sem categoria.'
       ])+
 
-      ver("1.10 – 1.11", "agosto 2026", [
-        '<b>Abre sempre no Orçamento do mês atual</b>, e com os filtros limpos — ao entrar na aplicação e ao trocar de orçamento. Antes reabria onde tinha ficado.'
-      ])+
-
-      ver("1.9", "agosto 2026", [
-        '<b>🩹 Cobrir</b> e <b>🎯 Financiar</b> deixaram de se confundir: o 🩹 <i>traz a categoria a zero</i>, o 🎯 <i>leva-a ao alvo</i>. Ícone novo, nova ordem, e os dois explicados no «Como funciona?».',
-        'O <b>🎯 avisa</b> antes de deixar o «Pronto a atribuir» negativo.',
-        '<b>Correção de cálculo:</b> nos alvos «até uma data» e trimestral/semestral/anual (modo Repor), ter tirado dinheiro da categoria a meio do mês fazia a mensalidade vir a dobrar.'
-      ])+
-
-      ver("1.8", "agosto 2026", [
-        '<b>Cópia de segurança mais fiável:</b> guardar passou a marcar <b>todos</b> os orçamentos, o aviso de «por guardar» é agora de todos (e diz qual falta), e o ecrã «Dados e cópias» atualiza-se logo ao guardar.',
-        '<b>Conflito de sincronização:</b> mostra a data e hora de cada versão, para ajudar a escolher qual manter.'
-      ])+
-
-      ver("1.7", "agosto 2026", [
-        '<b>Saber o que falta guardar:</b> data e hora da última cópia, quantas alterações fez desde então, e esse número também no botão 💾.',
-        '<b>Adiar categorias</b> passou a contar como alteração por guardar e a entrar na sincronização.'
-      ])+
-
-      ver("1.6", "agosto 2026", [
+      ver("1.5 – 1.8", "agosto 2026", [
         '<b>😴 Adiar categorias:</b> pôr um alvo «em pausa» só neste mês, para não pedir dinheiro. Volta sozinho no mês seguinte (ou reative com o ☀️).',
         '<b>Anular mais completo:</b> passou a cobrir também transferências, pagamentos de cartão, criar/editar contas e lançar recorrentes.',
+        '<b>Saber o que falta guardar:</b> data e hora da última cópia, quantas alterações fez desde então (também no botão 💾), guardar passou a marcar <b>todos</b> os orçamentos, e o conflito de sincronização mostra a data e hora de cada versão para ajudar a escolher.',
+        '<b>Contas de acompanhamento mais limpas:</b> o campo Categoria deixa de aparecer onde não faz sentido, evitando descontrolar o orçamento.',
         '<b>Estas «Novidades»:</b> o histórico de alterações, acessível pelo número da versão aqui em baixo.'
       ])+
 
-      ver("1.5", "agosto 2026", [
-        '<b>Contas de acompanhamento mais limpas:</b> o campo Categoria deixa de aparecer onde não faz sentido (nova transação, dividir, recorrentes, importar CSV), evitando descontrolar o orçamento.',
-        '<b>«Dados e cópias» arrumada:</b> exportações agrupadas num só menu e o «dados de exemplo» só aparece num orçamento vazio.'
-      ])+
-
-      ver("1.4", "agosto 2026", [
-        '<b>🔵 Filtro «Com excedente»:</b> mostra as categorias com mais do que o alvo pede — as candidatas a libertar dinheiro.',
-        '<b>Sincronização:</b> botão para atualizar só o token do GitHub quando expira, sem desligar nem recolar o gist.'
-      ])+
-
-      ver("1.3", "agosto 2026", [
-        '<b>Data e hora da última sincronização</b> visível no ecrã de sincronização.',
-        '<b>Barra do cartão de crédito</b> desaparece quando não há dívida a pagar.',
-        'A lista de <b>«Movimentos recentes»</b> limpa-se ao trocar de orçamento.',
-        '<b>Manual de instalação e sincronização</b> (documento à parte) para configurar noutro aparelho ou para outra pessoa.'
-      ])+
-
-      ver("1.2", "agosto 2026", [
-        '<b>Ordem das transações:</b> no mesmo dia, a mais recente aparece agora no topo.',
-        '<b>Duplicar</b> uma transação passa a usar a data de hoje e a aparecer nos movimentos.',
-        '<b>«Cobrir»</b> uma categoria: a lista de onde tirar o dinheiro ordena-se pela opção escolhida, e há um resumo antes de confirmar.',
-        '<b>Exportar a configuração do orçamento</b> (a «planta» dos alvos) para folha de cálculo.'
-      ])+
-
-      ver("1.1", "agosto 2026", [
+      ver("1.1 – 1.4", "agosto 2026", [
         '<b>«Repor até X» à YNAB:</b> o verde mantém-se depois de gastar; a barra encolhe à medida que se gasta, sem mudar de cor.',
         '<b>Anular / Refazer</b> as últimas ações, com um painel de <b>«Movimentos recentes»</b>.',
-        '<b>Filtros</b> por estado (🟢🟡🔴), «com saldo» e prioridade.',
-        '<b>Teclado de cálculo</b> no campo «Atribuído», útil no telemóvel.',
-        '<b>Vários orçamentos</b> no mesmo aparelho, com uma sincronização única.',
-        '<b>Correção</b> do cálculo dos alvos com data (ex.: juntar para as prendas de Natal).'
+        '<b>Filtros</b> por estado (🟢🟡🔴), «com saldo», prioridade e <b>🔵 com excedente</b> — as candidatas a libertar dinheiro.',
+        '<b>Vários orçamentos</b> no mesmo aparelho, com uma sincronização única, e <b>teclado de cálculo</b> no campo «Atribuído».',
+        '<b>Transações:</b> no mesmo dia a mais recente aparece no topo, e <b>duplicar</b> passa a usar a data de hoje.',
+        '<b>Manual de instalação e sincronização</b> (documento à parte), para configurar noutro aparelho ou para outra pessoa.'
       ])+
 
       ver("1.0", "versão base", [
@@ -4633,6 +4642,28 @@
   function val(id) { return el(id).value.trim(); }
   function valLim(id, n) { return corta(el(id).value, n); }
 
+  // Tudo o que fica pendurado numa categoria quando ela desaparece. Vive aqui, e nao dentro
+  // do "delete-category", porque eliminar um GRUPO elimina as categorias dele — e fazia-o sem
+  // limpar nada: as atribuições ficavam órfãs e continuavam a descontar do «Pronto a
+  // atribuir» para sempre, sem nenhuma categoria à vista que o explicasse.
+  function limparRestosDaCategoria(id){
+    for (var t=0;t<state.transactions.length;t++) if(state.transactions[t].categoryId===id) state.transactions[t].categoryId=null;
+    for (var k in state.assignments) if(state.assignments.hasOwnProperty(k) && k.split("|")[0]===id) delete state.assignments[k];
+    for (var sk in state.snooze) if(state.snooze.hasOwnProperty(sk) && sk.split("|")[0]===id) delete state.snooze[sk];
+    // As regras recorrentes também apontavam para a categoria apagada: continuavam ativas e
+    // passavam a lançar, TODOS os meses, transações com uma categoria que já não existe — que
+    // depois apareciam como "órfãs" no aviso de integridade. Desativam-se para o utilizador
+    // decidir o que fazer, em vez de desaparecerem em silêncio.
+    var n=0;
+    for (var r=0;r<(state.recurring||[]).length;r++){
+      if(state.recurring[r].categoryId===id){ state.recurring[r].categoryId=null; state.recurring[r].active=false; n++; }
+    }
+    return n;
+  }
+  function avisoRecorrentes(n){
+    if(!n) return;
+    toast(n+" regra"+(n===1?"":"s")+" recorrente"+(n===1?"":"s")+" usava"+(n===1?"":"m")+" esta categoria — ficou"+(n===1?"":"ram")+" em pausa até lhe dar outra.");
+  }
   var actions = {
     "prev-month": function(){ state.ui.month = shiftMonth(state.ui.month,-1); render(); },
     "next-month": function(){ state.ui.month = shiftMonth(state.ui.month, 1); render(); },
@@ -4657,7 +4688,7 @@
     // ou categoria, e a editar as transações a partir dali.
     "payee-report": function(k){
       closeModal();
-      state.ui.view="transactions"; state.ui.openAccount=null;
+      state.ui.view="transactions";
       state.ui.txFilter={ payee:k }; state.ui.txLimit=PAGINA;
       save(); render(); aoTopo();
     },
@@ -4756,12 +4787,15 @@
       for (i=0;i<state.transactions.length;i++){ t=state.transactions[i]; if(t.transfer && paresTocados[t.transfer]) delete t.transfer; }
       // regras recorrentes que usavam esta conta como origem OU como destino
       state.recurring = (state.recurring||[]).filter(function(r){ return r.accountId!==id && r.toAccountId!==id; });
-      if (state.ui.openAccount===id) state.ui.openAccount=null;
+      // A conta desapareceu: se a lista estava filtrada por ela, ficava a mostrar o vazio.
+      if (state.ui.txFilter && state.ui.txFilter.account===id) state.ui.txFilter=null;
       closeModal(); save(); render(); showUndo();
     },
-    "open-account": function(id){ state.ui.view="accounts"; state.ui.openAccount=id; render(); aoTopo(); },
-    "back-accounts": function(){ state.ui.openAccount=null; render(); aoTopo(); },
-    "archive-account": function(id){ var a=accountById(id); if(a){ a.hidden=true; if(state.ui.openAccount===id) state.ui.openAccount=null; closeModal(); save(); render(); toast("Conta arquivada — reponha em Dados e cópias → Arquivados."); } },
+    // Abrir uma conta é ver as transações dela: mesmo ecrã, filtro ligado. Assim pode logo
+    // cruzar com um período ou uma categoria sem ter de mudar de sítio.
+    "open-account": function(id){ state.ui.view="transactions"; state.ui.txFilter={account:id}; state.ui.txLimit=PAGINA; render(); aoTopo(); },
+    "back-accounts": function(){ state.ui.view="accounts"; state.ui.txFilter=null; render(); aoTopo(); },
+    "archive-account": function(id){ var a=accountById(id); if(a){ a.hidden=true; if(state.ui.txFilter && state.ui.txFilter.account===id) state.ui.txFilter=null; closeModal(); save(); render(); toast("Conta arquivada — reponha em Dados e cópias → Arquivados."); } },
     "restore-account": function(id){ var a=accountById(id); if(a){ a.hidden=false; save(); render(); archivedModal(); } },
     "archive-category": function(id){ var c=categoryById(id); if(c){ c.hidden=true; closeModal(); save(); render(); toast("Categoria arquivada — reponha em Dados e cópias → Arquivados."); } },
     "restore-category": function(id){ var c=categoryById(id); if(c){ c.hidden=false; save(); render(); archivedModal(); } },
@@ -4840,7 +4874,6 @@
       save(); render(); toast(msg); showUndo();
     },
 
-    "add-split": function(){ _split=null; splitModal(); },
     "to-split": function(){
       var _accTs=lkAcc(el("txAcc")?el("txAcc").value:null);
       if(_accTs && _accTs.type==="tracking"){ toast("Dividir por categorias não se aplica a contas de acompanhamento."); return; }
@@ -4876,7 +4909,7 @@
         toast(pair ? ("Transação dividida em "+lines.length+" categorias.") : "Transação registada.");
       }
     },
-    "cat-activity": function(id){ state.ui.view="transactions"; state.ui.txFilter={category:id}; state.ui.openAccount=null; state.ui.txLimit=PAGINA; render();  aoTopo(); },
+    "cat-activity": function(id){ state.ui.view="transactions"; state.ui.txFilter={category:id}; state.ui.txLimit=PAGINA; render();  aoTopo(); },
     "tx-filter-clear": function(){ state.ui.txFilter=null; state.ui.txLimit=PAGINA; save(); render(); aoTopo(); },
     "show-more-tx": function(){ state.ui.txLimit=(state.ui.txLimit||PAGINA)+PAGINA; save(); render(); },
     "report-toggle-cat": function(id){ var arr=(state.ui.reportCats||[]).slice(); var i=arr.indexOf(id); if(i>=0) arr.splice(i,1); else arr.push(id); state.ui.reportCats=arr; save(); render(); },
@@ -4893,12 +4926,27 @@
       closeModal(); save(); render(); toast("Grupo guardado.");
     },
     "delete-group": function(id){
-      var cats=categoriesOfGroup(id);
-      if (cats.length && !confirm("O grupo tem categorias. Eliminar o grupo e as suas categorias?")) return;
+      // TODAS as categorias do grupo, incluindo as arquivadas: o categoriesOfGroup esconde-as,
+      // e sem isto eram apagadas em silêncio — sem confirmação e sem limpeza — levando o
+      // dinheiro que tinham atribuído para um limbo que ninguém conseguia ver nem recuperar.
+      var doGrupo=state.categories.filter(function(c){return c.groupId===id;});
+      var arquivadas=doGrupo.filter(function(c){return c.hidden;}).length;
+      // Uma categoria de pagamento de cartão não se apaga à mão (é do cartão, não do utilizador):
+      // se o grupo tiver uma, o cartão teria de ser eliminado primeiro.
+      for (var q=0;q<doGrupo.length;q++) if(doGrupo[q].cardId){
+        toast("Este grupo tem a categoria de pagamento de um cartão. Elimine primeiro o cartão, em Contas."); return;
+      }
+      if (doGrupo.length && !confirm("O grupo tem "+doGrupo.length+" categoria"+(doGrupo.length===1?"":"s")+
+          (arquivadas?" ("+arquivadas+" arquivada"+(arquivadas===1?"":"s")+")":"")+
+          ". Eliminar o grupo e essas categorias? As transações delas ficam sem categoria e o dinheiro atribuído volta ao «Pronto a atribuir».")) return;
       pushUndo("Grupo eliminado.");
       state.groups=state.groups.filter(function(g){return g.id!==id;});
       state.categories=state.categories.filter(function(c){return c.groupId!==id;});
+      // A MESMA limpeza da eliminação de uma categoria, para cada uma das que iam dentro.
+      var recG=0;
+      for (var w=0;w<doGrupo.length;w++) recG += limparRestosDaCategoria(doGrupo[w].id);
       state.ui.lastFunding=null;
+      avisoRecorrentes(recG);
       closeModal(); save(); render(); showUndo();
     },
     "toggle-group": function(id){ state.collapsed[id]=!state.collapsed[id]; save(); render(); },
@@ -4968,19 +5016,9 @@
       if(!confirm("Eliminar esta categoria? As transações ficam sem categoria.")) return;
       pushUndo("Categoria «"+(pc?pc.name:"")+"» eliminada.");
       state.categories=state.categories.filter(function(c){return c.id!==id;});
-      for (var t=0;t<state.transactions.length;t++) if(state.transactions[t].categoryId===id) state.transactions[t].categoryId=null;
-      for (var k in state.assignments) if(state.assignments.hasOwnProperty(k) && k.split("|")[0]===id) delete state.assignments[k];
-      // As regras recorrentes também apontavam para a categoria apagada: continuavam ativas e
-      // passavam a lançar, TODOS os meses, transações com uma categoria que já não existe — que
-      // depois apareciam como "órfãs" no aviso de integridade. Desativam-se para o utilizador
-      // decidir o que fazer, em vez de desaparecerem em silêncio.
-      var recAfetadas=0;
-      for (var r=0;r<(state.recurring||[]).length;r++){
-        if(state.recurring[r].categoryId===id){ state.recurring[r].categoryId=null; state.recurring[r].active=false; recAfetadas++; }
-      }
-      for (var sk in state.snooze) if(state.snooze.hasOwnProperty(sk) && sk.split("|")[0]===id) delete state.snooze[sk];
+      var recAfetadas=limparRestosDaCategoria(id);
       state.ui.lastFunding=null;
-      if(recAfetadas) toast(recAfetadas+" regra"+(recAfetadas===1?"":"s")+" recorrente"+(recAfetadas===1?"":"s")+" usava"+(recAfetadas===1?"":"m")+" esta categoria — ficou"+(recAfetadas===1?"":"ram")+" em pausa até lhe dar outra.");
+      avisoRecorrentes(recAfetadas);
       closeModal(); save(); render(); showUndo();
     },
     "clear-preview": function(){ clearModal(); },
@@ -5266,6 +5304,7 @@
     },
     "export-json": function(){ exportJSON(); },
     "export-csv": exportCSV,
+    "export-view-csv": exportViewCSV,
     "export-budget-csv": exportBudgetCSV,
     "export-config-csv": exportBudgetConfigCSV,
     "backup-now": function(){ exportJSON(); },
@@ -5363,7 +5402,10 @@
       return "x/" + ((st && st.transactions) ? st.transactions.length : 0);
     }
   }
-  function backupSig(){ return sigOf(state); }
+  // A assinatura só muda quando os dados mudam, e isso só acontece num save() com conteúdo
+  // novo — que é onde a cache é deitada abaixo. Antes era recalculada a cada desenho da barra
+  // lateral, o que obrigava a percorrer o estado inteiro, caractere a caractere, por toque.
+  function backupSig(){ if(_sigCache===null) _sigCache = sigOf(state); return _sigCache; }
   // Assinatura de TODOS os orçamentos, para a sincronização perceber que algum mudou.
   function allSig(){
     var partes = [_bindex.active];
@@ -6021,15 +6063,38 @@
       if(!silent) toast(via==="partilha" ? "Cópia de segurança guardada." : "Cópia de segurança exportada.");
     });
   }
-  function exportCSV() {
+  // Uma transação por linha, sempre com as mesmas colunas e pela mesma ordem — quer se exporte
+  // tudo, quer se exporte só o que está à vista. Assim os dois ficheiros abrem iguais na folha
+  // de cálculo, e uma fórmula feita para um serve para o outro.
+  function linhasTx(lista) {
     var rows = [["Data","Conta","Beneficiário","Categoria","Nota","Saída","Entrada","Confirmada"]];
-    var sorted = state.transactions.slice().sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);});
+    var sorted = lista.slice().sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);});
     for (var i=0;i<sorted.length;i++){
       var t=sorted[i]; var acc=accountById(t.accountId);
       var cat = t.categoryId===INCOME?"Rendimento":(t.categoryId?((categoryById(t.categoryId)||{name:""}).name):"");
       rows.push([t.date, acc?acc.name:"", t.payee||"", cat, t.memo||"", (t.outflow||0).toFixed(2).replace(".",","), (t.inflow||0).toFixed(2).replace(".",","), t.cleared?"Sim":"Não"]);
     }
-    var csv = rows.map(function(r){ return r.map(function(c){ var s=String(c); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";"); }).join("\n");
+    return rows.map(function(r){ return r.map(function(c){ var s=String(c); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";"); }).join("\n");
+  }
+  // Exporta SÓ o que os filtros do ecrã Transações deixam à vista, pela mesma regra que desenha
+  // a lista (txFiltradas). O nome do ficheiro leva a conta, a categoria e o período quando os há:
+  // dois ficheiros «transacoes-vista» na pasta das transferências, exportados com filtros
+  // diferentes com cinco minutos de intervalo, não se distinguiam um do outro.
+  function exportViewCSV() {
+    var f = state.ui.txFilter || {};
+    var lista = txFiltradas();
+    if (!lista.length) { toast("Não há nada à vista para exportar."); return; }
+    var partes = ["transacoes-vista", limpaNome(budgetName(_bindex.active))];
+    if (f.account) { var a = accountById(f.account); if (a) partes.push(limpaNome(a.name)); }
+    if (f.category) partes.push(limpaNome(f.category===INCOME ? "Rendimento" : ((categoryById(f.category)||{name:""}).name)));
+    var jan = (f.per && f.per!=="custom") ? periodoDatas(f.per) : null;
+    var de = jan ? jan.from : f.from, ate = jan ? jan.to : f.to;
+    if (de || ate) partes.push((de||"inicio") + "_a_" + (ate||todayISO()));
+    guardarFicheiro(partes.filter(Boolean).join("-") + ".csv", "﻿"+linhasTx(lista), "text/csv;charset=utf-8",
+      function(){ toast(lista.length + (lista.length===1 ? " transação exportada" : " transações exportadas") + " — só o que estava à vista."); });
+  }
+  function exportCSV() {
+    var csv = linhasTx(state.transactions);
     guardarFicheiro("transacoes-" + limpaNome(budgetName(_bindex.active)) + "-" + todayISO() + ".csv", "﻿"+csv, "text/csv;charset=utf-8", function(){ toast("CSV exportado."); });
   }
   // Exporta a TABELA do orçamento do mês em vista: por grupo/categoria, o Atribuído, a Atividade
@@ -6705,9 +6770,14 @@
       // Clicar em "Orçamento" aterra sempre no mês atual (as setas continuam a navegar entre meses).
       if (novaView==="budget") state.ui.month = nowMonthKey();
       state.ui.view = novaView;
-      // "Contas" volta SEMPRE à lista de contas (fecha a conta aberta), mesmo já estando no separador.
-      state.ui.openAccount = null;
-      if(state.ui.view!=="transactions") state.ui.txFilter=null;
+      // Tocar num separador é começar de novo nesse ecrã, e isso vale para TODOS: «Contas» volta
+      // à lista de contas e «Transações» volta à lista inteira, sem filtros. Antes, o filtro de
+      // uma conta ou de uma categoria ficava colado ao separador e não havia forma óbvia de
+      // voltar a ver tudo — clicava-se em «Transações» e continuava a ver o mesmo recorte.
+      // Os atalhos que ABREM a lista já filtrada (uma conta, a atividade de uma categoria, um
+      // beneficiário) não passam por aqui: põem o filtro e desenham, e por isso não são afetados.
+      state.ui.txFilter = null;
+      state.ui.txLimit = PAGINA;
       render();
       // Clicar num separador começa sempre no topo — quer se mude de ecrã, quer se toque no
       // separador onde já se está (serve de "voltar ao início" numa lista longa). Só aqui: a
