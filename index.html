@@ -215,6 +215,22 @@
 
   .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
   /* Blocos da barra de filtros: cada um fica inteiro, e a quebra dá-se só ENTRE eles. */
+  /* Encolhimento por degraus: quando a barra não cabe numa linha, vai-se tirando o texto pela
+     ordem em que ele faz menos falta: 1) a prioridade (▲ ● ▼ dizem-se sozinhos); 2) o Limpar
+     (o ✕ é universal); 3) os dois botões de ação (o ➕ em destaque no canto é inconfundível);
+     4) os filtros de estado — 💰 e 🔵 são os que mais precisam do nome; 5) e por fim os rótulos
+     «Mostrar:» e «Prioridade:», que só nomeiam grupos já separados por uma barra vertical.
+     Esgotados os degraus, a janela já é estreita ao ponto de a vista passar à de telemóvel —
+     onde não há barra lateral e sobram 250 px. Só assim se evita a quebra em duas linhas. */
+  .toolbar.enc1 .f-prio .rot,
+  .toolbar.enc2 .btn-limpar .rot,
+  .toolbar.enc3 .tb-acao .rot,
+  .toolbar.enc4 .f-estado .rot,
+  .toolbar.enc5 .tb-etiq { display: none; }
+  .toolbar.enc1 .f-prio + .f-prio { margin-inline-start: -2px; }
+  /* Só durante a medição: sem quebra e sem encolher, para a largura natural ser a verdadeira. */
+  .toolbar.medindo { flex-wrap: nowrap; }
+  .toolbar.medindo .tb-bloco, .toolbar.medindo .tb-bloco > * { flex-shrink: 0; }
   .toolbar .tb-bloco { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
   .toolbar .tb-fim { flex: 1 1 auto; }   /* cresce para empurrar a contagem para a direita */
   .toolbar .spacer { flex: 1; }
@@ -508,7 +524,12 @@
   .so-fone { display: none; }
   button { -webkit-tap-highlight-color: transparent; }
 
-  @media (max-width: 820px), (max-height: 500px) {
+  /* A vista de telemóvel — barra de navegação em baixo, sem barra lateral — entra aos 1040 px
+     e não aos 820. Motivo: abaixo dos ~1040 a barra de filtros já não cabe numa linha mesmo
+     depois de perder todos os textos, e passaria a duas linhas. Mudando de vista libertam-se
+     os 250 px da barra lateral e ela volta a caber. Assim nunca há uma faixa de larguras em
+     que a barra parta em duas. */
+  @media (max-width: 1040px), (max-height: 500px) {
     .app { grid-template-columns: 1fr; }
     /* Barra lateral -> barra de navegação inferior (estilo iOS) */
     .sidebar {
@@ -813,7 +834,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.40";
+  var APP_VERSION = "1.44";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -2023,6 +2044,7 @@
     if (v === "reports") renderReports();
     refreshUndoButtons();
     medirTopo();
+    ajustarBarra();
   }
 
   function renderSidebar() {
@@ -2296,26 +2318,28 @@
       // os dois, é entre eles que a linha parte — nunca a meio de um grupo de filtros.
       '<div class="toolbar">' +
         '<div class="tb-bloco">' +
-        '<button class="btn primary hide-phone" data-action="add-tx">➕ Nova transação</button>' +
-        '<button class="btn" data-action="add-group">+ Grupo</button>' +
-        '<span class="muted hide-phone" style="font-size:12.5px;margin-inline-start:6px;">Mostrar:</span>' +
-        fBtn('f-over','budget-filter','over',bf.over,'🔵','Com excedente','Só as categorias com mais do que o alvo pede') +
-        fBtn('f-ok','budget-filter','ok',bf.ok,'🟢','Alvo cumprido','Só as categorias com o alvo cumprido') +
-        fBtn('f-warn','budget-filter','warn',bf.warn,'🟡','Abaixo do alvo','Só as categorias com o alvo por cumprir') +
-        fBtn('f-neg','budget-filter','neg',bf.neg,'🔴','Excedido','Só as categorias que gastaram mais do que tinham') +
-        fBtn('f-money','budget-filter','money',bf.money,'💰','Com saldo','Só as categorias com dinheiro disponível') +
+        // O «+ Grupo» leva um ícone próprio: sem texto, dois botões a começar por «+» ficavam
+        // indistinguíveis um do outro.
+        '<button class="btn primary hide-phone tb-acao" data-action="add-tx" title="Nova transação">➕<span class="rot"> Nova transação</span></button>' +
+        '<button class="btn tb-acao" data-action="add-group" title="Novo grupo de categorias">🗂<span class="rot"> Grupo</span></button>' +
+        '<span class="muted hide-phone tb-etiq" style="font-size:12.5px;margin-inline-start:6px;">Mostrar:</span>' +
+        fBtn('f-estado f-over','budget-filter','over',bf.over,'🔵','Com excedente','Só as categorias com mais do que o alvo pede') +
+        fBtn('f-estado f-ok','budget-filter','ok',bf.ok,'🟢','Alvo cumprido','Só as categorias com o alvo cumprido') +
+        fBtn('f-estado f-warn','budget-filter','warn',bf.warn,'🟡','Abaixo do alvo','Só as categorias com o alvo por cumprir') +
+        fBtn('f-estado f-neg','budget-filter','neg',bf.neg,'🔴','Excedido','Só as categorias que gastaram mais do que tinham') +
+        fBtn('f-estado f-money','budget-filter','money',bf.money,'💰','Com saldo','Só as categorias com dinheiro disponível') +
         // As adiadas não são «abaixo do alvo» nem «cumpridas» — são um estado à parte. Sem este
         // botão ficavam invisíveis a TODOS os filtros de estado, e só se encontravam a percorrer
         // a lista inteira: um ponto cego sobre decisões que a pessoa tomou de propósito.
-        fBtn('f-snoozed','budget-filter','snoozed',bf.snoozed,'😴','Adiadas','Só as categorias adiadas este mês') +
+        fBtn('f-estado f-snoozed','budget-filter','snoozed',bf.snoozed,'😴','Adiadas','Só as categorias adiadas este mês') +
         '</div>' +
         '<div class="tb-bloco tb-fim">' +
         '<span class="sep"></span>' +
-        '<span class="muted hide-phone" style="font-size:12.5px;">Prioridade:</span>' +
-        fBtn('f-alta','prio-filter','alta',bp.alta,'▲','Alta','Só as de prioridade alta') +
-        fBtn('f-normal','prio-filter','normal',bp.normal,'●','Normal','Só as de prioridade normal') +
-        fBtn('f-baixa','prio-filter','baixa',bp.baixa,'▼','Baixa','Só as de prioridade baixa') +
-        (filtering ? '<span class="sep"></span><button class="btn sm" data-action="budget-filter-clear">✕<span class="rot"> Limpar</span></button>' : '') +
+        '<span class="muted hide-phone tb-etiq" style="font-size:12.5px;">Prioridade:</span>' +
+        fBtn('f-prio f-alta','prio-filter','alta',bp.alta,'▲','Alta','Só as de prioridade alta') +
+        fBtn('f-prio f-normal','prio-filter','normal',bp.normal,'●','Normal','Só as de prioridade normal') +
+        fBtn('f-prio f-baixa','prio-filter','baixa',bp.baixa,'▼','Baixa','Só as de prioridade baixa') +
+        (filtering ? '<span class="sep"></span><button class="btn sm btn-limpar" data-action="budget-filter-clear">✕<span class="rot"> Limpar</span></button>' : '') +
         '<div class="spacer"></div>' +
         // A contagem está SEMPRE lá, encostada à direita — não aparece e desaparece conforme
         // se filtra, que era o que fazia a barra saltar a cada clique.
@@ -2856,6 +2880,23 @@
     try {
       var cs = document.querySelectorAll(".data-card");
       for (var i=0;i<cs.length;i++) cs[i].scrollTop = 0;
+    } catch(e){}
+  }
+  // Ajusta a barra de filtros do orçamento à largura que há. Mede a largura REAL que ela
+  // precisaria numa só linha e, enquanto não couber, tira o texto a um grupo de botões de cada
+  // vez. Cada degrau é medido outra vez: só se avança se o anterior não tiver chegado.
+  function ajustarBarra(){
+    try {
+      var tb = document.querySelector(".content .toolbar, #content .toolbar");
+      if (!tb || !tb.querySelector(".tb-bloco")) return;      // só a barra do orçamento tem blocos
+      var degraus = ["enc1","enc2","enc3","enc4","enc5"];
+      for (var i=0;i<degraus.length;i++) tb.classList.remove(degraus[i]);
+      tb.classList.add("medindo");
+      for (var d=0; d<=degraus.length; d++){
+        if (tb.scrollWidth <= tb.clientWidth + 1) break;      // já cabe: pára aqui
+        if (d < degraus.length) tb.classList.add(degraus[d]);
+      }
+      tb.classList.remove("medindo");
     } catch(e){}
   }
   // A barra de cima está colada ao topo e muda de altura (no telemóvel dobra para duas linhas).
@@ -3737,6 +3778,7 @@
         '<li><b>O ✓ e o «Por confirmar»:</b> o ✓ marca que o banco já processou a transação. Mexe no <b>Confirmado</b>, não no <b>Saldo</b> — um café pago ontem está pago, tenha o banco lançado ou não, e o orçamento tem de contar com isso. A diferença entre os dois é o <b>Por confirmar</b>, que aparece no cabeçalho da conta e no ecrã das transações: quando chega a zero, a app bate certo com o extrato.</li>'+
         '<li><b>Total do mês:</b> por cima das colunas, a soma do <b>Atribuído</b>, da <b>Atividade</b> e do <b>Disponível</b>. As categorias de <b>pagamento de cartão</b> ficam de fora das três: a atividade delas é o espelho positivo do que se gastou — 50 € de mercearia no cartão dão −50 na Mercearia e +50 no cartão — e somá-las daria zero, como se não se tivesse gasto nada. Os valores do cartão continuam na linha do grupo dele.</li>'+
         '<li><b>Vários orçamentos</b> (📚, no cabeçalho): pode ter um <b>Pessoal</b> e um <b>Família</b>, por exemplo. Cada um é <b>completamente separado</b> — contas, categorias e transações próprias — e troca-se com um toque. Se sincroniza, vão <b>todos no mesmo gist</b>; só há uma coisa a saber: se editar orçamentos <b>diferentes</b> em aparelhos diferentes antes de sincronizar, a aplicação pergunta qual manter, como faria com qualquer conflito.</li>'+
+        '<li><b>A barra de filtros do Orçamento encolhe com a janela.</b> À medida que o espaço aperta, os nomes dos botões vão desaparecendo pela ordem em que fazem menos falta — fica o símbolo, e o rato por cima diz sempre o que é. Se estreitar mesmo muito, a aplicação passa à vista de telemóvel, com o menu em baixo. É de propósito: assim a barra nunca se parte em duas linhas.</li>'+
         '<li><b>O cabeçalho das listas fica à vista:</b> ao descer uma lista de transações, os nomes das colunas — Data, Beneficiário, Categoria… — ficam colados ao topo, para saber sempre o que está a ler. No telemóvel, como a tabela é mais larga do que o ecrã, é a <b>lista</b> que corre dentro da sua própria área em vez da página inteira.</li>'+
         '<li><b>Contas nos campos de dinheiro:</b> em qualquer campo de valor pode escrever a conta em vez do total — <b>23,45+11,90+7,15</b>. O resultado aparece por baixo enquanto escreve e substitui a conta assim que sai do campo. No <b>telemóvel</b> aparece um <b>teclado próprio</b> com <b>+</b> e <b>−</b>, sem letras nem risco de enganos. Num par <b>Saída/Entrada</b>, um <b>−</b> escrito no princípio do campo continua a passar o valor para o outro lado; depois de números, é uma subtração.</li>'+
         '<li><b>Datas e teclado:</b> as datas escrevem-se sempre em <b>dd/mm/aaaa</b>, mesmo que tenha o browser noutro idioma — pode escrever só os números, que as barras aparecem sozinhas, ou usar o 📅 para as escolher no calendário. Dentro de qualquer janela, o <b>Enter</b> vale por carregar no botão principal.</li>'+
@@ -3798,18 +3840,16 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.38 – 1.40", "agosto 2026", [
-        '<b>Barra do orçamento arrumada:</b> a contagem de categorias está sempre visível e encostada à direita, o <b>✕ Limpar</b> aparece só quando há filtros ligados, e em ecrãs estreitos a linha parte sempre no mesmo sítio — entre os filtros de estado e os de prioridade.',
-        '<b>Separadores de mês nas recorrentes:</b> a lista passa a ser cortada por «Agosto 2026», «Setembro 2026»… para se ler de relance onde acaba um mês e começa o outro.',
-        '<b>Novo filtro 😴 Adiadas</b> na barra do orçamento. As categorias adiadas não são «abaixo do alvo» nem «cumpridas», por isso não apareciam em filtro nenhum — só percorrendo a lista toda.',
-        'No computador, a barra do orçamento deixou de repetir «Escreva no campo Atribuído de cada categoria».'
+      ver("1.38 – 1.44", "agosto 2026", [
+        '<b>Novo filtro 😴 Adiadas</b> no orçamento. As categorias adiadas não são «abaixo do alvo» nem «cumpridas», por isso não apareciam em filtro nenhum — só percorrendo a lista toda.',
+        '<b>Barra de filtros repensada:</b> a contagem está sempre encostada à direita e o <b>✕ Limpar</b> só aparece quando há filtros ligados. Se a janela apertar, os nomes vão saindo por ordem — e nunca parte em duas linhas.',
+        '<b>Separadores de mês nas recorrentes:</b> a lista passa a ser cortada por «Agosto 2026», «Setembro 2026»… para se ver de relance onde acaba um mês e começa o outro.'
       ])+
 
       ver("1.33 – 1.37", "agosto 2026", [
         '<b>O histórico deixou de ter limite prático:</b> as cópias passaram para uma zona do navegador com espaço de sobra. Antes, num orçamento com milhares de transações não cabiam e iam-se perdendo até sobrar uma — agora ficam as oito, cresça o orçamento o que crescer.',
         '<b>Cabeçalho fixo nas listas de transações:</b> Data, Beneficiário, Categoria e o resto ficam à vista enquanto desce a lista.',
-        'A aplicação passou a pedir ao navegador para não apagar os seus dados. O Safari limpa sozinho o que não é usado durante uns dias, e nada o impedia.',
-        'Em <b>Dados e cópias</b> passa a ver se os dados estão protegidos e quanto espaço têm mesmo disponível.',
+        '<b>Dados protegidos:</b> o Safari limpa sozinho o que não é usado durante uns dias, e nada o impedia — a aplicação passou a pedir para ser poupada. Em <b>Dados e cópias</b> vê se está protegida e quanto espaço tem.',
         'As opções com caixa de seleção deixaram de ser escritas em maiúsculas: ocupavam quase o dobro e partiam-se em duas linhas no telemóvel.',
         'O ficheiro descarregado de um ponto do histórico passou a sair formatado, como a cópia de segurança, e com um nome que já não se confunde com ela.'
       ])+
@@ -6378,6 +6418,7 @@
   window.addEventListener("scroll", escondeDica, true);
   window.addEventListener("resize", escondeDica);
   window.addEventListener("resize", medirTopo);
+  window.addEventListener("resize", ajustarBarra);
   window.addEventListener("orientationchange", function(){ setTimeout(medirTopo, 120); });
   document.addEventListener("focusout", function(e){
     if (e.target && e.target.classList && e.target.classList.contains("money")) fechaConta(e.target);
