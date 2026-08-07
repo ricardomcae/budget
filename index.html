@@ -2031,9 +2031,35 @@
 
   // Quem pode emprestar dinheiro para tapar um buraco. O Pronto a atribuir vem sempre
   // primeiro nas sugestões automáticas: é dinheiro que ainda não tem função nenhuma.
+  // Daqui a quantos meses é que o dinheiro desta categoria faz falta. É o terceiro eixo para
+  // decidir de onde tirar, e não se confunde com os outros dois: a PRIORIDADE diz o que é
+  // importante, a FOLGA diz onde há dinheiro parado, e o PRAZO diz quanto tempo há para repor
+  // o que se tirar. São coisas independentes — as férias do próximo verão podem ser prioritárias
+  // E distantes, e é delas que dói menos tirar hoje.
+  var PRAZO_LONGO = 999;   // sem prazo nenhum: nada foi prometido, logo nada urge
+  function mesesAtePrecisar(cat, m) {
+    var tg = cat.target;
+    if (!tg || !(tg.amount > 0)) return PRAZO_LONGO;          // sem alvo, sem compromisso
+    var t = tg.type || "monthly";
+    // Mensal e semanal são para gastar ESTE mês: tirar de lá estraga o mês corrente.
+    if (t === "monthly" || t === "weekly") return 0;
+    if (t === "byDate") {
+      if (!tg.date) return PRAZO_LONGO;
+      var d = monthsBetween(m, tg.date);
+      // Prazo já passado com dinheiro ainda lá: ninguém está à espera dele.
+      return d < 0 ? PRAZO_LONGO : d;
+    }
+    var per = t === "quarterly" ? 3 : (t === "semiannual" ? 6 : 12);
+    if (!tg.due) return per;                                   // sem mês marcado: vale o período
+    // O mês da despesa anda sozinho para o período seguinte quando passa — mesma regra do
+    // targetInfo, senão um alvo anual dado como «vencido» parecia sempre urgente.
+    var due = tg.due, g = 0;
+    while (monthsBetween(m, due) < 0 && g++ < 4000) due = shiftMonth(due, per);
+    return Math.max(0, monthsBetween(m, due));
+  }
   function coverSources(alvoId, m) {
     var out = [], rta = readyToAssign(m);
-    if (rta > 0.005) out.push({ id:RTA_ID, name:"Pronto a atribuir", prio:"baixa", max:round2(rta), rta:true });
+    if (rta > 0.005) out.push({ id:RTA_ID, name:"Pronto a atribuir", prio:"baixa", max:round2(rta), rta:true, meses:PRAZO_LONGO });
     var list = orderedCategories();
     for (var i=0;i<list.length;i++){
       var c = list[i];
@@ -2044,26 +2070,31 @@
       // Ao cartão só se tira a folga: o resto é preciso para o liquidar.
       if (c.cardId) { var t = tetoDaCategoria(c, m); max = round2(tem - (t.teto || 0)); }
       if (max <= 0.005) continue;
-      out.push({ id:c.id, name:c.name, prio:c.priority||"normal", max:round2(max), rta:false });
+      out.push({ id:c.id, name:c.name, prio:c.priority||"normal", max:round2(max), rta:false,
+                 meses: mesesAtePrecisar(c, m) });
     }
     return out;
   }
 
-  // Ordena as fontes conforme o modo escolhido — usada tanto na sugestão automática
-  // como na lista visível: "prio" mostra primeiro as prioridades mais baixas, "folga"
-  // quem tem mais dinheiro parado, "manual" mantém a ordem do ecrã Orçamento.
+  // Ordena as fontes conforme o modo escolhido — usada tanto na sugestão automática como na
+  // lista visível: "prio" mostra primeiro as prioridades mais baixas, "folga" quem tem mais
+  // dinheiro parado, "prazo" quem só precisa do dinheiro mais tarde, "manual" mantém a ordem
+  // do ecrã Orçamento. O desempate é sempre por quem tem mais: assim mexe-se em menos
+  // categorias para tapar o mesmo buraco.
   function coverOrder(fontes, modo) {
     var ord = fontes.slice();
     if (modo === "manual") return ord;
     ord.sort(function(a,b){
       if (a.rta !== b.rta) return a.rta ? -1 : 1;
       if (modo === "folga") return b.max - a.max;
+      if (modo === "prazo") return (b.meses - a.meses) || (b.max - a.max);
       return (PRIO_RANK[b.prio] - PRIO_RANK[a.prio]) || (b.max - a.max);
     });
     return ord;
   }
-  // Sugestão automática. "prio" tira primeiro de quem tem prioridade mais baixa,
-  // "folga" de quem tem mais dinheiro parado, "manual" não sugere nada.
+  // Sugestão automática. "prio" tira primeiro de quem tem prioridade mais baixa, "folga" de
+  // quem tem mais dinheiro parado, "prazo" de quem só precisa do dinheiro mais tarde,
+  // "manual" não sugere nada.
   function coverAuto(fontes, falta, modo) {
     var sel = {};
     if (modo === "manual") return sel;
@@ -3945,7 +3976,7 @@
         '<li><b>🎯 Financiar alvos</b> — <i>Pronto a atribuir → categorias.</i> Está sempre disponível. Dá a cada categoria o que lhe falta para cumprir o alvo do mês. Pode <b>financiar tudo</b>, ou <b>repartir só o que está por atribuir</b> — esta nunca o deixa negativo, e reparte de três maneiras: <b>por prioridade</b> (serve as Altas primeiro), <b>proporcional</b> (todas ficam igualmente perto do alvo — quem precisa de mais leva mais) ou <b>pela ordem da lista</b> (completa de cima para baixo até acabar).</li>'+
         '<li><b>↩ Repor a zero</b> — <i>categorias → Pronto a atribuir.</i> Aparece quando atribuiu mais do que tinha e o «Pronto a atribuir» ficou <b>negativo</b>. Retira às categorias com dinheiro parado até voltar a zero, com as mesmas três maneiras de repartir — mas ao contrário: <b>por prioridade</b> tira primeiro das <b>Baixas</b>, para proteger as Altas. Nenhuma categoria fica negativa.</li>'+
         '<li><b>🧹 Libertar excedente</b> — <i>categorias → Pronto a atribuir.</i> Aparece quando alguma categoria tem <b>mais do que o alvo dela pede</b> — por exemplo «repor até 200 €» com 500 € lá dentro. No <b>cartão de crédito</b>, o teto é o que falta liquidar: se atribuiu 500 € e só deve 200 €, liberta os 300 € de folga. Estar <b>adiantado</b> num objetivo com data não conta como excedente: se quer 3.000 € e já juntou 2.000 €, o dinheiro é seu e fica onde está — esticar o prazo apenas <b>baixa a mensalidade</b>. As de «reservar todos os meses» nunca entram, porque aí o dinheiro é mesmo para acumular.</li>'+
-        '<li><b>🩹 Cobrir</b> — <i>outras categorias → uma categoria.</i> Aparece na linha de uma categoria que ficou <b>negativa</b>, por ter gasto nela mais do que lá tinha. O objetivo é <b>trazê-la a zero</b>. Mostra o que falta e quem tem dinheiro parado, cada um com um cursor. Escolha de onde tirar: <b>primeiro das prioridades mais baixas</b> (sai de onde faz menos falta), <b>primeiro de quem tem mais folga</b>, ou <b>manual</b>. O que ainda não está atribuído é sempre gasto primeiro. Ao cartão de crédito só se tira a folga, nunca o que é preciso para o liquidar.</li>'+
+        '<li><b>🩹 Cobrir</b> — <i>outras categorias → uma categoria.</i> Aparece na linha de uma categoria que ficou <b>negativa</b>, por ter gasto nela mais do que lá tinha. O objetivo é <b>trazê-la a zero</b>. Mostra o que falta e quem tem dinheiro parado, cada um com um cursor. Escolha de onde tirar: <b>primeiro das prioridades mais baixas</b> (sai de onde é menos importante), <b>primeiro de quem tem mais folga</b> (mexe em menos categorias), <b>primeiro de quem precisa do dinheiro mais tarde</b> (dá mais tempo para repor — tira antes das férias do próximo verão do que do seguro que vence para o mês), ou <b>manual</b>. O que ainda não está atribuído é sempre gasto primeiro. Ao cartão de crédito só se tira a folga, nunca o que é preciso para o liquidar.</li>'+
         '<li><b>🎯 na linha de uma categoria</b> — <i>Pronto a atribuir → essa categoria.</i> Faz num toque o que a janela acima faz para todas: junta-lhe de uma vez o que falta para o <b>alvo do mês</b>. Se o «Pronto a atribuir» não chegar, <b>avisa antes</b> de o deixar negativo.</li>'+
         '<li><b>🩹 e 🎯 são coisas diferentes</b> — e podem aparecer os dois na mesma categoria. O <b>🩹 traz a zero</b> (tapa o que gastou a mais) e vai buscar o dinheiro a <b>outras categorias</b>; o <b>🎯 leva ao alvo</b> (o que planeou ter) e vai buscá-lo ao <b>Pronto a atribuir</b>. Por isso o 🩹 fica à esquerda: primeiro tapa-se o buraco, depois volta-se ao plano.</li>'+
         '<li><b>🧽 Limpar atribuições</b> — <i>categorias → Pronto a atribuir.</i> Devolve <b>tudo</b> o que atribuiu neste mês, para recomeçar do zero. Só mexe no mês que está a ver: o que transitou de meses anteriores fica onde está, e as transações não são tocadas. Se já gastou numa categoria mais do que o que transitou, ela fica negativa — a janela avisa quantas, antes de confirmar.</li>'+
@@ -4028,6 +4059,7 @@
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
       ver("1.52", "agosto 2026", [
+        '<b>Nova forma de escolher de onde tirar, no 🩹 Cobrir:</b> <b>primeiro de quem precisa do dinheiro mais tarde</b>. As que já havia olham para o que é <i>importante</i> (prioridade) ou para onde há <i>mais</i> parado (folga); esta olha para o <i>tempo</i> que há para repor — tira antes das férias do próximo verão do que do seguro que vence para o mês.',
         '<b>O balão do orçamento deixou de dar os parabéns quando há categorias excedidas.</b> Com o «Pronto a atribuir» a zero dizia «cada euro tem uma função 🎉» mesmo com contas por acertar; agora diz apenas <b>Tudo atribuído</b>, e é a barra vermelha por baixo que conta quantas e leva ao «Ver quais». O valor continua certo — o rendimento <i>está</i> todo atribuído; o que falta é acertar contas entre categorias.',
         '<b>Notas compridas</b> deixaram de esmagar as outras colunas: cortam com «…» e o texto todo aparece ao passar o rato (ou abrindo a transação). A frase das <b>alterações por guardar</b> passou também a ler-se como uma frase: «também 2 em «Ricardo» e 5 em «Família»», em vez dos números entre parênteses.',
         '<b>Correção importante — eliminar um grupo estragava o «Pronto a atribuir».</b> O dinheiro atribuído às categorias do grupo ficava para trás, invisível, e continuava a ser descontado para sempre. Agora volta ao «Pronto a atribuir», e a confirmação diz quantas categorias vão dentro — incluindo as arquivadas, que antes eram apagadas sem perguntar.',
@@ -4195,6 +4227,11 @@
 
   var _covSel = null, _covAlvo = null, _covFalta = 0, _covFontes = null;
 
+  function textoPrazo(meses){
+    if (meses >= PRAZO_LONGO) return "sem prazo";
+    if (meses <= 0) return "precisa este mês";
+    return "precisa daqui a "+meses+(meses===1?" mês":" meses");
+  }
   function coverModal(alvoId, keepSel) {
     var m = state.ui.month, cat = categoryById(alvoId);
     if (!cat) return;
@@ -4219,8 +4256,11 @@
     var linhas = coverOrder(fontes, modo).map(function(f){
       var v = _covSel[f.id] || 0;
       return '<div class="cov-row">'+
+        // A etiqueta mostra o critério POR QUE se está a ordenar — senão a ordem parecia
+        // arbitrária e não havia como conferir a sugestão.
         '<div class="cov-nome">'+(f.rta ? '💵 ' : '<span class="prio-dot p-'+f.prio+'">'+PRIO_ICON[f.prio]+'</span> ')+esc(f.name)+
-          '<span class="tag">tem '+fmt(f.max)+(f.rta?'':' · prioridade '+PRIO_LABEL[f.prio].toLowerCase())+'</span></div>'+
+          '<span class="tag">tem '+fmt(f.max)+(f.rta ? '' :
+            (modo==="prazo" ? ' · '+textoPrazo(f.meses) : ' · prioridade '+PRIO_LABEL[f.prio].toLowerCase()))+'</span></div>'+
         '<input type="range" class="cov-slider" data-cov="'+f.id+'" min="0" max="'+f.max+'" step="0.01" value="'+v+'">'+
         '<b class="cov-val" id="cv_'+f.id+'">'+fmt(v)+'</b></div>';
     }).join("");
@@ -4233,6 +4273,7 @@
         '<div class="field"><label>De onde tirar</label><select id="covModo">'+
           '<option value="prio"'+(modo==="prio"?" selected":"")+'>Primeiro das prioridades mais baixas</option>'+
           '<option value="folga"'+(modo==="folga"?" selected":"")+'>Primeiro de quem tem mais folga</option>'+
+          '<option value="prazo"'+(modo==="prazo"?" selected":"")+'>Primeiro de quem precisa do dinheiro mais tarde</option>'+
           '<option value="manual"'+(modo==="manual"?" selected":"")+'>Manual — escolho eu</option>'+
         '</select></div>'+
         '<div id="covKpis">'+opKpis("Em falta", fmt(-falta), "neg", "cobrir", fmt(coverTotal(_covSel)), fmt(round2(coverTotal(_covSel)-falta)), "")+'</div>'+
