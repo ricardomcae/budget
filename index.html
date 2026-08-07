@@ -158,6 +158,9 @@
   .rta-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 20px 26px 0; padding: 16px 22px; border-radius: 14px; background: var(--primary); color: #fff; box-shadow: var(--shadow); flex-wrap: wrap; }
   .rta-banner.zero { background: linear-gradient(135deg, var(--primary), var(--accent2)); }
   .rta-banner.over { background: linear-gradient(135deg, #b91c1c, #dc2626); }
+  /* Tudo atribuído, mas com categorias excedidas: nem verde de festa nem vermelho de erro —
+     o rendimento está todo distribuído, só que há contas por acertar entre categorias. */
+  .rta-banner.atencao { background: linear-gradient(135deg, #b45309, #d97706); }
   .rta-amount { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
   .rta-label { font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
   .rta-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -429,6 +432,8 @@
   table.data td, table.data th { white-space: nowrap; }
   table.data tbody tr:last-child { border-bottom: 0; }
   table.data tbody tr:hover, table.data tr.hoverable:hover { background: var(--surface-2); }
+  /* A nota nunca empurra as outras colunas: tem um tecto próprio e corta com «…». */
+  table.data td.col-nota { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
   .pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 600; }
   .pill.budget { background: var(--primary-soft); color: var(--primary-dark); }
   .pill.tracking { background: var(--neutral-soft); color: var(--text-muted); }
@@ -2145,8 +2150,18 @@
     var rta = readyToAssign(state.ui.month);
     var excedente = surplusPlan(state.ui.month, !!state.ui.surplusSemAlvo).total;
     var temAtribuido = clearPlan(state.ui.month).entries.length > 0;
-    var cls = rta > 0.005 ? "" : (rta < -0.005 ? "over" : "zero");
-    var msg = rta > 0.005 ? "Pronto a atribuir" : (rta < -0.005 ? "Atribuiu mais do que tinha" : "Tudo atribuído — cada euro tem uma função 🎉");
+    // Categorias excedidas (disponível negativo). Contadas ANTES do balão porque mudam o que
+    // ele diz: com contas por acertar, «cada euro tem uma função 🎉» seria uma boa notícia a
+    // tapar uma má. O número (0,00) está certo e não se mexe — o rendimento ESTÁ todo
+    // atribuído; o que falha é que gastou em certas categorias mais do que lhes tinha dado, e
+    // isso resolve-se movendo dinheiro ENTRE categorias, não atribuindo mais.
+    var excedidas = 0;
+    for (var oc=0; oc<state.categories.length; oc++) if (catStatus(state.categories[oc], state.ui.month) === "neg") excedidas++;
+    var cls = rta > 0.005 ? "" : (rta < -0.005 ? "over" : (excedidas ? "atencao" : "zero"));
+    var msg = rta > 0.005 ? "Pronto a atribuir"
+            : (rta < -0.005 ? "Atribuiu mais do que tinha"
+            : (excedidas ? ("Tudo atribuído, mas há "+excedidas+(excedidas===1?" categoria excedida":" categorias excedidas"))
+                         : "Tudo atribuído — cada euro tem uma função 🎉"));
     var undoBtn = '';   // o anular/refazer é agora só pelos botões ↩ ↪ do topo (sistema único)
     var dv = integrityDelta(state.ui.month);
     var aviso = "";
@@ -2166,9 +2181,7 @@
           '</span><button data-action="integrity">Ver quais</button></div>';
       }
     }
-    // Aviso de categorias excedidas (disponível negativo). Só visual + atalho para as filtrar.
-    var excedidas = 0;
-    for (var oc=0; oc<state.categories.length; oc++) if (catStatus(state.categories[oc], state.ui.month) === "neg") excedidas++;
+    // Aviso de categorias excedidas: só visual + atalho para as filtrar (já contadas acima).
     var over = "";
     if (excedidas > 0) {
       over = '<div class="overspent-bar"><span>🔴</span><span class="grow"><b>'+excedidas+'</b> '+
@@ -2490,7 +2503,10 @@
       accCell +
       '<td style="font-weight:600;">'+esc(t.payee||"")+(t.split?' <span class="tag" title="Transação dividida">🔗</span>':'')+'</td>'+
       '<td>'+catName+'</td>'+
-      '<td class="tag col-nota">'+esc(t.memo||"")+'</td>'+
+      // A nota pode ir até 300 caracteres. Sem limite de largura, uma nota comprida esmagava
+      // todas as outras colunas. Corta-se com «…» e o texto todo fica na dica do rato — para
+      // ler à vontade, abre-se a transação.
+      '<td class="tag col-nota"'+(t.memo?' title="'+esc(t.memo)+'"':'')+'>'+esc(t.memo||"")+'</td>'+
       '<td class="num">'+(t.outflow?'<span class="tx-amt out">'+fmt(t.outflow)+'</span>':'')+'</td>'+
       '<td class="num">'+(t.inflow?'<span class="tx-amt in">'+fmt(t.inflow)+'</span>':'')+'</td>'+
       balCell +
@@ -2647,7 +2663,6 @@
             bloco("Média por vez", fmt(media))+
           '</div>'+
           (catsTxt ? '<div class="hint" style="margin-top:10px;">Onde entrou: '+catsTxt+'</div>' : '')+
-          '<div class="hint" style="margin-top:6px;">Conta só o que os filtros deixam à vista — escolha um período para ver, por exemplo, só este ano.</div>'+
         '</div>';
     }
     // O ecrã tem três andares, do mais fixo para o mais volátil:
@@ -4014,6 +4029,8 @@
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
       ver("1.52", "agosto 2026", [
+        '<b>O balão do orçamento deixou de dar os parabéns quando há categorias excedidas.</b> Com o «Pronto a atribuir» a zero dizia «cada euro tem uma função 🎉» mesmo com contas por acertar. O valor continua certo — o rendimento <i>está</i> todo atribuído — mas o balão passa a âmbar e diz quantas categorias estão excedidas.',
+        '<b>Notas compridas</b> deixaram de esmagar as outras colunas: cortam com «…» e o texto todo aparece ao passar o rato (ou abrindo a transação). A frase das <b>alterações por guardar</b> passou também a ler-se como uma frase: «também 2 em «Ricardo» e 5 em «Família»», em vez dos números entre parênteses.',
         '<b>Correção importante — eliminar um grupo estragava o «Pronto a atribuir».</b> O dinheiro atribuído às categorias do grupo ficava para trás, invisível, e continuava a ser descontado para sempre. Agora volta ao «Pronto a atribuir», e a confirmação diz quantas categorias vão dentro — incluindo as arquivadas, que antes eram apagadas sem perguntar.',
         '<b>Correção — cartão de crédito:</b> a linha do cartão contava a dívida de todos os tempos e o «Libertar excedente» só até ao mês em vista, o que os fazia discordar. Contam agora os dois até ao mês que está a ver.',
         '<b>Abrir uma conta deixou de ser um ecrã à parte.</b> Contas → uma conta leva ao ecrã <b>Transações</b> já filtrado, com um chapéu por cima (nome, saldo e as ações da conta). Eram dois ecrãs com a mesma lista, e o da conta nem deixava procurar nem filtrar por período.',
@@ -5449,10 +5466,23 @@
     var outros = outrosPorGuardar().lista, meu = backupPending();
     var n = (state.backup && state.backup.pend) || 0;
     var nTxt = n>0 ? (' — <b>'+n+'</b> '+(n===1?'alteração':'alterações')) : '';
-    var quais = outros.map(function(o){ return '<b>«'+esc(o.name)+'»</b>'+(o.pend>0?(' ('+o.pend+')'):''); }).join(', ');
-    if (meu && outros.length) return '⚠️ Há alterações por guardar'+nTxt+' neste orçamento. Também em '+quais+'.';
+    // «2 em «Ricardo»» lê-se; ««Ricardo» (2)» obriga a adivinhar o que é o número entre
+    // parênteses. Com vários orçamentos a lista junta-se com vírgulas e um «e» no fim, para
+    // continuar a ser uma frase e não um despejo de dados.
+    var nomes = outros.map(function(o){
+      return (o.pend>0 ? (o.pend+' em ') : '')+'<b>«'+esc(o.name)+'»</b>';
+    });
+    var quais = nomes.length<=1 ? (nomes[0]||'')
+              : nomes.slice(0,-1).join(', ')+' e '+nomes[nomes.length-1];
+    if (meu && outros.length) return '⚠️ Há alterações por guardar'+nTxt+' neste orçamento. Também '+quais+'.';
     if (meu)                  return '⚠️ Há alterações por guardar'+nTxt+' desde a última cópia.';
-    if (outros.length)        return '⚠️ Este orçamento está guardado, mas falta guardar '+quais+' — a cópia inclui <b>todos</b> os orçamentos.';
+    // Aqui a frase é «falta guardar X»: «falta guardar 2 em «Ricardo»» daria a entender que se
+    // guardam alterações soltas. O que se guarda é o orçamento — por isso ficam só os nomes.
+    if (outros.length) {
+      var sNomes = outros.map(function(o){ return '<b>«'+esc(o.name)+'»</b>'; });
+      var sQuais = sNomes.length<=1 ? sNomes[0] : sNomes.slice(0,-1).join(', ')+' e '+sNomes[sNomes.length-1];
+      return '⚠️ Este orçamento está guardado, mas falta guardar '+sQuais+' — a cópia inclui <b>todos</b> os orçamentos.';
+    }
     return '✅ A última cópia está atualizada'+(_bindex.list.length>1?' (todos os orçamentos)':'')+'.';
   }
   function daysSinceBackup(){
