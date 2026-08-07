@@ -799,7 +799,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.37";
+  var APP_VERSION = "1.38";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -2152,7 +2152,7 @@
   // (por exemplo «Abaixo do alvo» E «Alta»). Sem nada escolhido num grupo, esse grupo não filtra.
   function passaFiltros(c, m, bf, bp){
     bf = bf || {}; bp = bp || {};
-    var fEstado = !!(bf.warn || bf.neg || bf.ok);
+    var fEstado = !!(bf.warn || bf.neg || bf.ok || bf.snoozed);
     var fPrio   = !!(bp.alta || bp.normal || bp.baixa);
     if (fEstado && !bf[catStatus(c, m)]) return false;
     if (fPrio && (c.cardId || !bp[c.priority||"normal"])) return false;   // as do cartão não têm prioridade
@@ -2172,7 +2172,7 @@
     var upc = upcomingTotals(m).porCat;   // o que cada categoria ainda tem por sair este mês
     var bf = state.ui.budgetFilters || {};
     var bp = state.ui.prioFilters || {};
-    var filtering = !!(bf.warn || bf.neg || bf.ok || bf.money || bf.over || bp.alta || bp.normal || bp.baixa);
+    var filtering = !!(bf.warn || bf.neg || bf.ok || bf.snoozed || bf.money || bf.over || bp.alta || bp.normal || bp.baixa);
     var nShown=0, nTotal=0;
     var rows = "";
     for (var g=0; g<state.groups.length; g++) {
@@ -2287,6 +2287,10 @@
         fBtn('f-warn','budget-filter','warn',bf.warn,'🟡','Abaixo do alvo','Só as categorias com o alvo por cumprir') +
         fBtn('f-neg','budget-filter','neg',bf.neg,'🔴','Excedido','Só as categorias que gastaram mais do que tinham') +
         fBtn('f-money','budget-filter','money',bf.money,'💰','Com saldo','Só as categorias com dinheiro disponível') +
+        // As adiadas não são «abaixo do alvo» nem «cumpridas» — são um estado à parte. Sem este
+        // botão ficavam invisíveis a TODOS os filtros de estado, e só se encontravam a percorrer
+        // a lista inteira: um ponto cego sobre decisões que a pessoa tomou de propósito.
+        fBtn('f-snoozed','budget-filter','snoozed',bf.snoozed,'😴','Adiadas','Só as categorias adiadas este mês') +
         '<span class="sep"></span>' +
         '<span class="muted hide-phone" style="font-size:12.5px;">Prioridade:</span>' +
         fBtn('f-alta','prio-filter','alta',bp.alta,'▲','Alta','Só as de prioridade alta') +
@@ -2295,7 +2299,7 @@
         (filtering ? '<button class="btn sm" data-action="budget-filter-clear">Limpar</button>' : '') +
         '<div class="spacer"></div>' +
         '<span class="muted'+(filtering?'':' hide-phone')+'" style="font-size:12.5px;">' +
-          (filtering ? ('A mostrar '+nShown+' de '+nTotal+' categorias') : 'Escreva no campo <b>Atribuído</b> de cada categoria') + '</span>' +
+          (filtering ? ('A mostrar '+nShown+' de '+nTotal+' categorias') : '') + '</span>' +
       '</div>' +
       '<div class="budget-card"><table class="budget"><thead><tr>' +
         '<th class="first">Categoria'+
@@ -3679,7 +3683,7 @@
         '<li>Definem-se no <b>✎</b> de cada categoria: mensal, semanal, trimestral, semestral, anual, ou até uma data.</li>'+
         '<li>No mensal, «<b>Repor até X</b>» acrescenta só o que falta para ter X disponível; «<b>Reservar X</b>» acrescenta sempre X, mesmo que já o tenha.</li>'+
         '<li>Trimestral, <b>semestral</b> e anual <b>param de pedir</b> quando já tiver o total. Indicando o mês da despesa, repartem o que falta até lá.</li>'+
-        '<li><b>😴 Adiar este mês:</b> num alvo que ainda pede dinheiro, o <b>😴</b> na linha da categoria diz para <b>não chatear só este mês</b> — deixa de aparecer a amarelo e sai do «Financiar alvos». No mês seguinte volta ao normal, ou reative antes com o <b>☀️</b>.</li>'+
+        '<li><b>😴 Adiar este mês:</b> num alvo que ainda pede dinheiro, o <b>😴</b> na linha da categoria diz para <b>não chatear só este mês</b> — deixa de aparecer a amarelo e sai do «Financiar alvos». No mês seguinte volta ao normal, ou reative antes com o <b>☀️</b>. Para ver de uma vez tudo o que adiou, use o filtro <b>😴 Adiadas</b> na barra do orçamento — adiadas não são nem «abaixo do alvo» nem «cumpridas», por isso não aparecem nesses.</li>'+
       '</ul>'+
 
       sec("Distribuir o dinheiro")+
@@ -3762,6 +3766,11 @@
       '<div class="modal-head"><h2>📋 Novidades</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
+
+      ver("1.38", "agosto 2026", [
+        '<b>Novo filtro 😴 Adiadas</b> na barra do orçamento. As categorias adiadas não são «abaixo do alvo» nem «cumpridas», por isso não apareciam em filtro nenhum — só percorrendo a lista toda.',
+        'No computador, a barra do orçamento deixou de repetir «Escreva no campo Atribuído de cada categoria».'
+      ])+
 
       ver("1.33 – 1.37", "agosto 2026", [
         '<b>O histórico deixou de ter limite prático:</b> as cópias passaram para uma zona do navegador com espaço de sobra. Antes, num orçamento com milhares de transações não cabiam e iam-se perdendo até sobrar uma — agora ficam as oito, cresça o orçamento o que crescer.',
