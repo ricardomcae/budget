@@ -214,6 +214,9 @@
   .btn.ghost:hover { background: var(--surface-2); }
 
   .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  /* Blocos da barra de filtros: cada um fica inteiro, e a quebra dá-se só ENTRE eles. */
+  .toolbar .tb-bloco { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
+  .toolbar .tb-fim { flex: 1 1 auto; }   /* cresce para empurrar a contagem para a direita */
   .toolbar .spacer { flex: 1; }
   .search { padding: 8px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); min-width: 180px; }
   select.filter, input.filter { padding: 8px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font-weight: 600; }
@@ -587,6 +590,10 @@
        impede que ela estique a linha — eram 20px a mais por transação. */
     .tx-selcell { padding: 10px 8px 10px 2px; margin: -10px 2px -10px 0; }
     .tx-sel, .tx-sel-all { width: 19px; height: 19px; }
+    /* No telemóvel nem um bloco inteiro cabe numa linha: aqui deixa-se partir por dentro,
+       senão transbordava para fora do ecrã. */
+    .toolbar .tb-bloco { flex-wrap: wrap; }
+    .toolbar .tb-fim .sep:first-child { display: none; }   /* barra vertical a abrir uma linha */
     .btn.f-filtro { padding: 6px 9px; font-size: 13px; }
     .rot { display: none; }          /* rótulo longo: fica só o símbolo ou a forma curta */
 
@@ -806,7 +813,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.39";
+  var APP_VERSION = "1.40";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -2285,7 +2292,10 @@
     }
     var tot = budgetTotals(m);
     el("content").innerHTML =
+      // A barra é feita de dois BLOCOS. Cada um mantém-se inteiro; se a janela não chegar para
+      // os dois, é entre eles que a linha parte — nunca a meio de um grupo de filtros.
       '<div class="toolbar">' +
+        '<div class="tb-bloco">' +
         '<button class="btn primary hide-phone" data-action="add-tx">➕ Nova transação</button>' +
         '<button class="btn" data-action="add-group">+ Grupo</button>' +
         '<span class="muted hide-phone" style="font-size:12.5px;margin-inline-start:6px;">Mostrar:</span>' +
@@ -2298,15 +2308,20 @@
         // botão ficavam invisíveis a TODOS os filtros de estado, e só se encontravam a percorrer
         // a lista inteira: um ponto cego sobre decisões que a pessoa tomou de propósito.
         fBtn('f-snoozed','budget-filter','snoozed',bf.snoozed,'😴','Adiadas','Só as categorias adiadas este mês') +
+        '</div>' +
+        '<div class="tb-bloco tb-fim">' +
         '<span class="sep"></span>' +
         '<span class="muted hide-phone" style="font-size:12.5px;">Prioridade:</span>' +
         fBtn('f-alta','prio-filter','alta',bp.alta,'▲','Alta','Só as de prioridade alta') +
         fBtn('f-normal','prio-filter','normal',bp.normal,'●','Normal','Só as de prioridade normal') +
         fBtn('f-baixa','prio-filter','baixa',bp.baixa,'▼','Baixa','Só as de prioridade baixa') +
-        (filtering ? '<button class="btn sm" data-action="budget-filter-clear">Limpar</button>' : '') +
+        (filtering ? '<span class="sep"></span><button class="btn sm" data-action="budget-filter-clear">✕<span class="rot"> Limpar</span></button>' : '') +
         '<div class="spacer"></div>' +
-        '<span class="muted'+(filtering?'':' hide-phone')+'" style="font-size:12.5px;">' +
-          (filtering ? ('A mostrar '+nShown+' de '+nTotal+' categorias') : '') + '</span>' +
+        // A contagem está SEMPRE lá, encostada à direita — não aparece e desaparece conforme
+        // se filtra, que era o que fazia a barra saltar a cada clique.
+        '<span class="muted" style="font-size:12.5px;white-space:nowrap;">' +
+          (filtering ? (nShown+' de '+nTotal+' categorias') : (nTotal+' categorias')) + '</span>' +
+        '</div>' +
       '</div>' +
       '<div class="budget-card"><table class="budget"><thead><tr>' +
         '<th class="first">Categoria'+
@@ -3783,7 +3798,8 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.38 – 1.39", "agosto 2026", [
+      ver("1.38 – 1.40", "agosto 2026", [
+        '<b>Barra do orçamento arrumada:</b> a contagem de categorias está sempre visível e encostada à direita, o <b>✕ Limpar</b> aparece só quando há filtros ligados, e em ecrãs estreitos a linha parte sempre no mesmo sítio — entre os filtros de estado e os de prioridade.',
         '<b>Separadores de mês nas recorrentes:</b> a lista passa a ser cortada por «Agosto 2026», «Setembro 2026»… para se ler de relance onde acaba um mês e começa o outro.',
         '<b>Novo filtro 😴 Adiadas</b> na barra do orçamento. As categorias adiadas não são «abaixo do alvo» nem «cumpridas», por isso não apareciam em filtro nenhum — só percorrendo a lista toda.',
         'No computador, a barra do orçamento deixou de repetir «Escreva no campo Atribuído de cada categoria».'
