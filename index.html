@@ -750,7 +750,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.22";
+  var APP_VERSION = "1.23";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -3613,6 +3613,11 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
+      ver("1.23", "agosto 2026", [
+        '<b>Fim dos avisos de conflito falsos:</b> ao gravar na nuvem pelo telemóvel, a confirmação do GitHub chega por vezes atrasada e a aplicação julgava estar em conflito consigo própria. Agora reconhece a sua própria gravação e não pergunta nada.',
+        '<b>Nada fica por enviar:</b> as alterações feitas enquanto a sincronização decorre passam a seguir logo a seguir, em vez de esperarem pela edição seguinte.'
+      ])+
+
       ver("1.21 – 1.22", "agosto 2026", [
         '<b>Listas mais compactas:</b> as linhas das transações (e do registo de uma conta) ficaram mais baixas, à altura das outras listas.',
         '<b>Beneficiários por ordem à escolha:</b> dos que mais usa, dos mais recentes, ou por ordem alfabética.',
@@ -5326,6 +5331,15 @@
       var outer = null;
       if (_sync.gistId) { outer = await gistRead(); }
       var remoteRev = outer ? (outer.rev||0) : 0, base = _sync.baseRev||0, changed = localChangedSinceSync();
+      // A leitura de confirmação logo a seguir à escrita pode vir atrasada (o GitHub demora um
+      // instante a mostrar o que acabou de receber, sobretudo em rede móvel). Nesse caso abortámos
+      // uma escrita que afinal ficou lá, e na tentativa seguinte encontramos na nuvem uma revisão
+      // mais recente do que a nossa base — mas escrita por NÓS. Não há trabalho de outro aparelho
+      // em risco, logo não há conflito a mostrar: adota-se o número da revisão e segue-se o
+      // caminho normal. Sem isto aparecia o ecrã de conflito com zero diferenças em transações.
+      if (outer && remoteRev > base && outer.device && outer.device === _sync.device) {
+        base = remoteRev; _sync.baseRev = remoteRev; saveSyncCfg();
+      }
       if (outer && remoteRev > base) {
         if (!changed) {
           adoptRemote(await decEnvelope(outer.enc, _sync.pass), remoteRev);
@@ -5383,13 +5397,18 @@
     _syncing = false;
   }
   function scheduleAutoSync(){
-    if (!_sync.auto || !syncReady() || _syncing || _gistPerdido) return;
+    if (!_sync.auto || !syncReady() || _gistPerdido) return;
     // A verificação "há dados novos?" (localChangedSinceSync -> allSig) lê e assina TODOS os
     // orçamentos: num orçamento grande custa dezenas de milissegundos. Estava a correr a cada
     // save() — ou seja, a cada mudança de mês, separador ou filtro — e travava o ecrã.
     // Agora só corre DENTRO do temporizador, uma vez por pausa de 4 segundos, e não no clique.
     clearTimeout(_autoTimer);
-    _autoTimer = setTimeout(function(){
+    var esperas = 0;
+    _autoTimer = setTimeout(function tick(){
+      // Se ainda há uma sincronização a decorrer, espera-se e volta a tentar. Antes desistia-se,
+      // e as alterações feitas DURANTE uma sincronização ficavam por enviar até ao toque seguinte
+      // — o que acontecia sempre no telemóvel, onde a ida à rede é mais lenta.
+      if (_syncing) { if (esperas++ < 20) { _autoTimer = setTimeout(tick, 1500); } return; }
       if (!localChangedSinceSync()) return;    // sem dados novos, não vale a pena ir à rede
       syncNow({silent:true});
     }, 4000);
