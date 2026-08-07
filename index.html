@@ -834,7 +834,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.47";
+  var APP_VERSION = "1.49";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -3340,15 +3340,22 @@
           '<div class="hint" style="margin-top:4px;">A «planta» do orçamento: que alvo tem cada categoria, e de que tipo.</div>'+
         '</details>'+
 
-        seccao("Manutenção")+
-
+        // «Manutenção» era um saco para o que sobrava. Cada uma destas coisas é de natureza
+        // diferente — uma preferência, uma arrumação e um recomeço — e merece o seu lugar.
+        seccao("Definições")+
         '<div class="field"><label>Moeda</label><select id="curSel">'+
           CURRENCIES.map(function(c){ return '<option value="'+c[0]+'"'+(((state.settings.currency||"EUR")===c[0])?" selected":"")+'>'+c[0]+' ('+c[1]+')</option>'; }).join("")+
-        '</select></div>'+
+        '</select><div class="hint">Muda só a forma como os valores são escritos. Não converte nada.</div></div>'+
+
+        seccao("Arrumação")+
         acao('<button class="btn" data-action="archived-menu" style="width:100%;justify-content:center;">🗄 Contas e categorias arquivadas</button>'+
-          '<div class="hint">Repor o que escondeu do orçamento sem apagar o histórico.</div>')+
-        (temDados() ? '' : acao('<button class="btn" data-action="load-sample" style="width:100%;justify-content:center;">🧪 Carregar dados de exemplo</button>'))+
-        acao('<button class="btn danger" data-action="reset-data" style="width:100%;justify-content:center;">🗑 Apagar todos os dados</button>')+
+          '<div class="hint">Repor o que escondeu do orçamento. O histórico delas nunca foi apagado.</div>')+
+
+        seccao("Recomeçar", "Estas substituem tudo o que tem neste orçamento. Guarde primeiro uma cópia no <b>2</b>.")+
+        (temDados() ? '' : acao('<button class="btn" data-action="load-sample" style="width:100%;justify-content:center;">🧪 Carregar dados de exemplo</button>'+
+          '<div class="hint">Um orçamento já montado, para experimentar sem medo.</div>'))+
+        acao('<button class="btn danger" data-action="reset-data" style="width:100%;justify-content:center;">🗑 Apagar todos os dados</button>'+
+          '<div class="hint">Fica com a aplicação vazia, como no primeiro dia.</div>')+
 
         (function(){ var e=espacoApp(); if(!e) return "";
           return '<div class="hint" id="zonaEspaco" style="border-top:1px solid var(--border);padding-top:10px;margin-top:18px;">Espaço usado: <b>'+mb(e.total)+
@@ -3869,8 +3876,9 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.38 – 1.47", "agosto 2026", [
-        '<b>«Dados e cópias» reorganizado:</b> passou a ter três blocos — <b>onde vivem os seus dados</b> (no navegador, em ficheiro, na nuvem), <b>trazer e levar</b> (importar do banco, exportar para folha de cálculo) e <b>manutenção</b>. Guardar e repor uma cópia ficaram juntos, que é onde se procuram.',
+      ver("1.38 – 1.49", "agosto 2026", [
+        '<b>Importar um ficheiro passou a perguntar antes.</b> Quando o ficheiro tinha um só orçamento, os dados eram substituídos em silêncio, sem pergunta nem forma de voltar atrás. Agora pergunta e guarda um ponto 🛟 primeiro.',
+        '<b>«Dados e cópias» reorganizado:</b> <b>onde vivem os seus dados</b> (no navegador, em ficheiro, na nuvem), <b>trazer e levar</b> (importar do banco, exportar para folha de cálculo) e depois <b>definições</b>, <b>arrumação</b> e <b>recomeçar</b>. Guardar e repor uma cópia ficaram juntos, que é onde se procuram.',
         'Os ficheiros <b>.csv</b> passaram a dizer de que orçamento são, e o ecrã avisa que exportam só o orçamento aberto e não repõem nada.',
         'Textos revistos em toda a aplicação: <b>aparelho</b> passou a ser sempre «aparelho» (dizia-se «dispositivo» a meio), os títulos das janelas passaram a ser iguais aos botões que as abrem, e o separador do browser deixou de dizer «Base-Zero (com sincronização)».',
         '<b>Novo filtro 😴 Adiadas</b> no orçamento. As categorias adiadas não são «abaixo do alvo» nem «cumpridas», por isso não apareciam em filtro nenhum — só percorrendo a lista toda.',
@@ -6206,6 +6214,7 @@
         var obj = JSON.parse(e.target.result), qtd;
         if (obj && obj.budgets && obj.budgets.length) {          // pacote com vários orçamentos
           if(!confirm("Isto substitui TODOS os orçamentos deste aparelho pelos "+obj.budgets.length+" do ficheiro. Continuar?")) return;
+          pontoDeSeguranca("antes de importar uma cópia");
           // Validar e preparar TUDO antes de escrever seja o que for: se o armazenamento enchesse
           // a meio do ciclo, ficavam alguns orçamentos já substituídos e outros não, com o índice
           // por atualizar — uma mistura das duas cópias, e a mensagem só dizia «Ficheiro inválido».
@@ -6220,7 +6229,13 @@
           var act = obj.active && lista.some(function(x){return x.id===obj.active;}) ? obj.active : lista[0].id;
           _bindex = { active:act, list:lista }; saveIndex(_bindex);
           state = loadBudgetRaw(act); qtd = lista.length;
-        } else if (obj && obj.accounts && obj.transactions) {    // ficheiro antigo: um só orçamento
+        } else if (obj && obj.accounts && obj.transactions) {    // UM só orçamento (ficheiro antigo, ou um ponto do histórico)
+          // Este caminho substitui o orçamento aberto e não tinha pergunta nenhuma: bastava
+          // escolher o ficheiro para os dados irem embora em silêncio. É o caminho por onde
+          // entra um ficheiro «historico-…», que é fácil de descarregar — logo, fácil de
+          // importar por engano.
+          if(!confirm("Isto substitui o orçamento aberto («"+(budgetName(_bindex.active)||"")+"») pelo conteúdo deste ficheiro.\nOs outros orçamentos não são tocados.\n\nContinuar?")) return;
+          pontoDeSeguranca("antes de importar um ficheiro");
           // Normalização completa, igual à do loadBudgetRaw. Faltavam campos (sobretudo o
           // `recurring`): criar ou apagar uma regra recorrente logo a seguir a importar um
           // ficheiro antigo rebentava em silêncio — o botão simplesmente não fazia nada.
