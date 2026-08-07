@@ -83,6 +83,13 @@
   .theme-toggle:hover { transform: scale(1.1); }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
+  /* O Safari do iPhone aumenta sozinho a letra de blocos largos com pouco texto («text
+     autosizing»). Era por isso que a linha do mês nas recorrentes — uma célula sozinha a
+     atravessar a tabela toda — aparecia maior num orçamento do que noutro: o aumento depende
+     da largura da tabela, que muda com o tamanho dos nomes lá dentro. Com isto, 11px são
+     sempre 11px. Não impede o utilizador de aumentar o texto — só impede o Safari de o fazer
+     por conta própria. */
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   body {
     font-family: var(--font);
     background: var(--bg);
