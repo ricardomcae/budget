@@ -750,7 +750,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.23";
+  var APP_VERSION = "1.24";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -1649,12 +1649,17 @@
     if (_bindex.list.length<=1){ toast("Tem de haver pelo menos um orçamento."); return; }
     var nome = budgetName(id);
     if(!confirm("Eliminar o orçamento «"+nome+"» e tudo o que tem dentro?\nEsta ação não se pode anular.")) return;
+    // Guarda-se o conteúdo ANTES de o apagar. O ponto de segurança tem de ir para a lista de um
+    // orçamento que SOBREVIVE (a do que se elimina desaparece com ele), por isso só se escreve
+    // depois de o orçamento ativo estar decidido, mais abaixo.
+    var salvo = null; try { salvo = loadBudgetRaw(id); } catch(e){}
     try { localStorage.removeItem(budKey(id)); localStorage.removeItem(SNAP_KEY+"::"+id); } catch(e){}
     _bindex.list = _bindex.list.filter(function(b){ return b.id!==id; });
     if (_bindex.active===id) {
       _bindex.active = _bindex.list[0].id; saveIndex(_bindex);
       state = loadBudgetRaw(_bindex.active); _idx=null; _payees=null; _undo=[]; _moves=[]; hideUndo();
     } else saveIndex(_bindex);
+    if (salvo) pontoDeSeguranca("antes de eliminar «"+nome+"»", salvo);
     scheduleAutoSync(); render(); budgetsModal();
     toast("Orçamento «"+nome+"» eliminado.");
   }
@@ -3594,7 +3599,7 @@
 
       sec("Os seus dados")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
-        '<li>Vivem <b>só neste aparelho</b>. Em <b>Dados e cópias</b> há três níveis: <b>1</b> histórico dos 5 últimos dias, para voltar atrás; <b>2</b> cópia em ficheiro, a única que sobrevive a perder o aparelho; <b>3</b> sincronização cifrada entre telemóvel e PC.</li>'+
+        '<li>Vivem <b>só neste aparelho</b>. Em <b>Dados e cópias</b> há três níveis: <b>1</b> histórico dos 5 últimos dias — mais um ponto 🛟 guardado automaticamente antes de cada ação que não se pode anular —, para voltar atrás; <b>2</b> cópia em ficheiro, a única que sobrevive a perder o aparelho; <b>3</b> sincronização cifrada entre telemóvel e PC.</li>'+
         '<li>A <b>cópia em ficheiro guarda todos os orçamentos</b> de uma vez — por isso o aviso de «alterações por guardar» também é de todos, mesmo os que não tem abertos.</li>'+
       '</ul>'+
 
@@ -3613,7 +3618,10 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.23", "agosto 2026", [
+      ver("1.23 – 1.24", "agosto 2026", [
+        '<b>Rede de segurança antes do que não se anula:</b> ao adotar a versão da nuvem, eliminar um orçamento, carregar dados de exemplo, voltar atrás no histórico ou apagar tudo, a aplicação guarda primeiro um ponto 🛟 com o estado anterior. Aparece no histórico, em <b>Dados e cópias</b>, com o motivo escrito.',
+        'Antes, o ponto do próprio dia era substituído ao sair da aplicação — e no telemóvel isso acontece em segundos, apagando justamente a versão a que se queria voltar.',
+        '<b>Avisos de sincronização em português corrente:</b> mensagens como «corrida» deram lugar a explicações do que aconteceu e do que fazer.',
         '<b>Fim dos avisos de conflito falsos:</b> ao gravar na nuvem pelo telemóvel, a confirmação do GitHub chega por vezes atrasada e a aplicação julgava estar em conflito consigo própria. Agora reconhece a sua própria gravação e não pergunta nada.',
         '<b>Nada fica por enviar:</b> as alterações feitas enquanto a sincronização decorre passam a seguir logo a seguir, em vez de esperarem pela edição seguinte.'
       ])+
@@ -4958,10 +4966,10 @@
         } catch(e){ toast("Não foi possível criar: "+e.message); }
       })();
     },
-    "sync-keep-local": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ await pushLocal(pc.remoteRev+1); setSyncStatus("Guardado na nuvem ✓"); toast("Mantido este dispositivo — enviado para a nuvem."); }catch(e){ toast("Falhou: "+e.message); } _pendingConflict=null; })(); },
-    "sync-use-remote": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ adoptRemote(await decEnvelope(pc.enc, _sync.pass), pc.remoteRev); toast("Adotada a versão da nuvem."); }catch(e){ toast("Falhou: "+e.message); } _pendingConflict=null; })(); },
-    "load-sample": function(){ if(temDados() && !confirm("Atenção: os dados atuais serão substituídos pelos dados de exemplo. Esta ação não pode ser anulada. Pretende continuar?")) return; loadSample(); },
-    "reset-data": function(){ if(confirm("Apagar TODOS os dados definitivamente? Esta ação não pode ser anulada.")){ state=JSON.parse(JSON.stringify(DEFAULT_STATE)); state.ui.month=nowMonthKey(); _undo=[]; hideUndo(); closeModal(); save(); render(); toast("Dados apagados."); } }
+    "sync-keep-local": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ await pushLocal(pc.remoteRev+1); setSyncStatus("Guardado na nuvem ✓"); toast("Mantido este dispositivo — enviado para a nuvem."); }catch(e){ setSyncStatus("Não foi possível guardar ⚠️"); toast(msgSync(e)); } _pendingConflict=null; })(); },
+    "sync-use-remote": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ adoptRemote(await decEnvelope(pc.enc, _sync.pass), pc.remoteRev); toast("Adotada a versão da nuvem."); }catch(e){ setSyncStatus("Não foi possível adotar ⚠️"); toast(msgSync(e)); } _pendingConflict=null; })(); },
+    "load-sample": function(){ if(temDados() && !confirm("Atenção: os dados atuais serão substituídos pelos dados de exemplo. Esta ação não pode ser anulada. Pretende continuar?")) return; pontoDeSeguranca("antes de carregar os dados de exemplo"); loadSample(); },
+    "reset-data": function(){ if(confirm("Apagar TODOS os dados definitivamente? Esta ação não pode ser anulada.")){ pontoDeSeguranca("antes de apagar todos os dados"); state=JSON.parse(JSON.stringify(DEFAULT_STATE)); state.ui.month=nowMonthKey(); _undo=[]; hideUndo(); closeModal(); save(); render(); toast("Dados apagados."); } }
   };
 
   function txById(id){ for(var i=0;i<state.transactions.length;i++) if(state.transactions[i].id===id) return state.transactions[i]; return null; }
@@ -5099,6 +5107,7 @@
   // porque NÃO transfere ficheiros (evita o download que o iOS bloqueia em silêncio).
   var SNAP_KEY = "meu-orcamento-snaps-v1";
   var SNAP_MAX = 5;
+  var SEG_MAX = 3;   // pontos de segurança guardados além dos diários
   function snapKey(){ return SNAP_KEY + "::" + _bindex.active; }
   function loadSnaps(){ try { return JSON.parse(localStorage.getItem(snapKey())) || []; } catch(e){ return []; } }
   function saveSnaps(arr){
@@ -5110,17 +5119,55 @@
   function takeDailySnapshot(){
     if(!state.transactions.length && !state.categories.length) return;   // nada de útil para guardar
     var day = todayISO(), sig = backupSig(), snaps = loadSnaps();
-    var last = snaps.length ? snaps[snaps.length-1] : null;
-    if(last && last.day===day && last.sig===sig) return;                 // hoje já está guardado tal e qual
+    // Procura-se o ponto DIÁRIO de hoje esteja ele onde estiver na lista — olhar só para a
+    // última entrada não chega: um ponto de segurança guardado entretanto fica por cima dele,
+    // e o dia de hoje acabava duplicado a cada gravação.
+    var iDia = -1;
+    for(var i=snaps.length-1;i>=0;i--){ if(snaps[i].day===day && !snaps[i].motivo){ iDia=i; break; } }
+    if(iDia>=0 && snaps[iDia].sig===sig) return;                         // hoje já está guardado tal e qual
     var entry = { day:day, at:new Date().toISOString(), sig:sig, data: JSON.stringify(state) };
-    if(last && last.day===day) snaps[snaps.length-1] = entry;            // substitui o de hoje
-    else snaps.push(entry);                                              // ou acrescenta um dia novo
-    while(snaps.length > SNAP_MAX) snaps.shift();                        // mantém só os últimos 5 dias
+    // Um ponto de segurança (guardado mesmo antes de uma ação destrutiva) nunca é substituído
+    // — é precisamente a versão anterior à ação que interessa manter.
+    if(iDia>=0) snaps[iDia] = entry;
+    else snaps.push(entry);
+    podarSnaps(snaps);
     saveSnaps(snaps);
+  }
+  // Mantém os últimos SNAP_MAX pontos DIÁRIOS e, além desses, os últimos SEG_MAX pontos de
+  // segurança. Assim uma tarde de experiências não empurra os dias todos para fora da lista,
+  // nem o passar dos dias apaga o ponto guardado antes de uma ação destrutiva.
+  function podarSnaps(snaps){
+    var seg=0, dia=0;
+    for(var i=snaps.length-1;i>=0;i--){
+      if(snaps[i].motivo){ if(++seg > SEG_MAX) snaps.splice(i,1); }
+      else { if(++dia > SNAP_MAX) snaps.splice(i,1); }
+    }
+    return snaps;
+  }
+  // Ponto de segurança: fotografia tirada IMEDIATAMENTE ANTES de uma ação que não se pode
+  // anular (adotar a nuvem, repor um dia antigo, carregar exemplos, apagar tudo, eliminar um
+  // orçamento). Sem isto, a rede de segurança desaparecia justamente nas ações que mais
+  // precisam dela: o ponto diário de hoje era reescrito com o estado JÁ destruído assim que
+  // se saísse da aplicação — no telemóvel, segundos depois.
+  function pontoDeSeguranca(motivo, estado){
+    try {
+      var st = estado || state;
+      if(!st || (!st.transactions || !st.transactions.length) && (!st.categories || !st.categories.length)) return;
+      var snaps = loadSnaps();
+      snaps.push({ day: todayISO(), at: new Date().toISOString(), sig: null,
+                   motivo: motivo, data: JSON.stringify(st) });
+      podarSnaps(snaps);
+      saveSnaps(snaps);
+    } catch(e){}
   }
   function restoreSnapshot(idx){
     var snaps = loadSnaps(), s = snaps[idx]; if(!s) return;
-    if(!confirm("Voltar ao orçamento tal como estava em "+fmtDate(s.day)+"?\nOs dados atuais deste aparelho são substituídos por essa versão.")) return;
+    var comoEstava = s.motivo ? ("como estava "+s.motivo+" ("+fmtDate(s.day)+")") : ("tal como estava em "+fmtDate(s.day));
+    if(!confirm("Voltar ao orçamento "+comoEstava+"?\nOs dados atuais deste aparelho são substituídos por essa versão.")) return;
+    // O ponto de segurança acrescenta uma entrada à lista, o que pode deslocar os índices.
+    // Por isso o «s» já foi lido ACIMA e é esse objeto que se usa daqui para a frente —
+    // reler pelo índice depois de guardar traria a entrada errada.
+    pontoDeSeguranca("antes de voltar atrás no histórico");
     try {
       var obj = JSON.parse(s.data);
       if(!obj.accounts || !obj.transactions) throw new Error("formato");
@@ -5132,7 +5179,7 @@
       obj.groups = obj.groups || []; obj.categories = obj.categories || [];
       obj.ui = { view:"budget", month: nowMonthKey() };
       state = obj; _undo=[]; hideUndo(); _idx=null; save(); closeModal(); render();
-      toast("Voltou ao orçamento de "+fmtDate(s.day)+". Se sincroniza, envie para atualizar os outros aparelhos.");
+      toast("Voltou ao orçamento "+comoEstava+". Se sincroniza, envie para atualizar os outros aparelhos.");
     } catch(e){ toast("Esse ponto do histórico está inválido."); }
   }
   function downloadSnapshot(idx){
@@ -5144,9 +5191,12 @@
     if(!snaps.length) return '<div class="hint" style="margin-top:8px;">Ainda não há histórico guardado — aparece da próxima vez que abrir a aplicação.</div>';
     var h = '<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">';
     for(var i=snaps.length-1;i>=0;i--){ var s=snaps[i];
-      h += '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 8px 6px 10px;">'+
-             '<span style="font-size:12.5px;font-weight:600;">'+fmtDate(s.day)+(i===snaps.length-1?' <span class="muted" style="font-weight:500;">· mais recente</span>':'')+'</span>'+
-             '<span style="display:flex;gap:6px;">'+
+      var etiq = s.motivo
+        ? ('🛟 '+fmtDate(s.day)+' <span class="muted" style="font-weight:500;">· '+esc(s.motivo)+'</span>')
+        : (fmtDate(s.day)+(i===snaps.length-1?' <span class="muted" style="font-weight:500;">· mais recente</span>':''));
+      h += '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between;background:var(--surface);border:1px solid '+(s.motivo?'var(--primary)':'var(--border)')+';border-radius:8px;padding:6px 8px 6px 10px;">'+
+             '<span style="font-size:12.5px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+etiq+'</span>'+
+             '<span style="display:flex;gap:6px;flex-shrink:0;">'+
                '<button class="btn" data-action="snap-restore" data-id="'+i+'" style="padding:5px 9px;font-size:12px;">↩ Repor</button>'+
                '<button class="btn" data-action="snap-download" data-id="'+i+'" style="padding:5px 9px;font-size:12px;" title="Descarregar este dia como ficheiro">⬇</button>'+
              '</span></div>';
@@ -5243,6 +5293,17 @@
   // revisão remota ainda é a que esperávamos, e relê DEPOIS para confirmar que foi a
   // nossa que ficou lá. Se em qualquer dos dois momentos aparecer outra, aborta-se com
   // "corrida" e o syncNow() recomeça do princípio, onde o conflito é tratado como deve ser.
+  // Traduz um erro de sincronização para linguagem de gente. A palavra "corrida" é um termo
+  // interno (dois aparelhos a escrever ao mesmo tempo) e não tem de chegar ao ecrã.
+  function msgSync(e){
+    var m = (e && e.message) || "";
+    if (/corrida/.test(m))      return "Outro aparelho estava a guardar ao mesmo tempo. Nada se perdeu — tente daqui a pouco.";
+    if (/\(404\)/.test(m))      return "A cópia na nuvem não foi encontrada. Verifique a configuração da sincronização.";
+    if (/\(401\)|\(403\)/.test(m)) return "O GitHub recusou o token — pode ter expirado ou sido revogado.";
+    if (/decrypt|Unexpected token|palavra-passe/i.test(m)) return "Não foi possível abrir a cópia da nuvem — a palavra-passe pode ser diferente.";
+    if (/Failed to fetch|NetworkError|network/i.test(m)) return "Não foi possível chegar ao GitHub. Verifique a ligação à Internet.";
+    return "Não foi possível concluir a sincronização. Tente novamente daqui a pouco.";
+  }
   async function pushLocal(rev){
     // Assinatura do que VAI ser enviado, capturada AGORA (antes das idas à rede). Se a gravássemos
     // no fim, a partir do estado atual, uma edição feita durante a sincronização ficaria marcada
@@ -5305,6 +5366,7 @@
       return;
     }
     var ui = state.ui;                    // preserva a vista/mês/tema deste dispositivo
+    pontoDeSeguranca("antes de adotar a versão da nuvem");
     var antigos = _bindex.list.map(function(b){ return b.id; });
     var lista = [];
     for (var i=0;i<remoto.budgets.length;i++){
@@ -5392,7 +5454,7 @@
         if (!opts.silent) toast("Outro aparelho está a sincronizar agora. Tente daqui a pouco.");
         _syncing = false; return;
       }
-      setSyncStatus("Erro: "+e.message); toast("Sincronização falhou: "+e.message);
+      setSyncStatus("Sincronização falhou ⚠️"); toast(msgSync(e));
     }
     _syncing = false;
   }
