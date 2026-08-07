@@ -248,10 +248,17 @@
   .toolbar.acc-acoes { margin-bottom: 10px; }
   /* A procura cresce para o espaço que sobra: o texto do campo estava a ser cortado a meio
      («Procurar beneficiário ou n»), e um campo que não cabe não consegue dizer o que faz. */
-  .toolbar.tx-filtros .search { flex: 1 1 240px; min-width: 150px; max-width: 380px; }
+  .toolbar.tx-filtros .search-wrap { flex: 1 1 240px; min-width: 150px; max-width: 380px; }
   .toolbar .tb-bloco { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
   .toolbar .tb-fim { flex: 1 1 auto; }   /* cresce para empurrar a contagem para a direita */
   .toolbar .spacer { flex: 1; }
+  /* O ✕ vive DENTRO da caixa de procura, encostado à direita e por cima do texto. O espaço
+     à direita do campo é reservado para ele quando aparece, para nunca tapar o que se escreveu. */
+  .search-wrap { position: relative; display: inline-flex; align-items: center; min-width: 0; }
+  .search-wrap .search { width: 100%; padding-inline-end: 30px; }
+  .search-x { position: absolute; inset-inline-end: 6px; border: 0; background: transparent; cursor: pointer;
+    color: var(--text-muted); font-size: 13px; line-height: 1; padding: 5px 6px; border-radius: 6px; }
+  .search-x:hover { background: var(--surface-2); color: var(--text); }
   .search { padding: 8px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); min-width: 180px; }
   select.filter, input.filter { padding: 8px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font-weight: 600; }
 
@@ -2591,6 +2598,12 @@
     // Chega-se aqui filtrado a partir da atividade de uma categoria — sem isto não há
     // forma óbvia de voltar a ver tudo.
     var temFiltro = !!(f.account || f.category || f.per || f.from || f.to || f.payee || (f.q||"").trim());
+    // A CONTA não é mais um filtro: quando se entra por Contas → uma conta, ela é o sítio onde
+    // se está. Por isso o «Limpar filtros» não lhe toca — limpava tudo e atirava a pessoa
+    // para fora da conta que estava a ver, o que ninguém pede ao escrever no campo de procura.
+    // Para sair da conta há dois caminhos óbvios e mesmo à vista: o «‹ Contas» e a própria
+    // caixa da conta, em «Todas as contas».
+    var temFiltroAlemDaConta = !!(f.category || f.per || f.from || f.to || f.payee || (f.q||"").trim());
     var soConta = !!(f.account && !f.category && !f.per && !f.from && !f.to && !f.payee && !(f.q||"").trim());
     // Resumo de um beneficiário: em vez de um ecrã novo, aproveita esta lista já filtrada e
     // acrescenta-lhe uma faixa com os totais. Conta sobre a lista VISÍVEL, por isso cruzar com
@@ -2679,9 +2692,15 @@
       '<span class="muted hide-phone tb-etiq" style="font-size:12.5px;">Mostrar:</span>'+
       // O que a procura varre está escrito no próprio campo E na dica: sem isso, a única forma
       // de saber que NÃO varre categorias nem valores era ir experimentar e concluir mal.
-      '<input class="search" id="txSearch" placeholder="Procurar no beneficiário e na nota…" '+
-        'title="Procura no beneficiário e na nota. Para categorias use o filtro de categoria, ao lado." '+
-        'aria-label="Procurar no beneficiário e na nota" value="'+esc(f.q||"")+'">'+
+      // O ✕ de dentro da caixa apaga SÓ o texto e deixa tudo o resto como estava — é o gesto
+      // que se espera de uma caixa de procura, e evita ter de usar o «Limpar filtros» (que é
+      // outra coisa) só para apagar uma palavra. Só aparece quando há texto lá dentro.
+      '<span class="search-wrap">'+
+        '<input class="search" id="txSearch" placeholder="Procurar no beneficiário e na nota…" '+
+          'title="Procura no beneficiário e na nota. Para categorias use o filtro de categoria, ao lado. Esc apaga." '+
+          'aria-label="Procurar no beneficiário e na nota" value="'+esc(f.q||"")+'">'+
+        ((f.q||"").trim() ? '<button class="search-x" data-action="tx-search-clear" title="Apagar o texto da procura" aria-label="Apagar o texto da procura">✕</button>' : '')+
+      '</span>'+
       '<select class="filter" id="txFilterAcc" title="Conta" aria-label="Filtrar por conta">'+accOpts+'</select>'+
       '<select class="filter" id="txFilterCat" title="Categoria" aria-label="Filtrar por categoria">'+catOpts+'</select>'+
       '<select class="filter" id="txFilterPer" title="Período" aria-label="Filtrar por período">'+perOpts+'</select>'+
@@ -2689,7 +2708,9 @@
                           dateField("txFilterTo", f.to||"", 'class="date-txt filter" title="Até"') : '')+
       // Aqui o «Limpar» FICA no telemóvel (ao contrário do orçamento): estes filtros são caixas
       // de seleção e um campo de texto — desfazê-los à mão dava quatro gestos. Perde só o rótulo.
-      (temFiltro ? '<button class="btn sm" data-action="tx-filter-clear" title="Ver todas as transações" aria-label="Limpar filtros">✕<span class="rot"> Limpar filtros</span></button>' : '')+
+      (temFiltroAlemDaConta ? '<button class="btn sm" data-action="tx-filter-clear" title="'+
+        (f.account ? "Limpar os filtros, mantendo esta conta" : "Ver todas as transações")+
+        '" aria-label="Limpar filtros">✕<span class="rot"> Limpar filtros</span></button>' : '')+
       '<div class="spacer"></div>'+
       (function(){ var pend = porConfirmar(f.account||null);
         if (Math.abs(pend) <= 0.005) return '';
@@ -3986,6 +4007,8 @@
         '<b>A letra deixou de variar de orçamento para orçamento no iPhone.</b> O Safari aumentava sozinho a letra de blocos largos com pouco texto — era por isso que a linha do mês nas recorrentes («AGOSTO 2026») aparecia maior num orçamento do que noutro: dependia da largura da tabela. Aumentar o texto nas definições do telemóvel continua a funcionar.',
         '<b>As barras de filtros passaram a caber numa linha no telemóvel.</b> No <b>Orçamento</b> sai o ✕ Limpar (desliga-se cada filtro tocando-lhe outra vez); nas <b>Transações</b> ele fica, mas só com o ✕, porque ali os filtros são caixas de seleção. As contagens dizem agora <b>quantas categorias / transações estão à vista</b>, em vez de «3 de 24».',
         '<b>Exportar para folha de cálculo passou a seguir o que está no ecrã.</b> O antigo ⬇ CSV das Transações parecia exportar o que estava à vista mas exportava sempre tudo. No lugar dele, e só no computador, há agora <b>⬇ Exportar o que vejo</b> nas Transações (respeita os filtros todos) e <b>⬇ Exportar esta conta</b> no registo de cada conta. Os três recortes possíveis passam a ter um botão cada: <b>uma conta</b>, <b>o que está filtrado</b> e <b>o orçamento inteiro</b> — este último em <b>Dados e cópias</b>, como sempre. Nenhum deles sai do orçamento aberto.',
+        '<b>A conta deixou de ser tratada como «mais um filtro».</b> Dentro de Contas → uma conta, carregar em <b>✕ Limpar filtros</b> limpava tudo e atirava-o para fora da conta que estava a ver. Agora limpa os outros filtros e <b>mantém a conta</b> — para sair dela há o «‹ Contas» e a própria caixa da conta, em «Todas as contas».',
+        '<b>✕ dentro da caixa de procura</b>, para apagar <b>só</b> o texto sem mexer nos outros filtros. A tecla <b>Esc</b> faz o mesmo, e o cursor fica no sítio para escrever logo outra coisa.',
         '<b>Correção importante — eliminar um grupo dava cabo do «Pronto a atribuir».</b> As categorias do grupo desapareciam, mas o dinheiro que lhes estava atribuído ficava para trás, invisível: continuava a ser descontado do «Pronto a atribuir» <b>para sempre</b>, e a verificação de integridade acusava uma diferença sem conseguir apontar nenhuma transação culpada. Agora eliminar um grupo faz a mesma limpeza que eliminar uma categoria: o dinheiro volta ao «Pronto a atribuir», as transações ficam sem categoria e as regras recorrentes afetadas ficam em pausa. A confirmação passou também a dizer quantas categorias vão dentro, incluindo as <b>arquivadas</b> — que antes eram apagadas sem sequer perguntar.',
         '<b>Correção — cartão de crédito:</b> a linha do cartão contava a dívida de <b>todos os tempos</b>, mas o «Libertar excedente» contava só até ao mês em vista. Com uma compra datada de um mês à frente, a app dizia «dívida coberta» e ao mesmo tempo oferecia-se para devolver o dinheiro reservado para essa mesma fatura. Passam os dois a contar até ao mês que está a ver.',
         '<b>Mais rápida a cada toque.</b> Cada ação gravava o orçamento inteiro duas vezes e voltava a percorrê-lo uma terceira para saber se havia alterações por guardar. Agora só grava quando algo mudou de facto. Nota-se sobretudo no telemóvel e com muitas transações.',
@@ -4910,7 +4933,17 @@
       }
     },
     "cat-activity": function(id){ state.ui.view="transactions"; state.ui.txFilter={category:id}; state.ui.txLimit=PAGINA; render();  aoTopo(); },
-    "tx-filter-clear": function(){ state.ui.txFilter=null; state.ui.txLimit=PAGINA; save(); render(); aoTopo(); },
+    // Limpa os filtros MAS mantém a conta: quem está dentro de uma conta quer continuar lá.
+    "tx-filter-clear": function(){
+      var conta = (state.ui.txFilter||{}).account || null;
+      state.ui.txFilter = conta ? { account: conta } : null;
+      state.ui.txLimit=PAGINA; save(); render(); aoTopo();
+    },
+    // Só o texto. Devolve o cursor à caixa, para se poder escrever outra coisa de imediato.
+    "tx-search-clear": function(){
+      var f = state.ui.txFilter||{}; f.q=""; state.ui.txFilter=f; state.ui.txLimit=PAGINA;
+      save(); renderTransactions(); var c=el("txSearch"); if(c) c.focus();
+    },
     "show-more-tx": function(){ state.ui.txLimit=(state.ui.txLimit||PAGINA)+PAGINA; save(); render(); },
     "report-toggle-cat": function(id){ var arr=(state.ui.reportCats||[]).slice(); var i=arr.indexOf(id); if(i>=0) arr.splice(i,1); else arr.push(id); state.ui.reportCats=arr; save(); render(); },
     "report-months": function(id){ state.ui.reportMonths=parseInt(id,10)||6; state.ui.reportFrom=null; state.ui.reportTo=null; save(); render(); },
@@ -6897,6 +6930,15 @@
     // Dentro de um campo, o Esc desfaz o que se estava a escrever e larga o campo —
     // só o segundo Esc é que fecha a janela.
     var t = e.target, tag = t && t.tagName;
+    // A caixa de procura é a exceção: ali o Esc apaga (que é o que se espera de uma procura) em
+    // vez de repor o texto anterior, e o cursor fica lá para se escrever logo outra coisa.
+    if (t && t.id === "txSearch") {
+      if (!t.value) { t.blur(); return; }
+      t.value = ""; t.setAttribute("data-prev", "");
+      var f = state.ui.txFilter||{}; f.q=""; state.ui.txFilter=f; state.ui.txLimit=PAGINA;
+      save(); renderTransactions(); var c=el("txSearch"); if(c) c.focus();
+      return;
+    }
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
       if (t.hasAttribute("data-prev")) t.value = t.getAttribute("data-prev");
       t.blur(); return;
