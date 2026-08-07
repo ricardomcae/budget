@@ -794,7 +794,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.33";
+  var APP_VERSION = "1.34";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -3242,10 +3242,39 @@
         (temDados() ? '' : '<div class="field"><button class="btn" data-action="load-sample" style="width:100%;justify-content:center;">🧪 Carregar dados de exemplo</button></div>')+
         '<div class="field"><button class="btn danger" data-action="reset-data" style="width:100%;justify-content:center;">🗑 Apagar todos os dados</button></div>'+
         (function(){ var e=espacoApp(); if(!e) return "";
-          return '<div class="hint" style="border-top:1px solid var(--border);padding-top:10px;">Espaço usado: <b>'+mb(e.total)+
-            '</b> de cerca de 5 MB (orçamento '+mb(e.dados)+' · histórico '+mb(e.hist)+').</div>'; })()+
+          return '<div class="hint" id="zonaEspaco" style="border-top:1px solid var(--border);padding-top:10px;">Espaço usado: <b>'+mb(e.total)+
+            '</b> de cerca de 5 MB (orçamento '+mb(e.dados)+' · lista do histórico '+mb(e.hist)+').<br>'+
+            '<span id="zonaExtra" class="muted">a verificar o resto…</span></div>'; })()+
       '</div>'+
       '<div class="modal-foot"><span class="muted" style="font-size:12px;">Orçamento base-zero · <a href="#" data-action="changelog" style="color:var(--primary);cursor:pointer;">Versão '+APP_VERSION+' — novidades</a></span><button class="btn" data-action="close">Fechar</button></div>');
+    // Estado real do armazenamento — as duas coisas que não se veem de outra forma: se os
+    // dados estão protegidos contra a limpeza automática do navegador, e quanto espaço têm
+    // mesmo disponível (o histórico já não vive no espaço apertado dos ~5 MB).
+    (function(){
+      var alvo = el("zonaExtra"); if(!alvo) return;
+      var partes = [];
+      function mostrar(){ alvo.innerHTML = partes.length ? partes.join(" &nbsp;·&nbsp; ") : ""; }
+      function fim(){ mostrar(); }
+      try {
+        if (navigator.storage && navigator.storage.estimate) {
+          navigator.storage.estimate().then(function(q){
+            if (q && q.quota) partes.unshift("Histórico e restantes cópias: <b>"+mb(q.usage||0)+"</b> de <b>"+
+              (q.quota>1073741824 ? (q.quota/1073741824).toFixed(1).replace(".",",")+" GB" : mb(q.quota))+"</b> disponíveis");
+            mostrar();
+          })["catch"](fim);
+        }
+        if (navigator.storage && navigator.storage.persisted) {
+          navigator.storage.persisted().then(function(ok){
+            partes.push(ok ? "🔒 Protegido: o navegador não apaga estes dados sozinho"
+                           : "⚠️ Ainda não protegido — o navegador pode apagar os dados se não usar a aplicação durante uns dias");
+            mostrar();
+          })["catch"](fim);
+        } else {
+          partes.push("Este navegador não diz se protege os dados.");
+          mostrar();
+        }
+      } catch(e){ alvo.textContent = ""; }
+    })();
     el("importFile").addEventListener("change", function(e){ importJSON(e.target.files[0]); });
     el("curSel").addEventListener("change", function(){ state.settings.currency=el("curSel").value; save(); render(); dataModal(); });
   }
@@ -3373,7 +3402,7 @@
     var detalhe = e ? (
       '<div class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">'+
         '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Orçamento</span><b style="font-variant-numeric:tabular-nums;">'+mb(e.dados)+'</b></div>'+
-        '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Histórico (até 5 dias)</span><b style="font-variant-numeric:tabular-nums;">'+mb(e.hist)+'</b></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Lista do histórico</span><b style="font-variant-numeric:tabular-nums;">'+mb(e.hist)+'</b></div>'+
         (e.outros?'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Outros</span><b style="font-variant-numeric:tabular-nums;">'+mb(e.outros)+'</b></div>':'')+
         '<div style="display:flex;justify-content:space-between;padding:7px 0 0;margin-top:5px;border-top:1px solid var(--border);font-weight:700;"><span>Total</span><b style="font-variant-numeric:tabular-nums;">'+mb(e.total)+'</b></div>'+
         '<div class="hint" style="margin-top:6px;">Os navegadores costumam dar cerca de 5 MB por sítio.</div>'+
@@ -3725,10 +3754,11 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.33", "agosto 2026", [
+      ver("1.33 – 1.34", "agosto 2026", [
         '<b>O histórico deixou de ter limite prático:</b> as cópias passaram para uma zona do navegador com espaço de sobra. Antes, num orçamento com milhares de transações não cabiam e iam-se perdendo até sobrar uma — agora ficam as oito, cresça o orçamento o que crescer.',
         '<b>Cabeçalho fixo nas listas de transações:</b> Data, Beneficiário, Categoria e o resto ficam à vista enquanto desce a lista.',
-        'A aplicação passou a pedir ao navegador para não apagar os seus dados. O Safari limpa sozinho o que não é usado durante uns dias, e nada o impedia.'
+        'A aplicação passou a pedir ao navegador para não apagar os seus dados. O Safari limpa sozinho o que não é usado durante uns dias, e nada o impedia.',
+        'Em <b>Dados e cópias</b> passa a ver se os dados estão protegidos e quanto espaço têm mesmo disponível.'
       ])+
 
       ver("1.32", "agosto 2026", [
