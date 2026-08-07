@@ -834,7 +834,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.44";
+  var APP_VERSION = "1.46";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -3262,28 +3262,41 @@
   }
 
   function dataModal() {
+    // O ecrã está organizado em TRÊS blocos, cada um com um propósito:
+    //   A · ONDE VIVEM OS DADOS — os três lugares possíveis, do mais frágil ao mais seguro
+    //   B · TRAZER E LEVAR      — importar de fora, exportar para fora
+    //   C · MANUTENÇÃO          — o que se mexe uma vez por ano
+    // Os números 1/2/3 nomeiam LUGARES (navegador, ficheiro, nuvem) e não aparelhos concretos:
+    // quem hoje tem um PC e um telemóvel pode amanhã ter outra coisa qualquer.
+    function caixa(titulo, corpo){
+      return '<div class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">'+
+        '<div style="font-weight:700;font-size:13px;">'+titulo+'</div>'+corpo+'</div>';
+    }
+    function acao(html){ return '<div class="field">'+html+'</div>'; }
+    function seccao(t, sub){
+      return '<div style="margin:22px 0 10px;"><div style="font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);">'+t+'</div>'+
+        (sub?'<div class="hint" style="margin-top:3px;">'+sub+'</div>':'')+'</div>';
+    }
     openModal(
       '<div class="modal-head"><h2>💾 Dados e cópias de segurança</h2><button class="x" data-action="close">×</button></div>'+
       '<div class="modal-body">'+
-        '<p class="muted" style="margin-top:0;">Os seus dados vivem <b>só neste aparelho</b>. Destas três, só a <b>2</b> e a <b>3</b> os salvam se o perder.</p>'+
-        '<div class="field"><label>Moeda</label><select id="curSel">'+
-          CURRENCIES.map(function(c){ return '<option value="'+c[0]+'"'+(((state.settings.currency||"EUR")===c[0])?" selected":"")+'>'+c[0]+' ('+c[1]+')</option>'; }).join("")+
-        '</select></div>'+
 
-        '<div class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">'+
-          '<div style="font-weight:700;font-size:13px;">1 · Histórico — voltar atrás</div>'+
+        seccao("Onde vivem os seus dados",
+          "O seu orçamento está guardado <b>dentro do navegador deste aparelho</b> — não há servidor nenhum com os seus dados. Só o <b>2</b> e o <b>3</b> os põem noutro sítio.")+
+
+        // ---- 1 · No navegador ----
+        caixa("1 · No navegador &nbsp;<span class=\"muted\" style=\"font-weight:600;font-size:11.5px;\">neste aparelho</span>",
           '<label class="opcao" style="margin-top:8px;">'+
-            '<input type="checkbox" data-action="toggle-autobackup" '+(state.settings.autoBackup!==false?"checked":"")+' style="width:auto;"> Guardar um ponto por dia</label>'+
-          '<div class="hint" style="margin-top:4px;">Os <b>5 dias</b> mais recentes, mais um ponto <b>🛟</b> guardado antes de cada ação que não se pode anular. <b>Não</b> o salvam se perder o aparelho — para isso é a <b>2</b>.</div>'+
-          snapshotsHtml()+
-        '</div>'+
+            '<input type="checkbox" data-action="toggle-autobackup" '+(state.settings.autoBackup!==false?"checked":"")+' style="width:auto;"> Guardar um ponto de histórico por dia</label>'+
+          '<div class="hint" style="margin-top:4px;">Os <b>5 dias</b> mais recentes, mais um ponto <b>🛟</b> antes de cada ação que não se pode anular. Servem para <b>corrigir enganos</b>, mas desaparecem com o aparelho — se o perder, se o trocar, ou se limpar os dados do navegador.</div>'+
+          snapshotsHtml())+
 
-        '<div class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">'+
-          '<div style="font-weight:700;font-size:13px;">2 · Cópia de segurança em ficheiro</div>'+
+        // ---- 2 · Em ficheiro ----
+        caixa("2 · Em ficheiro &nbsp;<span class=\"muted\" style=\"font-weight:600;font-size:11.5px;\">fora da aplicação</span>",
           '<div style="font-size:12.5px;font-weight:600;margin-top:8px;">'+
             (state.backup && state.backup.at
               ? ('Última: '+fmtDateTime(state.backup.at)+((daysSinceBackup()||0)>0?(' · há '+daysSinceBackup()+' dia'+((daysSinceBackup()===1)?'':'s')):' · hoje'))
-              : 'Ainda não guardou nenhuma cópia de segurança em ficheiro.')+
+              : 'Ainda não guardou nenhuma cópia em ficheiro.')+
           '</div>'+
           // Onde foi feita. O carimbo da cópia viaja na sincronização, por isso a última cópia pode
           // ter sido feita no outro aparelho — e o ficheiro está lá, não aqui.
@@ -3295,35 +3308,50 @@
               (b.devNome?(' (o '+esc(b.devNome)+')'):'')+' — o ficheiro está lá, não aqui.</div>';
           })()+
           '<div class="hint" style="margin-top:4px;">'+textoEstadoCopia()+'</div>'+
-          '<div class="hint" style="margin-top:6px;">Guarde-o <b>fora daqui</b> (OneDrive, e-mail, pen).'+
+          '<div class="hint" style="margin-top:6px;">É a <b>única</b> cópia que sobrevive a perder o aparelho — <b>guarde-a fora daqui</b> (OneDrive, e-mail, pen).'+
           (usaPartilha()?' Abre a partilha do iPhone.':'')+'</div>'+
-        '</div>'+
-        '<div class="field"><button class="btn primary" data-action="export-json" style="width:100%;justify-content:center;">⬇ Guardar cópia de segurança (.json)</button>'+
-          '<div class="hint">A cópia completa e fiel — a única que repõe tudo tal como está.</div></div>'+
-        '<details class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">'+
-          '<summary style="cursor:pointer;font-weight:700;font-size:13px;">⬇ Exportar para folha de cálculo (.csv)</summary>'+
-          '<div class="hint" style="margin:8px 0 10px;">Para abrir no Excel/Sheets — <b>não</b> substitui a cópia .json.</div>'+
-          '<button class="btn" data-action="export-csv" style="width:100%;justify-content:center;margin-bottom:8px;">Transações</button>'+
-          '<button class="btn" data-action="export-budget-csv" style="width:100%;justify-content:center;margin-bottom:8px;">Orçamento do mês em vista</button>'+
-          '<button class="btn" data-action="export-config-csv" style="width:100%;justify-content:center;">Configuração dos alvos</button>'+
-        '</details>'+
-        '<div class="field"><label>Importar cópia de segurança (.json)</label><input id="importFile" type="file" accept="application/json,.json"><div class="hint">Substitui todos os dados atuais por este ficheiro.</div></div>'+
-        '<div class="field"><button class="btn" data-action="import-csv" style="width:100%;justify-content:center;">📥 Importar transações do banco (.csv)</button><div class="hint">Acrescenta transações às existentes, sem substituir nada.</div></div>'+
-        '<hr style="border:0;border-top:1px solid var(--border);margin:18px 0;">'+
-        '<div class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">'+
-          '<div style="font-weight:700;font-size:13px;">3 · Sincronização entre dispositivos</div>'+
+          '<button class="btn primary" data-action="export-json" style="width:100%;justify-content:center;margin-top:10px;">⬇ Guardar cópia (.json)</button>'+
+          '<div class="hint" style="margin-top:4px;">Guarda <b>todos</b> os orçamentos, completos e fiéis.</div>'+
+          '<label style="display:block;margin-top:12px;font-size:12.5px;font-weight:600;">Repor a partir de um ficheiro</label>'+
+          '<input id="importFile" type="file" accept="application/json,.json" style="margin-top:5px;">'+
+          '<div class="hint">Substitui os dados atuais pelos do ficheiro.</div>')+
+
+        // ---- 3 · Na nuvem ----
+        caixa("3 · Na nuvem &nbsp;<span class=\"muted\" style=\"font-weight:600;font-size:11.5px;\">entre os seus aparelhos</span>",
           '<div style="font-size:12.5px;font-weight:600;margin-top:8px;">'+
             (syncReady() ? ('Ligada — '+esc(_syncStatus||"pronta")) : 'Desligada neste aparelho.')+'</div>'+
           (_sync.lastSyncAt ? '<div class="hint" style="margin-top:4px;">Última sincronização: <b>'+esc(fmtDateTime(_sync.lastSyncAt))+'</b></div>' : '')+
-          '<div class="hint" style="margin-top:4px;">Mantém o telemóvel e o PC com os mesmos dados — <b>todos os orçamentos</b> — numa cópia cifrada guardada num único gist privado do GitHub.</div>'+
-          '<button class="btn" data-action="open-sync" style="width:100%;justify-content:center;margin-top:10px;">☁️ '+(syncReady()?"Gerir sincronização":"Ligar sincronização")+'</button>'+
-        '</div>'+
-        '<div class="field"><button class="btn" data-action="archived-menu" style="width:100%;justify-content:center;">🗄 Contas e categorias arquivadas</button>'+
-          '<div class="hint">Repor o que escondeu do orçamento sem apagar o histórico.</div></div>'+
-        (temDados() ? '' : '<div class="field"><button class="btn" data-action="load-sample" style="width:100%;justify-content:center;">🧪 Carregar dados de exemplo</button></div>')+
-        '<div class="field"><button class="btn danger" data-action="reset-data" style="width:100%;justify-content:center;">🗑 Apagar todos os dados</button></div>'+
+          '<div class="hint" style="margin-top:4px;">Mantém os seus aparelhos com os mesmos dados — <b>todos os orçamentos</b> — numa cópia cifrada guardada num gist privado do GitHub.</div>'+
+          '<button class="btn" data-action="open-sync" style="width:100%;justify-content:center;margin-top:10px;">☁️ '+(syncReady()?"Gerir sincronização":"Ligar sincronização")+'</button>')+
+
+        seccao("Trazer e levar", "Para trabalhar com os dados <b>fora</b> da aplicação. Não substituem a cópia do <b>2</b>.")+
+
+        acao('<button class="btn" data-action="import-csv" style="width:100%;justify-content:center;">📥 Importar transações do banco (.csv)</button>'+
+          '<div class="hint">Acrescenta transações às existentes, no orçamento aberto.</div>')+
+
+        '<details class="field" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">'+
+          '<summary style="cursor:pointer;font-weight:700;font-size:13px;">⬆ Exportar para folha de cálculo (.csv)</summary>'+
+          '<div class="hint" style="margin:8px 0 10px;">Para abrir no Excel ou no Sheets e analisar à sua maneira. Exportam <b>só o orçamento aberto</b> («'+esc(budgetName(_bindex.active)||"")+'») e <b>não</b> repõem nada — para isso é a cópia <b>.json</b>.</div>'+
+          '<button class="btn" data-action="export-csv" style="width:100%;justify-content:center;">Transações</button>'+
+          '<div class="hint" style="margin:4px 0 8px;">Todas as transações, uma por linha.</div>'+
+          '<button class="btn" data-action="export-budget-csv" style="width:100%;justify-content:center;">Orçamento do mês em vista</button>'+
+          '<div class="hint" style="margin:4px 0 8px;">Os montantes de <b>'+monthLabel(state.ui.month)+'</b>, categoria a categoria.</div>'+
+          '<button class="btn" data-action="export-config-csv" style="width:100%;justify-content:center;">Configuração dos alvos</button>'+
+          '<div class="hint" style="margin-top:4px;">A «planta» do orçamento: que alvo tem cada categoria, e de que tipo.</div>'+
+        '</details>'+
+
+        seccao("Manutenção")+
+
+        '<div class="field"><label>Moeda</label><select id="curSel">'+
+          CURRENCIES.map(function(c){ return '<option value="'+c[0]+'"'+(((state.settings.currency||"EUR")===c[0])?" selected":"")+'>'+c[0]+' ('+c[1]+')</option>'; }).join("")+
+        '</select></div>'+
+        acao('<button class="btn" data-action="archived-menu" style="width:100%;justify-content:center;">🗄 Contas e categorias arquivadas</button>'+
+          '<div class="hint">Repor o que escondeu do orçamento sem apagar o histórico.</div>')+
+        (temDados() ? '' : acao('<button class="btn" data-action="load-sample" style="width:100%;justify-content:center;">🧪 Carregar dados de exemplo</button>'))+
+        acao('<button class="btn danger" data-action="reset-data" style="width:100%;justify-content:center;">🗑 Apagar todos os dados</button>')+
+
         (function(){ var e=espacoApp(); if(!e) return "";
-          return '<div class="hint" id="zonaEspaco" style="border-top:1px solid var(--border);padding-top:10px;">Espaço usado: <b>'+mb(e.total)+
+          return '<div class="hint" id="zonaEspaco" style="border-top:1px solid var(--border);padding-top:10px;margin-top:18px;">Espaço usado: <b>'+mb(e.total)+
             '</b> de cerca de 5 MB (orçamento '+mb(e.dados)+' · lista do histórico '+mb(e.hist)+').<br>'+
             '<span id="zonaExtra" class="muted">a verificar o resto…</span></div>'; })()+
       '</div>'+
@@ -3818,7 +3846,8 @@
 
       sec("Os seus dados")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
-        '<li>Vivem <b>só neste aparelho</b>. Em <b>Dados e cópias</b> há três níveis: <b>1</b> histórico dos 5 últimos dias — mais um ponto 🛟 guardado automaticamente antes de cada ação que não se pode anular —, para voltar atrás (fica numa zona do navegador com espaço de sobra, por isso não fica mais curto por o orçamento crescer); <b>2</b> cópia em ficheiro, a única que sobrevive a perder o aparelho; <b>3</b> sincronização cifrada entre telemóvel e PC.</li>'+
+        '<li><b>Onde vivem os seus dados.</b> Não há servidor nenhum: o orçamento está dentro do navegador deste aparelho. Em <b>Dados e cópias</b> há três lugares possíveis — <b>1 no navegador</b>: o histórico dos 5 últimos dias, mais um ponto 🛟 antes de cada ação que não se pode anular, para corrigir enganos (desaparece com o aparelho); <b>2 em ficheiro</b>: a única cópia que sobrevive a perdê-lo; <b>3 na nuvem</b>: uma cópia cifrada que mantém os seus aparelhos iguais.</li>'+
+        '<li><b>Folha de cálculo não é cópia de segurança.</b> Os <b>.csv</b> de <b>Trazer e levar</b> servem para abrir no Excel ou no Sheets e olhar para os dados de outra maneira — exportam <b>só o orçamento aberto</b> e <b>não repõem</b> nada. Quem repõe é sempre o <b>.json</b> do <b>2</b>.</li>'+
         '<li><b>Os dois ficheiros .json não são a mesma coisa.</b> O <b>⬇</b> de um ponto do histórico (<code>historico-…</code>) traz <b>um</b> orçamento tal como estava <b>nesse dia</b>. O botão <b>Guardar cópia de segurança</b> (<code>orcamentos-…</code>) traz <b>todos</b> os orçamentos no estado <b>atual</b>. Ambos se voltam a abrir pelo mesmo sítio — <b>Importar cópia</b> —, e o do histórico substitui só o orçamento a que pertence.</li>'+
         '<li><b>O navegador pode apagar-lhe os dados.</b> Para não servirem de rasto, os navegadores — o do iPhone em particular — limpam sozinhos o que guardam de um site que passe uns dias sem ser usado. A aplicação <b>pede</b> para ser poupada, e o pedido costuma ser aceite em quem a tem instalada no ecrã principal. No fim de <b>Dados e cópias</b> vê se está <b>🔒 Protegido</b> — e, se estiver, é mais uma razão para ter também a cópia em ficheiro: essa não depende de navegador nenhum.</li>'+
         '<li>Nesse mesmo sítio vê <b>quanto espaço está a ocupar</b>. São dois números: o do orçamento em si, que tem um limite apertado (~5 MB), e o do histórico, que vive numa zona à parte com espaço de sobra — por isso é normal o primeiro ser quase zero.</li>'+
@@ -3840,7 +3869,9 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.38 – 1.44", "agosto 2026", [
+      ver("1.38 – 1.46", "agosto 2026", [
+        '<b>«Dados e cópias» reorganizado:</b> passou a ter três blocos — <b>onde vivem os seus dados</b> (no navegador, em ficheiro, na nuvem), <b>trazer e levar</b> (importar do banco, exportar para folha de cálculo) e <b>manutenção</b>. Guardar e repor uma cópia ficaram juntos, que é onde se procuram.',
+        'Os ficheiros <b>.csv</b> passaram a dizer de que orçamento são, e o ecrã avisa que exportam só o orçamento aberto e não repõem nada.',
         '<b>Novo filtro 😴 Adiadas</b> no orçamento. As categorias adiadas não são «abaixo do alvo» nem «cumpridas», por isso não apareciam em filtro nenhum — só percorrendo a lista toda.',
         '<b>Barra de filtros repensada:</b> a contagem está sempre encostada à direita e o <b>✕ Limpar</b> só aparece quando há filtros ligados. Se a janela apertar, os nomes vão saindo por ordem — e nunca parte em duas linhas.',
         '<b>Separadores de mês nas recorrentes:</b> a lista passa a ser cortada por «Agosto 2026», «Setembro 2026»… para se ver de relance onde acaba um mês e começa o outro.'
@@ -5961,7 +5992,7 @@
       rows.push([t.date, acc?acc.name:"", t.payee||"", cat, t.memo||"", (t.outflow||0).toFixed(2).replace(".",","), (t.inflow||0).toFixed(2).replace(".",","), t.cleared?"Sim":"Não"]);
     }
     var csv = rows.map(function(r){ return r.map(function(c){ var s=String(c); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";"); }).join("\n");
-    guardarFicheiro("transacoes-" + todayISO() + ".csv", "﻿"+csv, "text/csv;charset=utf-8", function(){ toast("CSV exportado."); });
+    guardarFicheiro("transacoes-" + limpaNome(budgetName(_bindex.active)) + "-" + todayISO() + ".csv", "﻿"+csv, "text/csv;charset=utf-8", function(){ toast("CSV exportado."); });
   }
   // Exporta a TABELA do orçamento do mês em vista: por grupo/categoria, o Atribuído, a Atividade
   // e o Disponível — mais a linha do «Pronto a atribuir» e o total do mês. Espelha o que se vê no
@@ -5980,7 +6011,7 @@
     var tot=budgetTotals(m);
     rows.push([], ["Total do mês (sem cartões de crédito)","", n(tot.assigned), n(tot.activity), n(tot.avail)]);
     var csv = rows.map(function(r){ return r.map(function(c){ var s=String(c==null?"":c); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";"); }).join("\n");
-    guardarFicheiro("orcamento-"+m+".csv", "﻿"+csv, "text/csv;charset=utf-8", function(){ toast("Orçamento do mês exportado (CSV)."); });
+    guardarFicheiro("orcamento-" + limpaNome(budgetName(_bindex.active)) + "-" + m + ".csv", "﻿"+csv, "text/csv;charset=utf-8", function(){ toast("Orçamento do mês exportado (CSV)."); });
   }
   // Exporta a "planta" da configuração: cada categoria com o seu tipo de alvo, método (Repor/
   // Reservar) e valor — a estrutura do orçamento, não os montantes de um mês. Todas as categorias
@@ -6015,7 +6046,7 @@
       }
     }
     var csv = rows.map(function(r){ return r.map(function(c){ var s=String(c==null?"":c); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";"); }).join("\n");
-    guardarFicheiro("orcamento-configuracao.csv", "﻿"+csv, "text/csv;charset=utf-8", function(){ toast("Configuração do orçamento exportada (CSV)."); });
+    guardarFicheiro("alvos-" + limpaNome(budgetName(_bindex.active)) + ".csv", "﻿"+csv, "text/csv;charset=utf-8", function(){ toast("Configuração do orçamento exportada (CSV)."); });
   }
   // ---------- Importação de CSV ----------
   function splitCSVLine(line, d){
