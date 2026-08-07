@@ -358,7 +358,9 @@
   .muted { color: var(--text-muted); }
   .tag { font-size: 11.5px; color: var(--text-muted); }
   .row-actions { display: flex; gap: 4px; justify-content: flex-end; }
-  .row-actions button { background: transparent; border: 0; color: var(--text-muted); padding: 4px 6px; border-radius: 6px; font-size: 13px; }
+  /* A margem negativa devolve à linha a altura que o padding destes botões lhe acrescentava: a
+     zona de toque mantém-se, mas a linha deixa de crescer por causa deles. */
+  .row-actions button { background: transparent; border: 0; color: var(--text-muted); padding: 4px 6px; margin: -4px 0; border-radius: 6px; font-size: 13px; line-height: 1.3; }
   .row-actions button:hover { background: var(--neutral-soft); color: var(--text); }
 
   .empty { text-align: center; padding: 50px 20px; color: var(--text-muted); }
@@ -525,7 +527,9 @@
     table.data { min-width: 520px; }
     /* Área de toque maior nas caixas de seleção (a caixa continua com o mesmo tamanho, o que
        cresce é a zona sensível à volta) — 16px são difíceis de acertar com o dedo. */
-    .tx-selcell { padding: 10px 8px 10px 2px; margin-inline-end: 2px; }
+    /* Mesma ideia: a área de toque continua grande (o padding fica), mas a margem negativa
+       impede que ela estique a linha — eram 20px a mais por transação. */
+    .tx-selcell { padding: 10px 8px 10px 2px; margin: -10px 2px -10px 0; }
     .tx-sel, .tx-sel-all { width: 19px; height: 19px; }
     .btn.f-filtro { padding: 6px 9px; font-size: 13px; }
     .rot { display: none; }          /* rótulo longo: fica só o símbolo ou a forma curta */
@@ -746,7 +750,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.21";
+  var APP_VERSION = "1.22";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -3281,25 +3285,37 @@
   function payeesModal(){
     var idx = payeeIndex(), arr = [];
     for (var k in idx) if (idx.hasOwnProperty(k)) arr.push({ k:k, e:idx[k] });
-    arr.sort(function(a,b){ return b.e.count-a.e.count || (a.e.name<b.e.name?-1:1); });
+    // Ordem à escolha, guardada entre visitas. Em qualquer delas o nome desempata, para a lista
+    // não dançar entre beneficiários com a mesma contagem ou a mesma data.
+    var ordem = state.ui.payeeSort || "usados";
+    var porNome = function(a,b){ return a.e.name.localeCompare(b.e.name, "pt", {sensitivity:"base"}); };
+    arr.sort(ordem==="recentes" ? function(a,b){ return (a.e.lastDate<b.e.lastDate?1:(a.e.lastDate>b.e.lastDate?-1:0)) || porNome(a,b); }
+           : ordem==="nome"     ? porNome
+           :                      function(a,b){ return b.e.count-a.e.count || porNome(a,b); });
 
     var corpo;
     if (!arr.length) {
       corpo = '<div class="muted" style="text-align:center;padding:20px 0;">Ainda não há beneficiários — aparecem aqui à medida que for registando transações.</div>';
     } else {
-      corpo = '<div class="ac-wrap" style="margin-bottom:10px;"><input id="pyFilter" class="search" autocomplete="off" placeholder="Filtrar beneficiários…" style="width:100%;padding-inline-end:34px;">'+
+      corpo = '<div class="ac-wrap" style="margin-bottom:8px;"><input id="pyFilter" class="search" autocomplete="off" placeholder="Filtrar beneficiários…" style="width:100%;padding-inline-end:34px;">'+
         '<button type="button" class="date-btn" data-action="py-filter-clear" style="pointer-events:auto;cursor:pointer;color:var(--text-muted);" title="Limpar filtro" aria-label="Limpar filtro">✕</button></div>'+
+        '<div class="field" style="margin-bottom:10px;"><select id="pyOrdem">'+
+          '<option value="usados"'+(ordem==="usados"?" selected":"")+'>Dos que mais usa para os que menos usa</option>'+
+          '<option value="recentes"'+(ordem==="recentes"?" selected":"")+'>Dos mais recentes para os mais antigos</option>'+
+          '<option value="nome"'+(ordem==="nome"?" selected":"")+'>Por ordem alfabética</option>'+
+        '</select></div>'+
         '<div id="pyEmpty" class="muted hidden" style="text-align:center;padding:16px 0;">Nenhum beneficiário corresponde.</div>'+
         '<div id="pyList" style="max-height:340px;overflow:auto;">' + arr.map(function(x){
         // Os dois botões vão na MESMA célula da grelha (a .int-row tem 3 colunas: 1fr auto auto).
         // Postos como dois filhos separados, o segundo caía para a linha de baixo.
         return '<div class="int-row" data-pk="'+esc(payeeKey(x.e.name))+'"><span class="who"><b>'+esc(x.e.name)+'</b>'+
-          // Sem a categoria: um nome de categoria comprido voltava a cortar a linha, e a informação
-          // é pouco fiável (é só a ÚLTIMA usada, não a habitual). Quem quiser vê no 📊, que mostra
-          // todas as categorias com os respetivos totais. Fica compacto e cabe sempre.
-          // No telemóvel encurta ainda mais («4 · 05/08/2026»).
-          '<span class="tag"><span class="rot">'+x.e.count+' transaç'+(x.e.count===1?'ão':'ões')+' · última em </span>'+
-            '<span class="so-fone">'+x.e.count+' · </span>'+fmtDate(x.e.lastDate)+'</span></span>'+
+          // Sem a categoria: um nome comprido voltava a cortar a linha, e a informação era pouco
+          // fiável (era só a ÚLTIMA usada, não a habitual) — quem quiser vê-as todas no 📊.
+          // Sem ela sobra espaço para dizer «transações» por extenso mesmo no telemóvel; só o
+          // «última em» é que se abrevia, para caber num iPhone pequeno.
+          '<span class="tag">'+x.e.count+' transaç'+(x.e.count===1?'ão':'ões')+
+            '<span class="rot"> · última em </span><span class="so-fone"> · </span>'+
+            fmtDate(x.e.lastDate)+'</span></span>'+
           '<span></span>'+
           // Só os ícones: com o rótulo por extenso os dois botões comiam 163px dos 432 úteis da
           // janela, e a descrição (que precisa de ~290px) era cortada com "…". Assim sobram 356px
@@ -3597,8 +3613,11 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.21", "agosto 2026", [
-        '<b>Correção nas recorrentes diárias:</b> ao espreitar meses muito à frente, uma regra diária deixava de aparecer no «Ainda este mês». Agora conta até mais de 10 anos.',
+      ver("1.21 – 1.22", "agosto 2026", [
+        '<b>Listas mais compactas:</b> as linhas das transações (e do registo de uma conta) ficaram mais baixas, à altura das outras listas.',
+        '<b>Beneficiários por ordem à escolha:</b> dos que mais usa, dos mais recentes, ou por ordem alfabética.',
+        '<b>Tocar num separador volta ao topo</b> — e mudar de ecrã já não o deixa a meio da lista onde estava.',
+        '<b>Correção nas recorrentes diárias:</b> ao espreitar meses muito à frente, uma regra diária deixava de aparecer no «Ainda este mês».',
         'Se a cópia na nuvem não puder ser aberta por o navegador ser antigo, a aplicação passa a dizê-lo em vez de dar um erro incompreensível.'
       ])+
 
@@ -3611,20 +3630,20 @@
       ver("1.15", "agosto 2026", [
         '<b>Mais rápida</b> a mudar de mês, de separador e de filtro — sobretudo com muitas transações.',
         '<b>Correção:</b> uma conta criada com <b>saldo negativo</b> dava um aviso vermelho sem nada estar errado.',
-        '<b>Correção:</b> ao eliminar uma categoria, as regras recorrentes que a usavam ficavam a lançar para o vazio. Agora ficam em pausa, com aviso.',
+        '<b>Correção:</b> eliminar uma categoria deixava as regras recorrentes a lançar para o vazio. Agora ficam em pausa, com aviso.',
         '<b>Correções várias</b> ao reordenar categorias arquivadas, a importar cópias antigas e nos avisos do cartão.',
         '<b>«Como funciona?»</b> explica agora como o <b>excesso transita</b> para o mês seguinte.'
       ])+
 
       ver("1.14", "agosto 2026", [
         '<b>Regra recorrente diária</b> — junta-se à semanal, quinzenal, mensal, semestral e anual.',
-        '<b>Selecionar todas</b> na lista de transações: uma caixa no cabeçalho da coluna Data marca as que estão à vista, para as somar de uma vez.',
-        '<b>Cópia de segurança:</b> passa a dizer se a última foi feita <b>neste aparelho</b> ou noutro — o carimbo viaja na sincronização, e o ficheiro pode estar no outro.',
-        '<b>Conflito de sincronização:</b> mostra agora quantas transações existem só na nuvem e quantas só neste aparelho, para ajudar a escolher qual manter.'
+        '<b>Selecionar todas</b> na lista de transações: a caixa no cabeçalho marca as que estão à vista, para as somar de uma vez.',
+        '<b>Cópia de segurança:</b> diz agora se a última foi feita <b>neste aparelho</b> ou noutro — o ficheiro pode estar no outro.',
+        '<b>Conflito de sincronização:</b> mostra quantas transações existem só na nuvem e quantas só aqui, para ajudar a escolher.'
       ])+
 
       ver("1.13", "agosto 2026", [
-        '<b>A categoria passou a ser obrigatória</b> em contas de orçamento e cartões — ao criar, editar, duplicar e nas recorrentes. Sem ela o movimento ficava de fora do orçamento.',
+        '<b>A categoria passou a ser obrigatória</b> em contas de orçamento e cartões. Sem ela o movimento ficava de fora do orçamento.',
         'No <b>cartão</b> vale também para devoluções e cashbacks: indique a categoria onde tinha feito a despesa.',
         'Continuam sem categoria: o <b>saldo inicial</b>, as <b>transferências</b> entre contas suas e as contas de <b>acompanhamento</b>.',
         'Ao <b>importar do banco</b> não se pede (são muitas de uma vez), mas a aplicação diz quantas ficaram por classificar.'
@@ -3636,12 +3655,8 @@
         '<b>Aviso novo</b> no ecrã do Orçamento para compras no cartão sem categoria.'
       ])+
 
-      ver("1.11", "agosto 2026", [
-        '<b>Os filtros também começam limpos</b> ao entrar na aplicação ou trocar de orçamento — antes podiam ficar ligados a esconder categorias.'
-      ])+
-
-      ver("1.10", "agosto 2026", [
-        '<b>Abre sempre no Orçamento do mês atual</b> — ao entrar na aplicação e ao trocar de orçamento. Antes reabria onde tinha ficado, e podia deixá-lo noutro mês sem dar por isso.'
+      ver("1.10 – 1.11", "agosto 2026", [
+        '<b>Abre sempre no Orçamento do mês atual</b>, e com os filtros limpos — ao entrar na aplicação e ao trocar de orçamento. Antes reabria onde tinha ficado.'
       ])+
 
       ver("1.9", "agosto 2026", [
@@ -5941,7 +5956,12 @@
       // "Contas" volta SEMPRE à lista de contas (fecha a conta aberta), mesmo já estando no separador.
       state.ui.openAccount = null;
       if(state.ui.view!=="transactions") state.ui.txFilter=null;
-      render(); return;
+      render();
+      // Clicar num separador começa sempre no topo — quer se mude de ecrã, quer se toque no
+      // separador onde já se está (serve de "voltar ao início" numa lista longa). Só aqui: a
+      // cada render seria pior, porque editar uma transação a meio da lista saltava para cima.
+      try { window.scrollTo(0,0); } catch(e){}
+      return;
     }
     var a = e.target.closest("[data-action]");
     if (!a) return;
@@ -6015,6 +6035,11 @@
     var vazio = el("pyEmpty"); if(vazio) vazio.classList.toggle("hidden", visiveis>0);
   }
   document.addEventListener("input", function(e){ if(e.target && e.target.id==="pyFilter") pyFiltrar(); });
+  // Mudar a ordem dos beneficiários: guarda a escolha e volta a desenhar a janela.
+  document.addEventListener("change", function(e){
+    if(!e.target || e.target.id!=="pyOrdem") return;
+    state.ui.payeeSort = e.target.value; save(); payeesModal();
+  });
   // Tocar na zona do 📅 é tocar no próprio <input type="date"> (invisível, por cima): no telemóvel
   // isso basta para abrir o calendário nativo. No computador forçamos com showPicker(). O valor
   // escolhido volta ao campo de texto no "change" logo abaixo.
