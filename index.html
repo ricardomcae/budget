@@ -302,9 +302,16 @@
   .btn.f-ok.active   { background: var(--positive-soft); border-color: var(--positive); color: var(--positive); }
   .btn.f-money.active { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
   .btn.f-over.active  { background: var(--info-soft); border-color: var(--info); color: var(--info); }
+  /* Adiada é um estado em pausa, não um alerta: tom neutro, sem a carga das outras cores. */
+  .btn.f-snoozed.active { background: var(--neutral-soft); border-color: var(--text-muted); color: var(--text); }
   .btn.f-alta.active   { background: var(--positive-soft); border-color: var(--positive); color: var(--positive); }
   .btn.f-normal.active { background: var(--neutral-soft); border-color: var(--text-muted); color: var(--text); }
   .btn.f-baixa.active  { background: var(--negative-soft); border-color: var(--negative); color: var(--negative); }
+  /* Separador de mês nas listas: só para dar respiro à leitura. Não é clicável nem conta para nada. */
+  table.data tr.mes-sep td { background: var(--surface-2); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted);
+    padding: 7px 16px; border-top: 1px solid var(--border); }
+  table.data tr.mes-sep:first-child td { border-top: 0; }
   .toolbar .sep { width: 1px; align-self: stretch; background: var(--border); margin: 2px 4px; }
   .target-note { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
   /* Os montantes nunca partem de linha — era o que atirava o «€» para baixo. */
@@ -799,7 +806,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.38";
+  var APP_VERSION = "1.39";
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -2783,14 +2790,23 @@
         '<button class="btn primary" data-action="add-recurring">➕ Nova recorrente</button>');
       return;
     }
+    // Separador de mês. A lista já vem por ordem de data, por isso basta reparar quando o mês
+    // muda. É só uma linha a mais na tabela: não mexe em contas, em ordens nem em filtros.
+    var mesAnterior = null;
     var rows=list.map(function(r){
+      var sep = "";
+      var mesDesta = monthOf(r.nextDate);
+      if (mesDesta !== mesAnterior) {
+        mesAnterior = mesDesta;
+        sep = '<tr class="mes-sep"><td colspan="8">'+monthLabel(mesDesta)+'</td></tr>';
+      }
       var acc=accountById(r.accountId);
       var ehTr=!!r.toAccountId, dest=ehTr?accountById(r.toAccountId):null;
       var cat=ehTr
         ? ('<span class="pill tracking">↔ Transferência</span>'+(r.categoryId?' <span class="tag">'+esc((lkCat(r.categoryId)||{name:"(apagada)"}).name)+'</span>':''))
         : (r.categoryId===INCOME?'<span class="pill budget">Rendimento</span>':(r.categoryId?esc((categoryById(r.categoryId)||{name:"(apagada)"}).name):'<span class="muted">—</span>'));
       var amt=r.outflow?'<span class="tx-amt out">'+fmt(r.outflow)+'</span>':(r.inflow?'<span class="tx-amt in">'+fmt(r.inflow)+'</span>':'');
-      return '<tr class="hoverable" data-action="edit-recurring" data-id="'+r.id+'" style="cursor:pointer;'+(r.active?'':'opacity:.5;')+'">'+
+      return sep + '<tr class="hoverable" data-action="edit-recurring" data-id="'+r.id+'" style="cursor:pointer;'+(r.active?'':'opacity:.5;')+'">'+
         '<td style="white-space:nowrap;font-weight:600;">'+fmtDate(r.nextDate)+'</td>'+
         '<td><span class="pill tracking">'+(FREQ_LABEL[r.freq]||r.freq)+'</span></td>'+
         '<td style="font-weight:600;">'+(ehTr?('↔ '+esc(dest?dest.name:"—")):esc(r.payee||""))+'</td>'+
@@ -3767,7 +3783,8 @@
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
-      ver("1.38", "agosto 2026", [
+      ver("1.38 – 1.39", "agosto 2026", [
+        '<b>Separadores de mês nas recorrentes:</b> a lista passa a ser cortada por «Agosto 2026», «Setembro 2026»… para se ler de relance onde acaba um mês e começa o outro.',
         '<b>Novo filtro 😴 Adiadas</b> na barra do orçamento. As categorias adiadas não são «abaixo do alvo» nem «cumpridas», por isso não apareciam em filtro nenhum — só percorrendo a lista toda.',
         'No computador, a barra do orçamento deixou de repetir «Escreva no campo Atribuído de cada categoria».'
       ])+
