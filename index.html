@@ -272,7 +272,14 @@
   .grp-row td { padding: 11px 18px; background: var(--group-row); border-bottom: 1px solid var(--border); border-top: 1px solid var(--border); font-weight: 700; }
   .grp-row .grp-name { display: flex; align-items: center; gap: 9px; }
   .grp-row .grp-name .caret { transition: transform .15s; color: var(--text-muted); font-size: 12px; }
-  .grp-row .grp-name button.grp-toggle { background: transparent; border: 0; display: flex; align-items: center; gap: 9px; color: var(--text); font-weight: 700; padding: 0; }
+  /* Um <button> centra o texto por omissão. Enquanto o nome do grupo cabe numa linha isso
+     não se vê; quando quebra para duas, as linhas apareciam centradas e desalinhadas da
+     lista. O alinhamento ao início arruma-as por baixo do nome. O caret sobe para o topo
+     pela mesma razão: com duas linhas, centrado a meio ficava a flutuar. */
+  .grp-row .grp-name button.grp-toggle { background: transparent; border: 0; display: flex;
+    align-items: flex-start; gap: 9px; color: var(--text); font-weight: 700; padding: 0;
+    text-align: start; }
+  .grp-row .grp-name button.grp-toggle .caret { margin-top: 3px; }
   .grp-row .grp-add { font-size: 11.5px; color: var(--primary); font-weight: 600; background: transparent; border: 0; opacity: 0; }
   .grp-row:hover .grp-add { opacity: 1; }
   .grp-total { text-align: end; font-variant-numeric: tabular-nums; color: var(--text-muted); font-weight: 600; }
@@ -4116,17 +4123,13 @@
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
       ver("1.52", "agosto 2026", [
-        '<b>Cabeçalho do telemóvel refeito — botões do tamanho de um dedo.</b> Os ícones estavam espremidos e o nome do orçamento cortado a meio. Saiu o <b>título do ecrã</b> (a barra de baixo já diz onde se está) e a <b>cor da aplicação</b>, que passou para <b>Dados e cópias → Definições</b> — escolhe-se uma vez e estava a disputar espaço com botões de uso diário. Os que ficam têm agora <b>44px de altura</b>, o mínimo que a Apple recomenda para o toque, e uma área sensível que se estende para além do que se vê: cada botão ficou <b>47% maior</b> para o dedo, e continuam todos numa linha, com o nome do orçamento à vista.',
-        '<b>🕑 Movimentos recentes</b>, ao lado do ↩ ↪: o registo de como tem repartido o dinheiro pelas categorias — mover, cobrir, financiar, libertar excedente, atribuir à mão, adiar, e o que anulou. Já existia, mas era um painel dentro do Orçamento que desaparecia ao fechar a aplicação. Agora é uma janela ao alcance de qualquer ecrã, guarda os <b>últimos 30</b> e vai na sincronização — vê no telemóvel o que fez ao computador.',
-        '<b>O ↩ Anular e o ↪ Refazer ficaram de confiança.</b> O Refazer desaparecia sozinho ao mudar de mês, mexer num filtro ou carregar em «Ver quais» — agora só uma alteração a sério o fecha, porque navegar não é alterar. E o Anular passou a cobrir mais nove coisas que não tinham volta: confirmar/desconfirmar, prioridades, reordenar categorias, grupos e contas, arquivar e repor, e ativar ou desativar recorrentes.',
-        '<b>Duas correções no dinheiro.</b> Eliminar um <b>grupo</b> estragava o «Pronto a atribuir»: o dinheiro atribuído às categorias dele ficava para trás, invisível, e continuava a ser descontado para sempre — agora volta ao «Pronto a atribuir», e a confirmação diz quantas categorias vão dentro, incluindo as arquivadas. No <b>cartão de crédito</b>, a linha contava a dívida de todos os tempos mas o «Libertar excedente» só até ao mês em vista, e discordavam entre si; contam agora os dois até ao mês que está a ver.',
-        '<b>Abrir uma conta deixou de ser um ecrã à parte.</b> Contas → uma conta leva ao ecrã <b>Transações</b> já filtrado, com o nome e os saldos por cima. Eram dois ecrãs com a mesma lista, e o da conta nem deixava procurar nem filtrar por período.',
-        '<b>Os filtros das Transações fazem o que se espera:</b> o «✕ Limpar» mantém a conta onde está, há um <b>✕</b> dentro da caixa de procura para apagar só o texto (ou a tecla Esc), a coluna «Conta» deixou de reaparecer ao juntar outro filtro, e tocar no separador <b>Transações</b> volta à lista inteira.',
-        '<b>Exportar para folha de cálculo segue o que está no ecrã:</b> o <b>⬇ Exportar o que vejo</b> (no computador) respeita os filtros — o botão antigo parecia fazê-lo mas exportava sempre tudo. A exportação completa continua em <b>Dados e cópias</b>.',
-        '<b>Nova forma de escolher de onde tirar, no 🩹 Cobrir:</b> <b>primeiro de quem precisa do dinheiro mais tarde</b>. As que já havia olham para o que é <i>importante</i> (prioridade) ou para onde há <i>mais</i> parado (folga); esta olha para o <i>tempo</i> que há para repor — tira antes das férias do próximo verão do que do seguro que vence para o mês.',
-        '<b>Textos mais honestos:</b> o balão deixou de dizer «cada euro tem uma função 🎉» quando há categorias excedidas (o valor continua certo — o que falta é acertar contas entre categorias); as notas compridas cortam com «…» em vez de esmagar as outras colunas; e o aviso de alterações por guardar lê-se como uma frase — «também 2 em «Ricardo» e 5 em «Família»».',
-        '<b>No telemóvel:</b> as barras de filtros passaram a caber numa linha, as contagens dizem quantas categorias ou transações estão à vista, e o botão de trocar de orçamento diz o <b>nome do orçamento aberto</b> em vez de um ícone. A letra deixou também de variar de orçamento para orçamento no iPhone (o Safari aumentava-a sozinho).',
-        '<b>Mais rápida a cada toque:</b> cada ação gravava o orçamento inteiro duas vezes e percorria-o uma terceira. Agora só grava quando algo mudou.'
+        '<b>🕑 Movimentos recentes</b>, ao lado do ↩ ↪: o registo de como tem repartido o dinheiro pelas categorias — mover, cobrir, financiar, libertar excedente, atribuir à mão, adiar, e o que anulou. Guarda os <b>últimos 30</b>, acompanha o orçamento e vai na sincronização.',
+        '<b>O ↩ Anular e o ↪ Refazer ficaram de confiança.</b> O Refazer desaparecia sozinho ao navegar; agora só uma alteração a sério o fecha. E o Anular passou a cobrir mais nove coisas que não tinham volta — confirmar transações, prioridades, reordenar, arquivar e recorrentes.',
+        '<b>Duas correções no dinheiro.</b> Eliminar um <b>grupo</b> deixava para trás, invisível, o dinheiro atribuído às categorias dele, e continuava a descontá-lo do «Pronto a atribuir» para sempre. E no <b>cartão de crédito</b>, a linha contava a dívida de todos os tempos enquanto o «Libertar excedente» contava só até ao mês em vista — discordavam entre si.',
+        '<b>Abrir uma conta deixou de ser um ecrã à parte:</b> leva ao ecrã <b>Transações</b> já filtrado, com o nome e os saldos por cima — e assim também se pode procurar e filtrar por período, o que ali não dava. Os filtros passaram também a fazer o que se espera: o «✕ Limpar» mantém a conta, há um <b>✕</b> na caixa de procura só para o texto, e tocar no separador volta à lista inteira.',
+        '<b>Exportar segue o que está no ecrã:</b> o <b>⬇ Exportar o que vejo</b> respeita os filtros — o botão antigo parecia fazê-lo mas exportava sempre tudo. No <b>🩹 Cobrir</b> há uma forma nova de escolher de onde tirar: <b>primeiro de quem precisa do dinheiro mais tarde</b>.',
+        '<b>Telemóvel:</b> cabeçalho refeito com botões do tamanho de um dedo (44px, mais 47% de área), sem o título do ecrã nem o botão da cor — que passou para <b>Dados e cópias → Definições</b>. As barras de filtros cabem numa linha, e a letra deixou de variar de orçamento para orçamento no iPhone.',
+        '<b>Mais rápida a cada toque</b> (só grava quando algo muda), notas compridas deixaram de esmagar as colunas, e o balão do orçamento já não dá os parabéns quando há categorias excedidas.'
       ])+
 
       ver("1.33 – 1.51", "agosto 2026", [
