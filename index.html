@@ -2869,23 +2869,27 @@
       // LINHA DE RESUMO, mesmo por cima da lista: junta os números que descrevem o que se está
       // a ver. Estavam em três sítios — os saldos no chapéu da conta, o «por confirmar» e a
       // contagem no fim da barra de filtros — e cada um gastava uma linha por sua conta.
-      // À esquerda o que a conta TEM, à direita o que falta acertar e quantas linhas estão à vista.
+      // À esquerda ficam os três números que falam do DINHEIRO, seguidos, porque se leem em
+      // conjunto: o confirmado, o saldo, e a diferença entre os dois (o que falta o banco
+      // processar). À direita fica a contagem de linhas, que é outra conversa — fala da lista,
+      // não do dinheiro.
       (function(){
-        var esq = "", dir = "";
+        var partes = [];
         if (accA) {
           var balA = accountBalance(f.account), clA = accountBalance(f.account, true);
-          esq = pontoConta(f.account)+'Confirmado: <b>'+fmt(clA)+'</b>&nbsp; · &nbsp;Saldo: '+
-                '<b style="'+(balA<0?"color:var(--negative)":"")+'">'+fmt(balA)+'</b>';
+          partes.push('Confirmado: <b>'+fmt(clA)+'</b>');
+          partes.push('Saldo: <b style="'+(balA<0?"color:var(--negative)":"")+'">'+fmt(balA)+'</b>');
         }
         var pend = porConfirmar(f.account||null);
         if (Math.abs(pend) > 0.005) {
           // O «nesta conta»/«em todas as contas» só no computador: no telemóvel já se lê no
           // filtro de conta, ali ao lado, e era a peça mais comprida da linha.
-          dir += '<b class="pend" title="Registado mas ainda não confirmado no banco">Por confirmar: '+fmt(pend)+'</b>'+
-                 '<span class="hide-phone"> '+(f.account ? "nesta conta" : "em todas as contas")+'</span>&nbsp; · &nbsp;';
+          partes.push('<b class="pend" title="Registado mas ainda não confirmado no banco">Por confirmar: '+fmt(pend)+'</b>'+
+            '<span class="hide-phone"> '+(f.account ? "nesta conta" : "em todas as contas")+'</span>');
         }
+        var esq = (accA ? pontoConta(f.account) : "") + partes.join('&nbsp; · &nbsp;');
         // Diz sempre quantas transações ESTÃO À VISTA — como a contagem de categorias no orçamento.
-        dir += list.length+(list.length===1?' transação':' transações');
+        var dir = list.length+(list.length===1?' transação':' transações');
         return '<div class="tx-resumo muted"><span>'+esq+'</span><span>'+dir+'</span></div>';
       })();
 
@@ -4232,7 +4236,7 @@
         '<b>As notas das transações passaram a ver-se no telemóvel</b>: a coluna estava escondida, e agora aparece estreita, cortada com «…». As linhas mantêm a altura de sempre.',
         '<b>Os dados de exemplo foram refeitos</b> e passam a mostrar o que a aplicação ganhou entretanto: os quatro tipos de alvo (incluindo «reservar»), prioridades, uma categoria adiada, outra excedida para experimentar o 🩹 Cobrir, transação dividida, transferências dentro e fora do orçamento, conta de acompanhamento, notas e uma recorrente que é transferência.',
         '<b>Separadores de mês nas transações</b>, como já havia nas recorrentes — e só quando a lista atravessa mais do que um mês.',
-        '<b>Os números de resumo passaram a estar todos na mesma linha</b>, mesmo por cima da lista: à esquerda o <b>Confirmado</b> e o <b>Saldo</b> da conta, à direita o <b>Por confirmar</b> e quantas transações estão à vista. Estavam espalhados por três sítios e gastavam duas linhas; agora gastam uma — e deixam de mudar de sítio conforme o comprimento do nome da conta.',
+        '<b>Os números de resumo passaram a estar todos na mesma linha</b>, mesmo por cima da lista: à esquerda os que falam do dinheiro — <b>Confirmado</b>, <b>Saldo</b> e <b>Por confirmar</b>, que é a diferença entre os dois — e à direita quantas transações estão à vista. Estavam espalhados por três sítios e gastavam duas linhas; agora gastam uma — e deixam de mudar de sítio conforme o comprimento do nome da conta.',
         '<b>Uma coluna «Valor» em vez de «Saída» e «Entrada»</b> nas listas: cada transação ou sai ou entra, por isso metade do espaço estava sempre vazio. Agora as saídas aparecem a vermelho com <b>−</b> e as entradas a verde com <b>+</b> — e a largura que sobrou foi para a coluna das <b>notas</b>. Ao registar continua a haver dois campos, que é o que evita enganos ao escrever.',
         '<b>Seis cores à escolha</b> para a aplicação, em tons apagados — verde-mar, rosa velho, azul velho, malva, ocre e telha — em <b>Dados e cópias → Definições</b>, ao lado da moeda. A escolha acompanha o orçamento e vai na sincronização.',
         '<b>Telemóvel:</b> cabeçalho refeito com botões do tamanho de um dedo (44px, mais 47% de área), sem o título do ecrã nem o botão da cor — que passou para <b>Dados e cópias → Definições</b>. As barras de filtros cabem numa linha, e a letra deixou de variar de orçamento para orçamento no iPhone.',
