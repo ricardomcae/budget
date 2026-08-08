@@ -668,7 +668,7 @@
     table.data tbody td.tx-payee { position: relative; }
     /* Mais do dobro da largura da célula: a nota passa por baixo da categoria, que é onde
        há espaço livre. Fica sempre a uma linha, cortada com «…». */
-    .tx-memo { position: absolute; left: 16px; bottom: 6px; width: 250px;
+    .tx-memo { display: block; position: absolute; left: 16px; bottom: 6px; width: 250px;
       font-weight: 400; font-size: 11.5px; line-height: 15px; color: var(--text-muted);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* Na tabela das contas de ORÇAMENTO a coluna Tipo diz sempre «Orçamento» — o mesmo que o
