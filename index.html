@@ -76,9 +76,22 @@
       --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
     }
   }
-  /* Tema alternativo: rosa velho */
-  body.theme-rose { --primary: #b5657f; --primary-dark: #9c5069; --primary-soft: #f6dfe8; --accent2: #e7a0b8; }
-  @media (prefers-color-scheme: dark) { body.theme-rose { --primary: #d18aa0; --primary-dark: #b5657f; --primary-soft: #3a2632; --accent2: #8a4a62; } }
+  /* Cores da aplicação — seis, todas em tons apagados. Cada tema mexe apenas nas quatro
+     variáveis da cor de marca; os verdes e vermelhos dos valores nunca mudam, porque são eles
+     que dizem se há ou não dinheiro e não podem depender do gosto de cada um.
+     O tema sem classe (verde-mar) é o de origem e vive no :root, lá em cima. */
+  body.tema-rosa    { --primary: #b5657f; --primary-dark: #9c5069; --primary-soft: #f6dfe8; --accent2: #e7a0b8; }
+  body.tema-azul    { --primary: #5b7c99; --primary-dark: #48647c; --primary-soft: #dde8f1; --accent2: #9dbdd4; }
+  body.tema-malva   { --primary: #7d6b96; --primary-dark: #64557a; --primary-soft: #e7e2f0; --accent2: #b3a6c9; }
+  body.tema-ocre    { --primary: #97762a; --primary-dark: #7a5f21; --primary-soft: #f5ead0; --accent2: #d4b45e; }
+  body.tema-telha   { --primary: #a15c40; --primary-dark: #834a33; --primary-soft: #f6e2d9; --accent2: #d29a7e; }
+  @media (prefers-color-scheme: dark) {
+    body.tema-rosa  { --primary: #d18aa0; --primary-dark: #b5657f; --primary-soft: #3a2632; --accent2: #8a4a62; }
+    body.tema-azul  { --primary: #8fb0c9; --primary-dark: #6b8ba5; --primary-soft: #1e2c38; --accent2: #4e6d86; }
+    body.tema-malva { --primary: #a795c0; --primary-dark: #85759d; --primary-soft: #282234; --accent2: #6b5c85; }
+    body.tema-ocre  { --primary: #d4b45e; --primary-dark: #a8892f; --primary-soft: #332b12; --accent2: #8a7028; }
+    body.tema-telha { --primary: #d0947a; --primary-dark: #a86f56; --primary-soft: #34211a; --accent2: #8a5540; }
+  }
   .theme-toggle { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border); background: linear-gradient(135deg, var(--primary), var(--accent2)); padding: 0; flex: 0 0 auto; cursor: pointer; transition: transform .12s; }
   .theme-toggle:hover { transform: scale(1.1); }
   * { box-sizing: border-box; }
@@ -435,7 +448,6 @@
   table.data td.col-nota { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
   /* Nota por baixo do beneficiário. No computador não aparece — a nota tem coluna própria e
      mostrá-la duas vezes só roubava altura à lista. */
-  .tx-memo { display: none; }
   .pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 600; }
   .pill.budget { background: var(--primary-soft); color: var(--primary-dark); }
   .pill.tracking { background: var(--neutral-soft); color: var(--text-muted); }
@@ -533,6 +545,13 @@
   .tx-sel-bar .txsel-clear:hover { border-color: var(--primary); color: var(--primary); }
   .field .hint { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; font-weight: 500; text-transform: none; letter-spacing: 0; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  /* Bolinhas das cores. A escolhida leva um anel por fora — uma marca por dentro tapava
+     precisamente a cor que se está a mostrar. */
+  .cores { display: flex; gap: 10px; flex-wrap: wrap; padding: 2px 0; }
+  .cor-bola { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--surface);
+    box-shadow: 0 0 0 1px var(--border); cursor: pointer; padding: 0; transition: transform .12s; }
+  .cor-bola:hover { transform: scale(1.12); }
+  .cor-bola.sel { box-shadow: 0 0 0 2px var(--text); }
   .split-line select, .split-line input { width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); }
   .split-line select:focus, .split-line input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
   .seg { display: flex; gap: 6px; }
@@ -658,20 +677,10 @@
 
     /* Lista de transações: a nota vai quase sempre vazia e roubava largura, e o texto
        a partir em duas linhas deixava as alturas das linhas todas diferentes. */
-    /* No telemóvel a coluna da nota não cabe (a tabela já desliza de lado), por isso a nota
-       aparece por baixo do beneficiário.
-       A altura da linha é FIXA e igual para todas, com ou sem nota: é isso que dá a cadência
-       constante à lista e, ao mesmo tempo, deixa o conteúdo de cada célula centrar-se em
-       altura (vertical-align: middle) — nas linhas sem nota o nome fica ao meio, e não colado
-       ao topo com um vazio por baixo.
-       Nota: não se usa posicionamento absoluto para a nota atravessar as colunas ao lado. Numa
-       tabela com border-collapse, o WebKit não garante que a célula sirva de referência, e a
-       nota desaparecia da vista no iPhone. */
-    .col-nota { display: none !important; }
-    table.data tbody tr.tx-row { height: 58px; }
-    .tx-memo { display: block; font-weight: 400; font-size: 11.5px; line-height: 15px;
-      color: var(--text-muted); margin-top: 3px; max-width: 100%;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* A nota tem coluna própria também no telemóvel, mas estreita: dá para perceber do que
+       se trata, e o resto lê-se abrindo a transação. O limite em píxeis é o que garante o
+       corte — sem ele a coluna esticava até caber a nota inteira e empurrava tudo o resto. */
+    table.data td.col-nota { max-width: 96px; }
     /* Na tabela das contas de ORÇAMENTO a coluna Tipo diz sempre «Orçamento» — o mesmo que o
        título da secção. Esconde-se, e nas outras contas fica a forma curta: o espaço ganho é
        muito maior do que o pontinho de estado ocupa, por isso a vista continua a caber sem
@@ -707,7 +716,7 @@
     .rot { display: none; }          /* rótulo longo: fica só o símbolo ou a forma curta */
 
     /* Tabelas largas (transações/contas/recorrentes) com deslize horizontal suave */
-    table.data { min-width: 620px; }
+    table.data { min-width: 700px; }
 
     /* Modais e gráficos */
     .modal-overlay { padding: 14px 10px calc(14px + env(safe-area-inset-bottom)); align-items: flex-start; }
@@ -931,6 +940,21 @@
 
   // ---------- Estado ----------
   var APP_VERSION = "1.52";
+  // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
+  // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
+  var TEMAS = [
+    { id:"verde",  nome:"Verde-mar",  amostra:"#0d9488" },
+    { id:"rosa",   nome:"Rosa velho", amostra:"#b5657f" },
+    { id:"azul",   nome:"Azul velho", amostra:"#5b7c99" },
+    { id:"malva",  nome:"Malva",      amostra:"#7d6b96" },
+    { id:"ocre",   nome:"Ocre",       amostra:"#97762a" },
+    { id:"telha",  nome:"Telha",      amostra:"#a15c40" }
+  ];
+  function temaAtual(){
+    var t = (state.settings||{}).theme;
+    for (var i=0;i<TEMAS.length;i++) if (TEMAS[i].id===t) return t;
+    return "verde";
+  }
   var DEFAULT_STATE = {
     version: 1,
     settings: { locale: "pt-PT", currency: "EUR" },
@@ -1819,6 +1843,9 @@
       }
       o.backup = o.backup || { at:null, sig:null, autoDay:null, pend:0 };
       if (!Array.isArray(o.moves)) o.moves = [];       // orçamentos criados antes desta funcionalidade
+      // Nomes antigos das duas únicas cores que havia, antes de serem seis.
+      if (o.settings.theme === "rose")  o.settings.theme = "rosa";
+      if (o.settings.theme === "green") o.settings.theme = "verde";
       return o;
     } catch(e){ return JSON.parse(JSON.stringify(DEFAULT_STATE)); }
   }
@@ -2171,7 +2198,12 @@
   function coverTotal(sel) { var s=0; for (var k in sel) if (sel.hasOwnProperty(k)) s += sel[k]||0; return round2(s); }
 
   // ---------- Desenho do ecrã ----------
-  function applyTheme(){ if (document.body) document.body.classList.toggle("theme-rose", !!(state.settings && state.settings.theme==="rose")); }
+  function applyTheme(){
+    if (!document.body) return;
+    var t = temaAtual();
+    for (var i=0;i<TEMAS.length;i++) document.body.classList.remove("tema-"+TEMAS[i].id);
+    if (t !== "verde") document.body.classList.add("tema-"+t);   // o verde é o de origem: não precisa de classe
+  }
   function render() {
     _txSel = {};   // a seleção temporária de transações não sobrevive a mudanças de página
     var _sb = document.getElementById("txSelBar"); if (_sb) _sb.classList.remove("show");
@@ -2600,18 +2632,10 @@
     var balCell = (runBal===undefined) ? '' : '<td class="num" style="font-variant-numeric:tabular-nums;font-weight:600;'+(runBal<-0.005?"color:var(--negative)":"")+'">'+fmt(runBal)+'</td>';
     var accCell = "";
     if (withAccount) { var a=lkAcc(t.accountId); accCell = '<td class="tag" style="white-space:nowrap;">'+esc(a?a.name:"—")+'</td>'; }
-    return '<tr class="hoverable tx-row" data-action="edit-tx" data-id="'+t.id+'" style="cursor:pointer;">'+
+    return '<tr class="hoverable" data-action="edit-tx" data-id="'+t.id+'" style="cursor:pointer;">'+
       '<td class="muted" style="white-space:nowrap;"><label class="tx-selcell" title="Selecionar (só para somar)"><input type="checkbox" class="tx-sel" data-id="'+t.id+'"'+(_txSel[t.id]?" checked":"")+'></label>'+fmtDate(t.date)+'</td>'+
       accCell +
-      // A nota aparece por baixo do beneficiário (só no telemóvel, onde a coluna dela não cabe).
-      // A altura da linha é fixada no CSS e é a mesma para todas, com ou sem nota — assim a
-      // lista mantém a cadência, e nas linhas sem nota o nome fica centrado em altura, em vez
-      // de colado ao topo com um vazio por baixo.
-      // De caminho, é o que faz uma procura por texto explicar-se a si própria: procura-se
-      // «jantar» e vê-se a nota que deu o resultado, em vez de uma linha que parece não ter
-      // nada a ver com o que se procurou.
-      '<td class="tx-payee" style="font-weight:600;">'+esc(t.payee||"")+(t.split?' <span class="tag" title="Transação dividida">🔗</span>':'')+
-        (t.memo?'<span class="tx-memo">'+esc(t.memo)+'</span>':'')+'</td>'+
+      '<td style="font-weight:600;">'+esc(t.payee||"")+(t.split?' <span class="tag" title="Transação dividida">🔗</span>':'')+'</td>'+
       '<td>'+catName+'</td>'+
       // A nota pode ir até 300 caracteres. Sem limite de largura, uma nota comprida esmagava
       // todas as outras colunas. Corta-se com «…» e o texto todo fica na dica do rato — para
@@ -3601,15 +3625,26 @@
         // «Manutenção» era um saco para o que sobrava. Cada uma destas coisas é de natureza
         // diferente — uma preferência, uma arrumação e um recomeço — e merece o seu lugar.
         seccao("Definições")+
-        // A cor vivia num botão do cabeçalho. No telemóvel esse espaço faz falta a coisas de
-        // uso diário, e uma cor escolhe-se uma vez — o lugar dela é aqui, ao pé da moeda.
-        '<div class="field"><label>Cor da aplicação</label>'+
-          '<button class="btn" data-action="toggle-theme" style="width:100%;justify-content:center;">'+
-            (((state.settings||{}).theme==="rose") ? "🌸 Rosa — mudar para verde" : "🌿 Verde — mudar para rosa")+
-          '</button><div class="hint">Vale só neste aparelho.</div></div>'+
-        '<div class="field"><label>Moeda</label><select id="curSel">'+
-          CURRENCIES.map(function(c){ return '<option value="'+c[0]+'"'+(((state.settings.currency||"EUR")===c[0])?" selected":"")+'>'+c[0]+' ('+c[1]+')</option>'; }).join("")+
-        '</select><div class="hint">Muda só a forma como os valores são escritos. Não converte nada.</div></div>'+
+        // Cor e moeda lado a lado: são as duas preferências do orçamento, e nenhuma precisa da
+        // largura toda. As cores são bolinhas — vê-se logo o que se vai escolher, em vez de um
+        // botão que descreve a cor por palavras.
+        '<div class="grid-2">'+
+          '<div class="field"><label>Cor da aplicação</label>'+
+            '<div class="cores">'+
+              TEMAS.map(function(t){
+                var sel = (temaAtual()===t.id);
+                return '<button class="cor-bola'+(sel?' sel':'')+'" data-action="set-theme" data-id="'+t.id+'"'+
+                  ' style="background:'+t.amostra+'" title="'+t.nome+'" aria-label="'+t.nome+'"'+
+                  ' aria-pressed="'+(sel?"true":"false")+'"></button>';
+              }).join("")+
+            '</div><div class="hint" id="corNome">'+esc((function(){
+                for (var i=0;i<TEMAS.length;i++) if (TEMAS[i].id===temaAtual()) return TEMAS[i].nome;
+                return "";
+              })())+'</div></div>'+
+          '<div class="field"><label>Moeda</label><select id="curSel">'+
+            CURRENCIES.map(function(c){ return '<option value="'+c[0]+'"'+(((state.settings.currency||"EUR")===c[0])?" selected":"")+'>'+c[0]+' ('+c[1]+')</option>'; }).join("")+
+          '</select><div class="hint">Muda só a forma como os valores são escritos. Não converte nada.</div></div>'+
+        '</div>'+
 
         seccao("Arrumação")+
         acao('<button class="btn" data-action="archived-menu" style="width:100%;justify-content:center;">🗄 Contas e categorias arquivadas</button>'+
@@ -4081,7 +4116,7 @@
         '<li><b>O cabeçalho das listas fica à vista:</b> ao descer uma lista de transações, os nomes das colunas — Data, Beneficiário, Categoria… — ficam colados ao topo, para saber sempre o que está a ler. No telemóvel, como a tabela é mais larga do que o ecrã, é a <b>lista</b> que corre dentro da sua própria área em vez da página inteira.</li>'+
         '<li><b>Contas nos campos de dinheiro:</b> em qualquer campo de valor pode escrever a conta em vez do total — <b>23,45+11,90+7,15</b>. O resultado aparece por baixo enquanto escreve e substitui a conta assim que sai do campo. No <b>telemóvel</b> aparece um <b>teclado próprio</b> com <b>+</b> e <b>−</b>, sem letras nem risco de enganos. Num par <b>Saída/Entrada</b>, um <b>−</b> escrito no princípio do campo continua a passar o valor para o outro lado; depois de números, é uma subtração.</li>'+
         '<li><b>Datas e teclado:</b> as datas escrevem-se sempre em <b>dd/mm/aaaa</b>, mesmo que tenha o browser noutro idioma — pode escrever só os números, que as barras aparecem sozinhas, ou usar o 📅 para as escolher no calendário. Dentro de qualquer janela, o <b>Enter</b> vale por carregar no botão principal.</li>'+
-        '<li><b>Cor da aplicação</b> (verde ou rosa): no computador é o círculo colorido no canto superior direito; no telemóvel está em <b>Dados e cópias → Definições</b>, ao pé da moeda. Vale só neste aparelho — não vai na sincronização.</li>'+
+        '<li><b>Cor da aplicação:</b> seis tons apagados à escolha, em <b>Dados e cópias → Definições</b> — basta tocar numa bolinha. No computador, o círculo no canto superior direito percorre-as uma a uma. A cor <b>acompanha o orçamento</b>: fica guardada com ele e vai na sincronização, como as outras definições. Os verdes e vermelhos dos valores nunca mudam — são eles que dizem se há ou não dinheiro.</li>'+
         '<li><b>Esc</b> dentro de um campo desfaz o que estava a escrever e larga o campo, sem gravar. Dentro de uma janela, é preciso carregar duas vezes: a primeira sai do campo, a segunda fecha a janela. Na <b>caixa de procura</b> das Transações o Esc <b>apaga</b> o texto (e o cursor fica lá) — o mesmo que o <b>✕</b> dentro da caixa.</li>'+
       '</ul>'+
 
@@ -4107,7 +4142,7 @@
         '<li><b>🕑 Movimentos recentes</b> (ao lado do ↩ ↪, no topo) — o registo de como tem repartido o dinheiro <b>pelas categorias</b>: mover entre categorias, 🩹 cobrir, 🎯 financiar, 🧹 libertar excedente, atribuir à mão, adiar, e também o que anulou. Guarda os <b>últimos 30</b> e acompanha o orçamento (sobrevive a fechar a aplicação e vai na sincronização). As <b>transações não entram</b> — essas têm a sua própria lista. É só para ler: para andar para trás use o <b>↩</b>.</li>'+
         '<li><b>Somar à pressa:</b> as caixas à esquerda da data selecionam transações e mostram o total em baixo. A caixa no <b>cabeçalho</b> marca todas as que estão à vista. É só uma conta rápida — não altera nada, e a seleção desaparece ao mudar de página.</li>'+
         '<li><b>Campos de valor:</b> algarismos e um separador decimal. Em <b>Saída/Entrada</b>, o «-» troca de lado.</li>'+
-        '<li><b>Notas nas transações:</b> no computador têm coluna própria; no telemóvel, onde não cabia, aparecem por baixo do beneficiário, em letra pequena. As linhas têm <b>todas a mesma altura</b>, com ou sem nota, e a nota completa vê-se abrindo a transação.</li>'+
+        '<li><b>Notas nas transações:</b> têm coluna própria em qualquer ecrã — no telemóvel, estreita e cortada com «…», o suficiente para saber do que se trata. A nota completa vê-se ao passar o rato por cima ou abrindo a transação.</li>'+
         '<li><b>Procurar:</b> o campo no topo das Transações procura <b>apenas</b> no <b>beneficiário</b> e na <b>nota</b> — não procura em categorias, valores nem datas, que têm filtros próprios ao lado. Basta parte da palavra, e maiúsculas ou minúsculas é igual. Cruza-se com os filtros de conta, categoria e período («Confeitaria» + <i>este ano</i> + conta X).</li>'+
         '<li><b>🏷️ Beneficiários:</b> mudar um nome altera todas as transações; dar-lhe um nome que já existe <b>junta</b> os dois. O <b>📊 Ver</b> mostra tudo o que gastou nesse beneficiário — total, número de vezes, média e em que categorias entrou. Como é a lista de transações normal, pode juntar-lhe um <b>período</b> para ver só um ano, e editar as transações a partir dali.</li>'+
         '<li><b>Importar .csv</b> do banco: as linhas que já existem são detetadas e saltadas.</li>'+
@@ -4156,7 +4191,9 @@
         '<b>Duas correções no dinheiro.</b> Eliminar um <b>grupo</b> deixava para trás, invisível, o dinheiro atribuído às categorias dele, e continuava a descontá-lo do «Pronto a atribuir» para sempre. E no <b>cartão de crédito</b>, a linha contava a dívida de todos os tempos enquanto o «Libertar excedente» contava só até ao mês em vista — discordavam entre si.',
         '<b>Abrir uma conta deixou de ser um ecrã à parte:</b> leva ao ecrã <b>Transações</b> já filtrado, com o nome e os saldos por cima — e assim também se pode procurar e filtrar por período, o que ali não dava. Os filtros passaram também a fazer o que se espera: o «✕ Limpar» mantém a conta, há um <b>✕</b> na caixa de procura só para o texto, e tocar no separador volta à lista inteira.',
         '<b>Exportar segue o que está no ecrã:</b> o <b>⬇ Exportar o que vejo</b> respeita os filtros — o botão antigo parecia fazê-lo mas exportava sempre tudo. No <b>🩹 Cobrir</b> há uma forma nova de escolher de onde tirar: <b>primeiro de quem precisa do dinheiro mais tarde</b>.',
-        '<b>As notas das transações passaram a ver-se no telemóvel</b>, por baixo do beneficiário — a coluna não cabia e ficavam escondidas. Todas as linhas têm a mesma altura, com ou sem nota.',
+        '<b>As notas das transações passaram a ver-se no telemóvel</b>: a coluna estava escondida, e agora aparece estreita, cortada com «…». As linhas mantêm a altura de sempre.',
+        '<b>Os dados de exemplo foram refeitos</b> e passam a mostrar o que a aplicação ganhou entretanto: os quatro tipos de alvo (incluindo «reservar»), prioridades, uma categoria adiada, outra excedida para experimentar o 🩹 Cobrir, transação dividida, transferências dentro e fora do orçamento, conta de acompanhamento, notas e uma recorrente que é transferência.',
+        '<b>Seis cores à escolha</b> para a aplicação, em tons apagados — verde-mar, rosa velho, azul velho, malva, ocre e telha — em <b>Dados e cópias → Definições</b>, ao lado da moeda. A escolha acompanha o orçamento e vai na sincronização.',
         '<b>Telemóvel:</b> cabeçalho refeito com botões do tamanho de um dedo (44px, mais 47% de área), sem o título do ecrã nem o botão da cor — que passou para <b>Dados e cópias → Definições</b>. As barras de filtros cabem numa linha, e a letra deixou de variar de orçamento para orçamento no iPhone.',
         '<b>Mais rápida a cada toque</b> (só grava quando algo muda), notas compridas deixaram de esmagar as colunas, e o balão do orçamento já não dá os parabéns quando há categorias excedidas.'
       ])+
@@ -4178,15 +4215,15 @@
       ])+
 
       ver("1.1 – 1.12", "agosto 2026", [
-        '<b>🩹 Cobrir</b> (trazer a zero) e <b>🎯 Financiar</b> (levar ao alvo) deixaram de se confundir, e o 🎯 avisa antes de deixar o «Pronto a atribuir» negativo. <b>😴 Adiar</b> põe um alvo em pausa só neste mês.',
+        '<b>🩹 Cobrir</b> (trazer a zero) e <b>🎯 Financiar</b> (levar ao alvo) deixaram de se confundir, e o 🎯 avisa antes de deixar o «Pronto a atribuir» negativo. Juntam-se-lhes o <b>🧹 Libertar excedente</b>, o <b>🧽 Limpar atribuições</b> (devolve tudo o que atribuiu no mês) e o <b>↔ Mover</b> entre categorias. <b>😴 Adiar</b> põe um alvo em pausa só neste mês.',
         '<b>Anular / Refazer</b> as últimas ações, e o registo dos <b>«Movimentos recentes»</b>, cobrindo também transferências, pagamentos de cartão e recorrentes.',
-        '<b>Filtros</b> por estado (🟢🟡🔴), com saldo, com excedente e prioridade. <b>Vários orçamentos</b> no mesmo aparelho, com uma sincronização única.',
+        '<b>Filtros</b> no orçamento: por estado (<b>🔴</b> excedido, <b>🟡</b> abaixo do alvo, <b>🟢</b> cumprido, <b>🔵</b> com excedente), <b>💰</b> com saldo e por prioridade. <b>Vários orçamentos</b> no mesmo aparelho, com uma sincronização única.',
         '<b>Saber o que falta guardar:</b> data da última cópia e quantas alterações fez desde então, também no botão 💾.',
         '<b>Correções de cálculo</b> nos alvos com data e no modo Repor, e nas recorrentes do dia 29–31 depois de fevereiro.'
       ])+
 
       ver("1.0", "versão base", [
-        'Orçamento base-zero com <b>alvos</b> (mensal, semanal, trimestral, semestral, anual ou até uma data), contas de <b>orçamento</b>, <b>cartões de crédito</b> e de <b>acompanhamento</b>, <b>sincronização cifrada</b> entre aparelhos e <b>cópias de segurança</b> em ficheiro.'
+        'Orçamento base-zero com <b>alvos</b> (mensal, semanal, trimestral, semestral, anual ou até uma data), contas de <b>orçamento</b>, <b>cartões de crédito</b> e de <b>acompanhamento</b>, ecrã de <b>Relatórios</b> (evolução do património, rendimento e despesa por mês e por categoria), <b>sincronização cifrada</b> entre aparelhos e <b>cópias de segurança</b> em ficheiro.'
       ])+
 
       '</div></div>'+
@@ -4800,13 +4837,18 @@
     "prev-month": function(){ state.ui.month = shiftMonth(state.ui.month,-1); render(); },
     "next-month": function(){ state.ui.month = shiftMonth(state.ui.month, 1); render(); },
     "this-month": function(){ state.ui.month = nowMonthKey(); render(); },
+    // O círculo do cabeçalho (no computador) percorre as cores, uma a uma.
     "toggle-theme": function(){
-      state.settings.theme = (state.settings && state.settings.theme==="rose") ? "green" : "rose";
+      var t = temaAtual(), i = 0;
+      for (var k=0;k<TEMAS.length;k++) if (TEMAS[k].id===t) i=k;
+      state.settings.theme = TEMAS[(i+1)%TEMAS.length].id;
       save(); render();
-      // Quando se muda a cor a partir de «Dados e cópias», o próprio botão tem de passar a
-      // dizer a cor nova — senão ficava a prometer a que acabou de sair. O "curSel" (Moeda)
-      // só existe nesse ecrã, por isso serve de deteção.
-      if (el("curSel")) dataModal();
+      if (el("curSel")) dataModal();   // o "curSel" (Moeda) só existe no ecrã Dados e cópias
+    },
+    // Escolher uma cor concreta, pelas bolinhas em «Dados e cópias».
+    "set-theme": function(id){
+      state.settings.theme = id; save(); render();
+      if (el("curSel")) dataModal();   // redesenha para a bolinha escolhida ficar marcada
     },
     "close": closeModal,
     "help": helpModal,
@@ -6518,58 +6560,108 @@
   }
 
   // ---------- Dados de exemplo ----------
+  // Orçamento de demonstração. Não é só para "ter dados": é para mostrar, de uma vez, o que a
+  // aplicação sabe fazer — os quatro tipos de alvo, prioridades, uma categoria adiada, outra
+  // excedida (para se ver o 🩹 Cobrir), transação dividida, transferências dentro e fora do
+  // orçamento, cartão de crédito com fatura por pagar, conta de acompanhamento e recorrentes.
+  // Quem carrega isto está a experimentar: convém que encontre as coisas montadas, e a bater certo.
   function loadSample() {
     var s = JSON.parse(JSON.stringify(DEFAULT_STATE));
-    s.ui.month = nowMonthKey();
-    var accCO = {id:uid(), name:"Conta à ordem", type:"budget", note:""};
-    var accPoup = {id:uid(), name:"Poupança", type:"budget", note:"Fundo de emergência"};
-    var accCC = {id:uid(), name:"Cartão de crédito", type:"credit", note:"", payFrom:accCO.id};
-    s.accounts = [accCO, accPoup, accCC];
+    var m = nowMonthKey();
+    s.ui.month = m;
+
+    var accCO   = {id:uid(), name:"Conta à ordem", type:"budget",   note:""};
+    var accPoup = {id:uid(), name:"Poupança",      type:"budget",   note:"Fundo de emergência"};
+    var accCC   = {id:uid(), name:"Cartão de crédito", type:"credit", note:"", payFrom:null};
+    var accPPR  = {id:uid(), name:"PPR",           type:"tracking", note:"Fora do orçamento — só para acompanhar"};
+    accCC.payFrom = accCO.id;
+    s.accounts = [accCO, accPoup, accCC, accPPR];
 
     var g1={id:uid(),name:"Despesas fixas"}, g2={id:uid(),name:"Qualidade de vida"}, g3={id:uid(),name:"Poupança e objetivos"};
     s.groups=[g1,g2,g3];
-    function cat(name,gid,tgt){ return {id:uid(),name:name,groupId:gid,target:tgt||null}; }
+    function cat(name,gid,tgt,prio,nota){ return {id:uid(),name:name,groupId:gid,target:tgt||null,priority:prio||"normal",note:nota||""}; }
     function mo(a){ return {type:"monthly",amount:a}; }
-    var cRenda=cat("Renda/Casa",g1.id,mo(650)), cLuz=cat("Água, luz e gás",g1.id,mo(120)), cNet=cat("Internet e telemóvel",g1.id,mo(45)),
-        cSuper=cat("Supermercado",g1.id,{type:"weekly",amount:90,weekday:1}), cTransp=cat("Transportes",g1.id,mo(90)),
-        cSeguro=cat("Seguro auto / IUC",g1.id,{type:"yearly",amount:600}),
-        cRest=cat("Restaurantes",g2.id,mo(120)), cLazer=cat("Lazer e subscrições",g2.id,mo(40)), cRoupa=cat("Roupa",g2.id,null),
-        cEmerg=cat("Fundo de emergência",g3.id,mo(150)), cFerias=cat("Férias",g3.id,{type:"byDate",amount:1200,date:shiftMonth(nowMonthKey(),6)});
-    s.categories=[cRenda,cLuz,cNet,cSuper,cTransp,cSeguro,cRest,cLazer,cRoupa,cEmerg,cFerias];
+
+    var cRenda  = cat("Renda/Casa",           g1.id, mo(650), "alta"),
+        cLuz    = cat("Água, luz e gás",      g1.id, mo(120), "alta", "conta bimestral — varia muito"),
+        cNet    = cat("Internet e telemóvel", g1.id, mo(45),  "alta"),
+        cSuper  = cat("Supermercado",         g1.id, {type:"weekly",amount:90,weekday:1}, "alta"),
+        cTransp = cat("Transportes",          g1.id, mo(90)),
+        // Alvo anual com mês marcado: reparte o que falta pelos meses até lá.
+        cSeguro = cat("Seguro auto / IUC",    g1.id, {type:"yearly",amount:600,due:shiftMonth(m,4)}, "alta"),
+        cRest   = cat("Restaurantes",         g2.id, mo(120), "baixa"),
+        cLazer  = cat("Lazer e subscrições",  g2.id, mo(40),  "baixa"),
+        cRoupa  = cat("Roupa",                g2.id, mo(60),  "baixa"),
+        cPrend  = cat("Prendas de Natal",     g2.id, {type:"byDate",amount:400,date:shiftMonth(m,4)}, "baixa"),
+        // "Reservar" (setAside): mete o mesmo todos os meses e não olha para o saldo.
+        cEmerg  = cat("Fundo de emergência",  g3.id, {type:"monthly",amount:150,fund:"setAside"}, "alta"),
+        cFerias = cat("Férias",               g3.id, {type:"byDate",amount:1200,date:shiftMonth(m,6)});
+    s.categories=[cRenda,cLuz,cNet,cSuper,cTransp,cSeguro,cRest,cLazer,cRoupa,cPrend,cEmerg,cFerias];
+
     var payGrp={id:uid(), name:"Pagamentos de cartão de crédito", system:true};
     var payCat={id:uid(), groupId:payGrp.id, name:"💳 "+accCC.name, cardId:accCC.id, target:null};
     s.groups.push(payGrp); s.categories.push(payCat); accCC.paymentCatId=payCat.id;
 
-    var m = nowMonthKey();
-    function A(cid,v){ s.assignments[cid+"|"+m]=v; }
-    A(cRenda.id,650); A(cLuz.id,120); A(cNet.id,45); A(cSuper.id,400); A(cTransp.id,90);
-    A(cRest.id,120); A(cLazer.id,40); A(cEmerg.id,150); A(cSeguro.id,50); A(cRoupa.id,50);
+    // As Prendas estão ADIADAS este mês (😴): têm alvo, mas não pedem dinheiro agora.
+    // É uma categoria sem gastos de propósito — adiada E excedida ao mesmo tempo confundiria.
+    s.snooze[cPrend.id+"|"+m] = true;
 
-    function T(day,acc,payee,cid,out,inf,cl){ s.transactions.push({id:uid(),date:m+"-"+pad(day),accountId:acc,payee:payee,categoryId:cid,memo:"",outflow:out||0,inflow:inf||0,cleared:cl!==false}); }
-    T(1, accCO.id, "Salário", INCOME, 0, 1850, true);
-    T(2, accCO.id, "Senhorio", cRenda.id, 650, 0, true);
-    T(4, accCO.id, "EDP", cLuz.id, 98.40, 0, true);
-    T(5, accCO.id, "MEO", cNet.id, 44.99, 0, true);
-    T(6, accCO.id, "Continente", cSuper.id, 86.75, 0, true);
-    T(8, accCC.id, "Restaurante O Prego", cRest.id, 34.50, 0, false);
-    T(10, accCO.id, "Passe Navegante", cTransp.id, 40, 0, true);
-    T(12, accCO.id, "Pingo Doce", cSuper.id, 62.30, 0, true);
-    T(14, accCC.id, "Netflix", cLazer.id, 13.99, 0, false);
-    // A Poupança é uma conta de orçamento: pôr lá dinheiro é uma TRANSFERÊNCIA, não uma despesa.
-    // O «Fundo de emergência» mantém o que lhe foi atribuído, e as contas continuam a bater certo.
+    function A(cid,v){ s.assignments[cid+"|"+m]=v; }
+    // Deixa-se de propósito algum dinheiro por atribuir, para haver o que experimentar no
+    // 🎯 Financiar alvos; e o Supermercado, o Seguro e as Férias ficam abaixo do alvo, para
+    // a lista mostrar as várias cores em vez de um verde uniforme.
+    A(cRenda.id,650); A(cLuz.id,120); A(cNet.id,45); A(cSuper.id,330); A(cTransp.id,100);
+    A(cSeguro.id,60); A(cRest.id,100); A(cLazer.id,40); A(cEmerg.id,150); A(cFerias.id,100);
+    A(cRoupa.id,60);
+    // As Prendas ficam sem atribuição: estão adiadas.
+
+    function T(day,acc,payee,cid,out,inf,cl,nota){
+      s.transactions.push({id:uid(),date:m+"-"+pad(day),accountId:acc,payee:payee,categoryId:cid,
+        memo:nota||"",outflow:out||0,inflow:inf||0,cleared:cl!==false});
+    }
+    T(1,  accCO.id, "Salário",            INCOME,      0, 1850, true);
+    T(2,  accCO.id, "Senhorio",           cRenda.id, 650, 0, true, "renda de "+monthLabel(m));
+    T(4,  accCO.id, "EDP",                cLuz.id,   98.40, 0, true);
+    T(5,  accCO.id, "MEO",                cNet.id,   44.99, 0, true, "fibra + telemóvel");
+    T(6,  accCO.id, "Continente",         cSuper.id, 86.75, 0, true);
+    T(10, accCO.id, "Passe Navegante",    cTransp.id, 40, 0, true);
+    T(12, accCO.id, "Pingo Doce",         cSuper.id, 62.30, 0, true);
+    T(18, accCO.id, "Galp combustível",   cTransp.id, 55, 0, true, "depósito cheio antes da viagem");
+    T(22, accCO.id, "Continente",         cSuper.id, 74.20, 0, true);
+    // Compras no CARTÃO: a app reserva sozinha o dinheiro na categoria de pagamento.
+    // Ficam por confirmar (a fatura ainda não passou no banco).
+    T(8,  accCC.id, "Restaurante O Prego", cRest.id,  34.50, 0, false, "almoço de trabalho");
+    T(14, accCC.id, "Netflix",             cLazer.id, 13.99, 0, false);
+    T(20, accCC.id, "Zara",                cRoupa.id, 49.90, 0, false);
+    // Restaurantes fica EXCEDIDO (gastou mais do que tinha), para se ver o aviso e o 🩹 Cobrir.
+    T(24, accCO.id, "Tasca do Zé",         cRest.id,  78.00, 0, true, "jantar de anos");
+
+    // TRANSAÇÃO DIVIDIDA: uma compra repartida por duas categorias.
+    var sp = uid();
+    s.transactions.push({id:uid(), date:m+"-16", accountId:accCO.id, payee:"Continente", categoryId:cSuper.id,
+      memo:"compra grande do mês", outflow:71.40, inflow:0, cleared:true, split:sp});
+    s.transactions.push({id:uid(), date:m+"-16", accountId:accCO.id, payee:"Continente", categoryId:cLazer.id,
+      memo:"compra grande do mês", outflow:18.60, inflow:0, cleared:true, split:sp});
+
+    // TRANSFERÊNCIA dentro do orçamento (não leva categoria: o dinheiro não saiu do orçamento).
     var pTr=uid();
-    s.transactions.push({id:uid(), date:m+"-15", accountId:accCO.id,   payee:"↔ Poupança",       categoryId:null, memo:"", outflow:150, inflow:0,   cleared:true, transfer:pTr});
-    s.transactions.push({id:uid(), date:m+"-15", accountId:accPoup.id, payee:"↔ Conta à ordem",  categoryId:null, memo:"", outflow:0,   inflow:150, cleared:true, transfer:pTr});
-    T(18, accCO.id, "Galp combustível", cTransp.id, 55, 0, true);
-    T(20, accCC.id, "Zara", cRoupa.id, 49.90, 0, false);
-    T(22, accCO.id, "Continente", cSuper.id, 74.20, 0, true);
+    s.transactions.push({id:uid(), date:m+"-15", accountId:accCO.id,   payee:"↔ Poupança",      categoryId:null, memo:"", outflow:150, inflow:0,   cleared:true, transfer:pTr});
+    s.transactions.push({id:uid(), date:m+"-15", accountId:accPoup.id, payee:"↔ Conta à ordem", categoryId:null, memo:"", outflow:0,   inflow:150, cleared:true, transfer:pTr});
+    // TRANSFERÊNCIA que SAI do orçamento (para o PPR): leva categoria, senão as contas não batiam.
+    var pPPR=uid();
+    s.transactions.push({id:uid(), date:m+"-25", accountId:accCO.id,  payee:"↔ PPR", categoryId:cFerias.id, memo:"reforço anual", outflow:100, inflow:0, cleared:true, transfer:pPPR});
+    s.transactions.push({id:uid(), date:m+"-25", accountId:accPPR.id, payee:"↔ Conta à ordem", categoryId:null, memo:"", outflow:0, inflow:100, cleared:true, transfer:pPPR});
 
     var nextM = shiftMonth(m, 1);
     s.recurring = [
-      {id:uid(), nextDate: nextM+"-01", freq:"monthly", accountId:accCO.id, payee:"Salário", categoryId:INCOME, memo:"", outflow:0, inflow:1850, active:true},
-      {id:uid(), nextDate: nextM+"-02", freq:"monthly", accountId:accCO.id, payee:"Senhorio", categoryId:cRenda.id, memo:"", outflow:650, inflow:0, active:true},
-      {id:uid(), nextDate: nextM+"-14", freq:"monthly", accountId:accCC.id, payee:"Netflix", categoryId:cLazer.id, memo:"", outflow:13.99, inflow:0, active:true}
+      {id:uid(), nextDate: nextM+"-01", dia:1,  freq:"monthly", accountId:accCO.id, payee:"Salário",  categoryId:INCOME,      memo:"", outflow:0,     inflow:1850, active:true},
+      {id:uid(), nextDate: nextM+"-02", dia:2,  freq:"monthly", accountId:accCO.id, payee:"Senhorio", categoryId:cRenda.id,   memo:"", outflow:650,   inflow:0,    active:true},
+      {id:uid(), nextDate: nextM+"-14", dia:14, freq:"monthly", accountId:accCC.id, payee:"Netflix",  categoryId:cLazer.id,   memo:"", outflow:13.99, inflow:0,    active:true},
+      {id:uid(), nextDate: nextM+"-05", dia:5,  freq:"monthly", accountId:accCO.id, payee:"Seguro auto", categoryId:cSeguro.id, memo:"prestação", outflow:50, inflow:0, active:false},
+      // Recorrente que é uma TRANSFERÊNCIA: põe dinheiro de lado todos os meses, sozinha.
+      {id:uid(), nextDate: nextM+"-15", dia:15, freq:"monthly", accountId:accCO.id, toAccountId:accPoup.id, payee:"", categoryId:null, memo:"poupança automática", outflow:150, inflow:0, active:true}
     ];
+
     state = s; save(); render(); toast("Dados de exemplo carregados.");
   }
 
