@@ -251,7 +251,12 @@
      como um bloco só. */
   /* Os três andares do ecrã Transações colam-se uns aos outros: lidos de cima a baixo são
      um bloco só (que conta → o que posso fazer → o que estou a ver), e não três barras soltas. */
-  .toolbar.acc-head { margin-bottom: 10px; }
+  /* Os saldos ficam sempre numa linha própria: encostados ao mesmo alinhamento do nome, e
+     iguais em todas as contas. Deixados a flutuar, subiam para o lado do nome nas contas de
+     nome curto e desciam nas de nome comprido — duas contas, dois aspetos, sem razão. */
+  .toolbar.acc-head { margin-bottom: 10px; row-gap: 6px; }
+  .toolbar.acc-head .spacer { display: none; }
+  .toolbar.acc-head .acc-saldos { width: 100%; }
   .toolbar.acc-head h3 { margin: 0; font-size: 17px; font-weight: 700; }
   .toolbar.acc-acoes { margin-bottom: 10px; }
   /* A procura cresce para o espaço que sobra: o texto do campo estava a ser cortado a meio
@@ -2820,7 +2825,8 @@
           '<h3>'+esc(accA.name)+' <span class="pill '+(accA.type==="budget"?"budget":(accA.type==="credit"?"credit":"tracking"))+'">'+
             (accA.type==="budget"?"Orçamento":(accA.type==="credit"?"Cartão de crédito":"Acompanhamento"))+'</span></h3>'+
           '<div class="spacer"></div>'+
-          '<span class="muted" style="font-size:12.5px;white-space:nowrap;">'+pontoConta(f.account)+
+          // Os saldos levam marca própria para o telemóvel os poder pôr numa linha só deles.
+          '<span class="acc-saldos muted" style="font-size:12.5px;white-space:nowrap;">'+pontoConta(f.account)+
             'Confirmado: <b>'+fmt(clA)+'</b>&nbsp; · &nbsp;Saldo: <b style="'+(balA<0?"color:var(--negative)":"")+'">'+fmt(balA)+'</b></span>'+
         '</div>';
     }
@@ -2898,7 +2904,22 @@
     // movimentos escondidos pelo meio não é um saldo, é um número errado.
     var mostraConta = !f.account;
     var nCols = 7 + (mostraConta?1:0) + (soConta?1:0);
-    var body = list.length ? visiveis.map(function(t){ return txRow(t, balOf?balOf[t.id]:undefined, mostraConta); }).join("")
+    // Separadores de mês, como na lista de recorrentes: dizem de relance onde acaba um mês e
+    // começa o outro, sem obrigar a ler as datas uma a uma. Só aparecem se a lista à vista
+    // atravessar mais do que um mês — num filtro de «este mês» seriam um título a separar
+    // coisa nenhuma.
+    var mesesNaVista = {}; for (var vm=0; vm<visiveis.length; vm++) mesesNaVista[monthOf(visiveis[vm].date)] = 1;
+    var separaMeses = Object.keys(mesesNaVista).length > 1;
+    var mesAnterior = null;
+    var body = list.length ? visiveis.map(function(t){
+                               var sep = "";
+                               if (separaMeses) {
+                                 var mm = monthOf(t.date);
+                                 if (mm !== mesAnterior) { mesAnterior = mm;
+                                   sep = '<tr class="mes-sep"><td colspan="'+nCols+'">'+monthLabel(mm)+'</td></tr>'; }
+                               }
+                               return sep + txRow(t, balOf?balOf[t.id]:undefined, mostraConta);
+                             }).join("")
                            : ('<tr><td colspan="'+nCols+'" class="empty">'+(soConta ? 'Esta conta ainda não tem transações.' : 'Nada corresponde ao filtro.')+'</td></tr>');
     if (list.length > LIM) body += '<tr><td colspan="'+nCols+'" style="text-align:center;padding:14px;">'+
       '<button class="btn" data-action="show-more-tx">Mostrar mais '+PAGINA+' (a ver '+LIM+' de '+list.length+')</button></td></tr>';
@@ -4146,6 +4167,7 @@
         '<li><b>No telemóvel, o cabeçalho</b> tem, por esta ordem: o <b>nome do orçamento</b> (toque para trocar ou gerir), <b>➕</b> nova transação, <b>🏷️</b> beneficiários, <b>💾</b> dados e cópias, <b>↩ ↪</b> anular e refazer, <b>🕑</b> movimentos recentes e <b>❓</b> esta ajuda. O título do ecrã não aparece — é a barra de baixo, com o separador aceso, que diz onde está.</li>'+
         '<li><b>🕑 Movimentos recentes</b> (ao lado do ↩ ↪, no topo) — o registo de como tem repartido o dinheiro <b>pelas categorias</b>: mover entre categorias, 🩹 cobrir, 🎯 financiar, 🧹 libertar excedente, atribuir à mão, adiar, e também o que anulou. Guarda os <b>últimos 30</b> e acompanha o orçamento (sobrevive a fechar a aplicação e vai na sincronização). As <b>transações não entram</b> — essas têm a sua própria lista. É só para ler: para andar para trás use o <b>↩</b>.</li>'+
         '<li><b>Somar à pressa:</b> as caixas à esquerda da data selecionam transações e mostram o total em baixo. A caixa no <b>cabeçalho</b> marca todas as que estão à vista. É só uma conta rápida — não altera nada, e a seleção desaparece ao mudar de página.</li>'+
+        '<li><b>Separadores de mês</b> nas listas de transações e de recorrentes: «Agosto 2026», «Julho 2026»… Só aparecem quando a lista atravessa mais do que um mês — num filtro de «este mês» não separariam nada.</li>'+
         '<li><b>Uma coluna «Valor»</b> nas listas de transações e de recorrentes: as saídas aparecem a <b>vermelho com −</b> e as entradas a <b>verde com +</b>. Ao registar ou editar continua a haver dois campos, <b>Saída</b> e <b>Entrada</b>, que é o que evita enganos ao escrever.</li>'+
         '<li><b>Campos de valor:</b> algarismos e um separador decimal. Em <b>Saída/Entrada</b>, o «-» troca de lado.</li>'+
         '<li><b>Notas nas transações:</b> têm coluna própria em qualquer ecrã — no telemóvel, estreita e cortada com «…», o suficiente para saber do que se trata. A nota completa vê-se ao passar o rato por cima ou abrindo a transação.</li>'+
@@ -4199,6 +4221,7 @@
         '<b>Exportar segue o que está no ecrã:</b> o <b>⬇ Exportar o que vejo</b> respeita os filtros — o botão antigo parecia fazê-lo mas exportava sempre tudo. No <b>🩹 Cobrir</b> há uma forma nova de escolher de onde tirar: <b>primeiro de quem precisa do dinheiro mais tarde</b>.',
         '<b>As notas das transações passaram a ver-se no telemóvel</b>: a coluna estava escondida, e agora aparece estreita, cortada com «…». As linhas mantêm a altura de sempre.',
         '<b>Os dados de exemplo foram refeitos</b> e passam a mostrar o que a aplicação ganhou entretanto: os quatro tipos de alvo (incluindo «reservar»), prioridades, uma categoria adiada, outra excedida para experimentar o 🩹 Cobrir, transação dividida, transferências dentro e fora do orçamento, conta de acompanhamento, notas e uma recorrente que é transferência.',
+        '<b>Separadores de mês nas transações</b>, como já havia nas recorrentes — e só quando a lista atravessa mais do que um mês. Dentro de uma conta, os saldos passaram também a ter linha própria: antes subiam ou desciam conforme o comprimento do nome da conta, e duas contas tinham aspetos diferentes sem razão.',
         '<b>Uma coluna «Valor» em vez de «Saída» e «Entrada»</b> nas listas: cada transação ou sai ou entra, por isso metade do espaço estava sempre vazio. Agora as saídas aparecem a vermelho com <b>−</b> e as entradas a verde com <b>+</b> — e a largura que sobrou foi para a coluna das <b>notas</b>. Ao registar continua a haver dois campos, que é o que evita enganos ao escrever.',
         '<b>Seis cores à escolha</b> para a aplicação, em tons apagados — verde-mar, rosa velho, azul velho, malva, ocre e telha — em <b>Dados e cópias → Definições</b>, ao lado da moeda. A escolha acompanha o orçamento e vai na sincronização.',
         '<b>Telemóvel:</b> cabeçalho refeito com botões do tamanho de um dedo (44px, mais 47% de área), sem o título do ecrã nem o botão da cor — que passou para <b>Dados e cópias → Definições</b>. As barras de filtros cabem numa linha, e a letra deixou de variar de orçamento para orçamento no iPhone.',
