@@ -680,7 +680,8 @@
     /* A nota tem coluna própria também no telemóvel, mas estreita: dá para perceber do que
        se trata, e o resto lê-se abrindo a transação. O limite em píxeis é o que garante o
        corte — sem ele a coluna esticava até caber a nota inteira e empurrava tudo o resto. */
-    table.data td.col-nota { max-width: 96px; }
+    /* Menos uma coluna deu espaço à nota: cabe agora bastante mais texto antes de cortar. */
+    table.data td.col-nota { max-width: 150px; }
     /* Na tabela das contas de ORÇAMENTO a coluna Tipo diz sempre «Orçamento» — o mesmo que o
        título da secção. Esconde-se, e nas outras contas fica a forma curta: o espaço ganho é
        muito maior do que o pontinho de estado ocupa, por isso a vista continua a caber sem
@@ -716,7 +717,7 @@
     .rot { display: none; }          /* rótulo longo: fica só o símbolo ou a forma curta */
 
     /* Tabelas largas (transações/contas/recorrentes) com deslize horizontal suave */
-    table.data { min-width: 700px; }
+    table.data { min-width: 620px; }
 
     /* Modais e gráficos */
     .modal-overlay { padding: 14px 10px calc(14px + env(safe-area-inset-bottom)); align-items: flex-start; }
@@ -2641,8 +2642,10 @@
       // todas as outras colunas. Corta-se com «…» e o texto todo fica na dica do rato — para
       // ler à vontade, abre-se a transação.
       '<td class="tag col-nota"'+(t.memo?' title="'+esc(t.memo)+'"':'')+'>'+esc(t.memo||"")+'</td>'+
-      '<td class="num">'+(t.outflow?'<span class="tx-amt out">'+fmt(t.outflow)+'</span>':'')+'</td>'+
-      '<td class="num">'+(t.inflow?'<span class="tx-amt in">'+fmt(t.inflow)+'</span>':'')+'</td>'+
+      // Sai a vermelho com −, entra a verde com +. O sinal faz o trabalho principal; a cor
+      // é reforço, não é a única pista.
+      '<td class="num">'+(t.outflow ? '<span class="tx-amt out">−'+fmt(t.outflow)+'</span>'
+                        : (t.inflow ? '<span class="tx-amt in">+'+fmt(t.inflow)+'</span>' : ''))+'</td>'+
       balCell +
       '<td style="text-align:center;"><span class="cleared-dot '+(t.cleared?"on":"")+'" data-action="toggle-clear" data-id="'+t.id+'">✓</span></td>'+
       '<td class="row-actions">'+
@@ -2894,7 +2897,7 @@
     // A coluna SALDO é outra história e continua presa ao soConta: um saldo acumulado com
     // movimentos escondidos pelo meio não é um saldo, é um número errado.
     var mostraConta = !f.account;
-    var nCols = 8 + (mostraConta?1:0) + (soConta?1:0);
+    var nCols = 7 + (mostraConta?1:0) + (soConta?1:0);
     var body = list.length ? visiveis.map(function(t){ return txRow(t, balOf?balOf[t.id]:undefined, mostraConta); }).join("")
                            : ('<tr><td colspan="'+nCols+'" class="empty">'+(soConta ? 'Esta conta ainda não tem transações.' : 'Nada corresponde ao filtro.')+'</td></tr>');
     if (list.length > LIM) body += '<tr><td colspan="'+nCols+'" style="text-align:center;padding:14px;">'+
@@ -2903,7 +2906,7 @@
     el("content").innerHTML = head + resumoPayee +
       '<div class="data-card"><table class="data"><thead><tr>'+
       '<th>'+thSelTodas()+'Data</th>'+(mostraConta?'<th>Conta</th>':'')+'<th>Beneficiário</th><th>Categoria</th><th class="col-nota">Nota</th>'+
-      '<th class="num">Saída</th><th class="num">Entrada</th>'+(soConta?'<th class="num">Saldo</th>':'')+
+      '<th class="num">Valor</th>'+(soConta?'<th class="num">Saldo</th>':'')+
       '<th style="text-align:center;">✓</th><th></th></tr></thead><tbody>'+body+'</tbody></table></div>';
   }
 
@@ -3112,7 +3115,9 @@
       var cat=ehTr
         ? ('<span class="pill tracking">↔ Transferência</span>'+(r.categoryId?' <span class="tag">'+esc((lkCat(r.categoryId)||{name:"(apagada)"}).name)+'</span>':''))
         : (r.categoryId===INCOME?'<span class="pill budget">Rendimento</span>':(r.categoryId?esc((categoryById(r.categoryId)||{name:"(apagada)"}).name):'<span class="muted">—</span>'));
-      var amt=r.outflow?'<span class="tx-amt out">'+fmt(r.outflow)+'</span>':(r.inflow?'<span class="tx-amt in">'+fmt(r.inflow)+'</span>':'');
+      // Mesmo sinal e mesma cor da lista de transações: duas listas de dinheiro que se leem
+      // de maneiras diferentes obrigam a reaprender a segunda.
+      var amt=r.outflow?'<span class="tx-amt out">−'+fmt(r.outflow)+'</span>':(r.inflow?'<span class="tx-amt in">+'+fmt(r.inflow)+'</span>':'');
       return sep + '<tr class="hoverable" data-action="edit-recurring" data-id="'+r.id+'" style="cursor:pointer;'+(r.active?'':'opacity:.5;')+'">'+
         '<td style="white-space:nowrap;font-weight:600;">'+fmtDate(r.nextDate)+'</td>'+
         '<td><span class="pill tracking">'+(FREQ_LABEL[r.freq]||r.freq)+'</span></td>'+
@@ -4141,6 +4146,7 @@
         '<li><b>No telemóvel, o cabeçalho</b> tem, por esta ordem: o <b>nome do orçamento</b> (toque para trocar ou gerir), <b>➕</b> nova transação, <b>🏷️</b> beneficiários, <b>💾</b> dados e cópias, <b>↩ ↪</b> anular e refazer, <b>🕑</b> movimentos recentes e <b>❓</b> esta ajuda. O título do ecrã não aparece — é a barra de baixo, com o separador aceso, que diz onde está.</li>'+
         '<li><b>🕑 Movimentos recentes</b> (ao lado do ↩ ↪, no topo) — o registo de como tem repartido o dinheiro <b>pelas categorias</b>: mover entre categorias, 🩹 cobrir, 🎯 financiar, 🧹 libertar excedente, atribuir à mão, adiar, e também o que anulou. Guarda os <b>últimos 30</b> e acompanha o orçamento (sobrevive a fechar a aplicação e vai na sincronização). As <b>transações não entram</b> — essas têm a sua própria lista. É só para ler: para andar para trás use o <b>↩</b>.</li>'+
         '<li><b>Somar à pressa:</b> as caixas à esquerda da data selecionam transações e mostram o total em baixo. A caixa no <b>cabeçalho</b> marca todas as que estão à vista. É só uma conta rápida — não altera nada, e a seleção desaparece ao mudar de página.</li>'+
+        '<li><b>Uma coluna «Valor»</b> nas listas de transações e de recorrentes: as saídas aparecem a <b>vermelho com −</b> e as entradas a <b>verde com +</b>. Ao registar ou editar continua a haver dois campos, <b>Saída</b> e <b>Entrada</b>, que é o que evita enganos ao escrever.</li>'+
         '<li><b>Campos de valor:</b> algarismos e um separador decimal. Em <b>Saída/Entrada</b>, o «-» troca de lado.</li>'+
         '<li><b>Notas nas transações:</b> têm coluna própria em qualquer ecrã — no telemóvel, estreita e cortada com «…», o suficiente para saber do que se trata. A nota completa vê-se ao passar o rato por cima ou abrindo a transação.</li>'+
         '<li><b>Procurar:</b> o campo no topo das Transações procura <b>apenas</b> no <b>beneficiário</b> e na <b>nota</b> — não procura em categorias, valores nem datas, que têm filtros próprios ao lado. Basta parte da palavra, e maiúsculas ou minúsculas é igual. Cruza-se com os filtros de conta, categoria e período («Confeitaria» + <i>este ano</i> + conta X).</li>'+
@@ -4193,6 +4199,7 @@
         '<b>Exportar segue o que está no ecrã:</b> o <b>⬇ Exportar o que vejo</b> respeita os filtros — o botão antigo parecia fazê-lo mas exportava sempre tudo. No <b>🩹 Cobrir</b> há uma forma nova de escolher de onde tirar: <b>primeiro de quem precisa do dinheiro mais tarde</b>.',
         '<b>As notas das transações passaram a ver-se no telemóvel</b>: a coluna estava escondida, e agora aparece estreita, cortada com «…». As linhas mantêm a altura de sempre.',
         '<b>Os dados de exemplo foram refeitos</b> e passam a mostrar o que a aplicação ganhou entretanto: os quatro tipos de alvo (incluindo «reservar»), prioridades, uma categoria adiada, outra excedida para experimentar o 🩹 Cobrir, transação dividida, transferências dentro e fora do orçamento, conta de acompanhamento, notas e uma recorrente que é transferência.',
+        '<b>Uma coluna «Valor» em vez de «Saída» e «Entrada»</b> nas listas: cada transação ou sai ou entra, por isso metade do espaço estava sempre vazio. Agora as saídas aparecem a vermelho com <b>−</b> e as entradas a verde com <b>+</b> — e a largura que sobrou foi para a coluna das <b>notas</b>. Ao registar continua a haver dois campos, que é o que evita enganos ao escrever.',
         '<b>Seis cores à escolha</b> para a aplicação, em tons apagados — verde-mar, rosa velho, azul velho, malva, ocre e telha — em <b>Dados e cópias → Definições</b>, ao lado da moeda. A escolha acompanha o orçamento e vai na sincronização.',
         '<b>Telemóvel:</b> cabeçalho refeito com botões do tamanho de um dedo (44px, mais 47% de área), sem o título do ecrã nem o botão da cor — que passou para <b>Dados e cópias → Definições</b>. As barras de filtros cabem numa linha, e a letra deixou de variar de orçamento para orçamento no iPhone.',
         '<b>Mais rápida a cada toque</b> (só grava quando algo muda), notas compridas deixaram de esmagar as colunas, e o balão do orçamento já não dá os parabéns quando há categorias excedidas.'
