@@ -659,17 +659,18 @@
     /* Lista de transações: a nota vai quase sempre vazia e roubava largura, e o texto
        a partir em duas linhas deixava as alturas das linhas todas diferentes. */
     /* No telemóvel a coluna da nota não cabe (a tabela já desliza de lado), por isso a nota
-       passa para uma faixa na base da linha. A faixa existe em todas as linhas — por isso a
-       altura é sempre a mesma — e o conteúdo normal das células centra-se no espaço acima
-       dela, que é o que traz o nome, a categoria e os botões de volta ao meio da linha. */
+       aparece por baixo do beneficiário.
+       A altura da linha é FIXA e igual para todas, com ou sem nota: é isso que dá a cadência
+       constante à lista e, ao mesmo tempo, deixa o conteúdo de cada célula centrar-se em
+       altura (vertical-align: middle) — nas linhas sem nota o nome fica ao meio, e não colado
+       ao topo com um vazio por baixo.
+       Nota: não se usa posicionamento absoluto para a nota atravessar as colunas ao lado. Numa
+       tabela com border-collapse, o WebKit não garante que a célula sirva de referência, e a
+       nota desaparecia da vista no iPhone. */
     .col-nota { display: none !important; }
     table.data tbody tr.tx-row { height: 58px; }
-    table.data tbody tr.tx-row td { padding-bottom: 24px; }
-    table.data tbody td.tx-payee { position: relative; }
-    /* Mais do dobro da largura da célula: a nota passa por baixo da categoria, que é onde
-       há espaço livre. Fica sempre a uma linha, cortada com «…». */
-    .tx-memo { display: block; position: absolute; left: 16px; bottom: 6px; width: 250px;
-      font-weight: 400; font-size: 11.5px; line-height: 15px; color: var(--text-muted);
+    .tx-memo { display: block; font-weight: 400; font-size: 11.5px; line-height: 15px;
+      color: var(--text-muted); margin-top: 3px; max-width: 100%;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* Na tabela das contas de ORÇAMENTO a coluna Tipo diz sempre «Orçamento» — o mesmo que o
        título da secção. Esconde-se, e nas outras contas fica a forma curta: o espaço ganho é
@@ -2602,12 +2603,10 @@
     return '<tr class="hoverable tx-row" data-action="edit-tx" data-id="'+t.id+'" style="cursor:pointer;">'+
       '<td class="muted" style="white-space:nowrap;"><label class="tx-selcell" title="Selecionar (só para somar)"><input type="checkbox" class="tx-sel" data-id="'+t.id+'"'+(_txSel[t.id]?" checked":"")+'></label>'+fmtDate(t.date)+'</td>'+
       accCell +
-      // A nota vive numa FAIXA na base da linha, fora do fluxo da célula. Duas consequências,
-      // ambas pedidas: pode atravessar por baixo da categoria (tem mais do dobro da largura da
-      // célula do beneficiário), e não empurra nada — o nome, a categoria e os botões ficam
-      // centrados em altura como nas linhas sem nota.
-      // A faixa está reservada em TODAS as linhas, tenham nota ou não: com alturas diferentes a
-      // lista fica aos degraus e o olho perde a cadência de uma linha para a outra.
+      // A nota aparece por baixo do beneficiário (só no telemóvel, onde a coluna dela não cabe).
+      // A altura da linha é fixada no CSS e é a mesma para todas, com ou sem nota — assim a
+      // lista mantém a cadência, e nas linhas sem nota o nome fica centrado em altura, em vez
+      // de colado ao topo com um vazio por baixo.
       // De caminho, é o que faz uma procura por texto explicar-se a si própria: procura-se
       // «jantar» e vê-se a nota que deu o resultado, em vez de uma linha que parece não ter
       // nada a ver com o que se procurou.
@@ -4108,7 +4107,7 @@
         '<li><b>🕑 Movimentos recentes</b> (ao lado do ↩ ↪, no topo) — o registo de como tem repartido o dinheiro <b>pelas categorias</b>: mover entre categorias, 🩹 cobrir, 🎯 financiar, 🧹 libertar excedente, atribuir à mão, adiar, e também o que anulou. Guarda os <b>últimos 30</b> e acompanha o orçamento (sobrevive a fechar a aplicação e vai na sincronização). As <b>transações não entram</b> — essas têm a sua própria lista. É só para ler: para andar para trás use o <b>↩</b>.</li>'+
         '<li><b>Somar à pressa:</b> as caixas à esquerda da data selecionam transações e mostram o total em baixo. A caixa no <b>cabeçalho</b> marca todas as que estão à vista. É só uma conta rápida — não altera nada, e a seleção desaparece ao mudar de página.</li>'+
         '<li><b>Campos de valor:</b> algarismos e um separador decimal. Em <b>Saída/Entrada</b>, o «-» troca de lado.</li>'+
-        '<li><b>Notas nas transações:</b> no computador têm coluna própria; no telemóvel, onde não cabia, aparecem numa faixa na base da linha, por baixo do beneficiário e da categoria. A faixa existe em <b>todas</b> as linhas, tenham nota ou não, para a lista ter sempre a mesma cadência. A nota completa vê-se abrindo a transação.</li>'+
+        '<li><b>Notas nas transações:</b> no computador têm coluna própria; no telemóvel, onde não cabia, aparecem por baixo do beneficiário, em letra pequena. As linhas têm <b>todas a mesma altura</b>, com ou sem nota, e a nota completa vê-se abrindo a transação.</li>'+
         '<li><b>Procurar:</b> o campo no topo das Transações procura <b>apenas</b> no <b>beneficiário</b> e na <b>nota</b> — não procura em categorias, valores nem datas, que têm filtros próprios ao lado. Basta parte da palavra, e maiúsculas ou minúsculas é igual. Cruza-se com os filtros de conta, categoria e período («Confeitaria» + <i>este ano</i> + conta X).</li>'+
         '<li><b>🏷️ Beneficiários:</b> mudar um nome altera todas as transações; dar-lhe um nome que já existe <b>junta</b> os dois. O <b>📊 Ver</b> mostra tudo o que gastou nesse beneficiário — total, número de vezes, média e em que categorias entrou. Como é a lista de transações normal, pode juntar-lhe um <b>período</b> para ver só um ano, e editar as transações a partir dali.</li>'+
         '<li><b>Importar .csv</b> do banco: as linhas que já existem são detetadas e saltadas.</li>'+
@@ -4157,7 +4156,7 @@
         '<b>Duas correções no dinheiro.</b> Eliminar um <b>grupo</b> deixava para trás, invisível, o dinheiro atribuído às categorias dele, e continuava a descontá-lo do «Pronto a atribuir» para sempre. E no <b>cartão de crédito</b>, a linha contava a dívida de todos os tempos enquanto o «Libertar excedente» contava só até ao mês em vista — discordavam entre si.',
         '<b>Abrir uma conta deixou de ser um ecrã à parte:</b> leva ao ecrã <b>Transações</b> já filtrado, com o nome e os saldos por cima — e assim também se pode procurar e filtrar por período, o que ali não dava. Os filtros passaram também a fazer o que se espera: o «✕ Limpar» mantém a conta, há um <b>✕</b> na caixa de procura só para o texto, e tocar no separador volta à lista inteira.',
         '<b>Exportar segue o que está no ecrã:</b> o <b>⬇ Exportar o que vejo</b> respeita os filtros — o botão antigo parecia fazê-lo mas exportava sempre tudo. No <b>🩹 Cobrir</b> há uma forma nova de escolher de onde tirar: <b>primeiro de quem precisa do dinheiro mais tarde</b>.',
-        '<b>As notas das transações passaram a ver-se no telemóvel</b>, numa faixa na base da linha que atravessa por baixo do beneficiário e da categoria — a coluna não cabia e ficavam escondidas. Todas as linhas têm a mesma altura, com ou sem nota.',
+        '<b>As notas das transações passaram a ver-se no telemóvel</b>, por baixo do beneficiário — a coluna não cabia e ficavam escondidas. Todas as linhas têm a mesma altura, com ou sem nota.',
         '<b>Telemóvel:</b> cabeçalho refeito com botões do tamanho de um dedo (44px, mais 47% de área), sem o título do ecrã nem o botão da cor — que passou para <b>Dados e cópias → Definições</b>. As barras de filtros cabem numa linha, e a letra deixou de variar de orçamento para orçamento no iPhone.',
         '<b>Mais rápida a cada toque</b> (só grava quando algo muda), notas compridas deixaram de esmagar as colunas, e o balão do orçamento já não dá os parabéns quando há categorias excedidas.'
       ])+
