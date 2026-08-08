@@ -27,7 +27,7 @@
     --text: #0f172a;
     --text-muted: #64748b;
     --border: #e2e8f0;
-    --primary: #0d9488;
+    --primary: #0c857a;          /* branco por cima: 4,5 (mínimo recomendado) */
     --primary-dark: #0f766e;
     --primary-soft: #ccfbf1;
     --accent2: #22d3ee;
@@ -80,10 +80,10 @@
      variáveis da cor de marca; os verdes e vermelhos dos valores nunca mudam, porque são eles
      que dizem se há ou não dinheiro e não podem depender do gosto de cada um.
      O tema sem classe (verde-mar) é o de origem e vive no :root, lá em cima. */
-  body.tema-rosa    { --primary: #b5657f; --primary-dark: #9c5069; --primary-soft: #f6dfe8; --accent2: #e7a0b8; }
-  body.tema-azul    { --primary: #5b7c99; --primary-dark: #48647c; --primary-soft: #dde8f1; --accent2: #9dbdd4; }
+  body.tema-rosa    { --primary: #aa5f77; --primary-dark: #9c5069; --primary-soft: #f6dfe8; --accent2: #e7a0b8; }
+  body.tema-azul    { --primary: #597a96; --primary-dark: #48647c; --primary-soft: #dde8f1; --accent2: #9dbdd4; }
   body.tema-malva   { --primary: #7d6b96; --primary-dark: #64557a; --primary-soft: #e7e2f0; --accent2: #b3a6c9; }
-  body.tema-ocre    { --primary: #97762a; --primary-dark: #7a5f21; --primary-soft: #f5ead0; --accent2: #d4b45e; }
+  body.tema-ocre    { --primary: #927229; --primary-dark: #7a5f21; --primary-soft: #f5ead0; --accent2: #d4b45e; }
   body.tema-telha   { --primary: #a15c40; --primary-dark: #834a33; --primary-soft: #f6e2d9; --accent2: #d29a7e; }
   @media (prefers-color-scheme: dark) {
     body.tema-rosa  { --primary: #d18aa0; --primary-dark: #b5657f; --primary-soft: #3a2632; --accent2: #8a4a62; }
@@ -140,7 +140,7 @@
   .nav button .ic { font-size: 16px; width: 20px; text-align: center; }
   .nav button:hover { background: rgba(255,255,255,.06); color: var(--sidebar-text-strong); }
   .nav button.active { background: var(--primary); color: #fff; }
-  .side-section { padding: 14px 20px 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .8px; color: #64748b; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+  .side-section { padding: 14px 20px 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .8px; color: #94a3b8; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
   .side-accounts { padding: 2px 12px; display: flex; flex-direction: column; gap: 1px; }
   .side-acc { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 7px; background: transparent; border: 0; color: var(--sidebar-text); width: 100%; text-align: start; }
   .side-acc:hover { background: rgba(255,255,255,.06); color: var(--sidebar-text-strong); }
@@ -740,10 +740,17 @@
        que a Apple recomenda, sem mexer no tamanho visível do botão. */
     .prio-btn, .cleared-dot, .cat-actions button, .row-actions button, .grp-add,
     .modal-head button.x, .theme-toggle, .month-nav button.arrow { position: relative; }
-    .prio-btn::after, .cleared-dot::after, .cat-actions button::after, .row-actions button::after,
-    .grp-add::after, .modal-head button.x::after, .theme-toggle::after, .month-nav button.arrow::after {
+    /* Os que estão SOZINHOS podem crescer até aos 44px sem invadir nada. */
+    .prio-btn::after, .cleared-dot::after, .grp-add::after,
+    .modal-head button.x::after, .theme-toggle::after, .month-nav button.arrow::after {
       content: ""; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px;
       transform: translate(-50%, -50%); }
+    /* Os que estão EM FILA (duplicar/eliminar, e as ações de cada categoria) não: uma zona de
+       44px em botões colados sobrepõe-se à do vizinho, e tocar entre dois acionaria o errado
+       — eliminar em vez de duplicar, por exemplo. Aqui o alvo cresce em altura (onde não há
+       vizinhos) e o espaço entre eles aumenta, que é o que evita mesmo os enganos. */
+    .cat-actions, .row-actions { gap: 10px; }
+    .cat-actions button, .row-actions button { min-height: 40px; padding-inline: 8px; }
     .btn.sm, .today-btn { min-height: 38px; }
     /* No cabeçalho vão um pouco além dos 38px do resto: são os mais usados, e são os
        únicos que se acertam com o polegar enquanto se segura o telemóvel numa mão. */
@@ -810,7 +817,7 @@
              lateral, por isso aqui é só de telemóvel. -->
         <button class="btn sm so-fone-btn" data-action="help" aria-label="Como funciona">❓</button>
       </div>
-      <button class="theme-toggle" data-action="toggle-theme" title="Alternar cor: verde / rosa" aria-label="Alternar cor da aplicação"></button>
+      <button class="theme-toggle" data-action="toggle-theme" title="Mudar a cor da aplicação" aria-label="Mudar a cor da aplicação"></button>
     </div>
 
     <div id="rtaWrap"></div>
@@ -950,11 +957,11 @@
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
-    { id:"verde",  nome:"Verde-mar",  amostra:"#0d9488" },
-    { id:"rosa",   nome:"Rosa velho", amostra:"#b5657f" },
-    { id:"azul",   nome:"Azul velho", amostra:"#5b7c99" },
+    { id:"verde",  nome:"Verde-mar",  amostra:"#0c857a" },
+    { id:"rosa",   nome:"Rosa velho", amostra:"#aa5f77" },
+    { id:"azul",   nome:"Azul velho", amostra:"#597a96" },
     { id:"malva",  nome:"Malva",      amostra:"#7d6b96" },
-    { id:"ocre",   nome:"Ocre",       amostra:"#97762a" },
+    { id:"ocre",   nome:"Ocre",       amostra:"#927229" },
     { id:"telha",  nome:"Telha",      amostra:"#a15c40" }
   ];
   function temaAtual(){
@@ -1006,7 +1013,10 @@
     // uma vez por save (barato), mas só se escreve quando o conteúdo MUDOU de facto.
     var json;
     try { json = JSON.stringify(state); } catch(e0){ json = null; }
-    if (json !== null && json === _ultimoJSON) { scheduleAutoSync(); return true; }
+    // Sem serialização não se grava nada: escrever "null" apagaria o orçamento na leitura
+    // seguinte, e em silêncio — porque não houve exceção nenhuma para avisar.
+    if (json === null) { if(!_semEspaco){ _semEspaco=true; toast("Não foi possível guardar — os dados não puderam ser preparados."); } return false; }
+    if (json === _ultimoJSON) { scheduleAutoSync(); return true; }
     try { localStorage.setItem(budKey(_bindex.active), json); _ultimoJSON = json; _sigCache = null; }
     catch (e) { guardou = false; }
     if (guardou) _semEspaco = false;
@@ -1920,7 +1930,7 @@
     _bindex.list = _bindex.list.filter(function(b){ return b.id!==id; });
     if (_bindex.active===id) {
       _bindex.active = _bindex.list[0].id; saveIndex(_bindex);
-      state = loadBudgetRaw(_bindex.active); _idx=null; _payees=null; limparHistorico(); hideUndo();
+      state = loadBudgetRaw(_bindex.active); _ultimoJSON=null; _sigCache=null; _idx=null; _payees=null; limparHistorico(); hideUndo();
     } else saveIndex(_bindex);
     if (salvo) pontoDeSeguranca("antes de eliminar «"+nome+"»", salvo);
     scheduleAutoSync(); render(); budgetsModal();
@@ -2285,8 +2295,10 @@
     // O número (0,00) está certo e não se mexe: o rendimento ESTÁ todo atribuído. O que falha
     // é ter gasto em certas categorias mais do que lhes deu, e isso resolve-se movendo dinheiro
     // ENTRE categorias, não atribuindo mais.
-    var excedidas = 0;
-    for (var oc=0; oc<state.categories.length; oc++) if (catStatus(state.categories[oc], state.ui.month) === "neg") excedidas++;
+    // Só as categorias VISÍVEIS: o «Ver quais» liga um filtro que corre sobre essas, por isso
+    // contar as arquivadas dava um número que a lista a seguir não conseguia mostrar.
+    var visiveisCats = orderedCategories(), excedidas = 0;
+    for (var oc=0; oc<visiveisCats.length; oc++) if (catStatus(visiveisCats[oc], state.ui.month) === "neg") excedidas++;
     var cls = rta > 0.005 ? "" : (rta < -0.005 ? "over" : "zero");
     var msg = rta > 0.005 ? "Pronto a atribuir"
             : (rta < -0.005 ? "Atribuiu mais do que tinha"
@@ -2447,7 +2459,7 @@
         '<span class="caret" style="transform:rotate('+(collapsed?"-90":"0")+'deg)">▾</span>' + esc(grp.name) + '</button>' +
         (grp.system ? '' :
           '<button class="grp-add" data-action="add-category" data-id="'+grp.id+'">+ categoria</button>' +
-          '<button class="grp-add" data-action="edit-group" data-id="'+grp.id+'">✎</button>') + '</div></td>' +
+          '<button class="grp-add" data-action="edit-group" data-id="'+grp.id+'" title="Editar grupo" aria-label="Editar o grupo '+esc(grp.name)+'">✎</button>') + '</div></td>' +
         '<td class="grp-total">'+fmt(gAssigned)+'</td>' +
         '<td class="grp-total">'+fmt(gActivity)+'</td>' +
         '<td class="grp-total">'+fmt(gAvail)+'</td></tr>';
@@ -2502,15 +2514,15 @@
         rows += '<tr class="cat-row" data-id="'+cat.id+'" draggable="true" data-drag="cat" data-drag-id="'+cat.id+'"><td>' +
           '<div class="cat-name-cell">' + prioBtn + '<span class="cat-name">'+esc(cat.name)+'</span>' +
           '<span class="cat-actions">' +
-            '<button data-action="move-money" data-id="'+cat.id+'" title="Mover dinheiro">↔</button>' +
-            '<button data-action="edit-category" data-id="'+cat.id+'" title="Editar / alvo">✎</button>' +
+            '<button data-action="move-money" data-id="'+cat.id+'" title="Mover dinheiro" aria-label="Mover dinheiro de ou para '+esc(cat.name)+'">↔</button>' +
+            '<button data-action="edit-category" data-id="'+cat.id+'" title="Editar / alvo" aria-label="Editar a categoria '+esc(cat.name)+'">✎</button>' +
             // Ordem deliberada: primeiro o que TAPA O BURACO (🩹, traz a zero), só depois o que
             // LEVA AO ALVO (🎯). É a sequência lógica de quem estourou numa categoria — e os dois
             // aparecem juntos sempre que a categoria ficou negativa e ainda está abaixo do alvo.
-            (avail < -0.005 ? '<button data-action="cover-overspend" data-id="'+cat.id+'" title="Cobrir o excesso — trazer a zero, tirando de outras categorias">🩹</button>' : '') +
-            (ti && ti.need>0 ? '<button data-action="fund-one" data-id="'+cat.id+'" title="Financiar o alvo — juntar o que falta, do Pronto a atribuir">🎯</button>' : '') +
-            (ti && ti.snoozed ? '<button data-action="unsnooze-cat" data-id="'+cat.id+'" title="Reativar o alvo este mês">☀️</button>'
-              : (ti && ti.need>0 ? '<button data-action="snooze-cat" data-id="'+cat.id+'" title="Adiar o alvo este mês — não pedir agora">😴</button>' : '')) +
+            (avail < -0.005 ? '<button data-action="cover-overspend" data-id="'+cat.id+'" title="Cobrir o excesso — trazer a zero, tirando de outras categorias" aria-label="Cobrir o excesso de '+esc(cat.name)+'">🩹</button>' : '') +
+            (ti && ti.need>0 ? '<button data-action="fund-one" data-id="'+cat.id+'" title="Financiar o alvo — juntar o que falta, do Pronto a atribuir" aria-label="Financiar o alvo de '+esc(cat.name)+'">🎯</button>' : '') +
+            (ti && ti.snoozed ? '<button data-action="unsnooze-cat" data-id="'+cat.id+'" title="Reativar o alvo este mês" aria-label="Reativar o alvo de '+esc(cat.name)+' este mês">☀️</button>'
+              : (ti && ti.need>0 ? '<button data-action="snooze-cat" data-id="'+cat.id+'" title="Adiar o alvo este mês — não pedir agora" aria-label="Adiar o alvo de '+esc(cat.name)+' este mês">😴</button>' : '')) +
           '</span></div>' + (cat.note?'<div class="tag" style="margin-top:3px;">📝 '+esc(cat.note)+'</div>':'') + targetHtml +
           (upc[cat.id] ? '<div class="target-note">📅 Ainda por sair este mês: '+fmt(upc[cat.id])+
             (avail < upc[cat.id]-0.005 ? ' <b style="color:var(--warning)">— faltam '+fmt(round2(upc[cat.id]-avail))+'</b>' : '')+'</div>' : '') + '</td>' +
@@ -2653,10 +2665,11 @@
       '<td class="num">'+(t.outflow ? '<span class="tx-amt out">−'+fmt(t.outflow)+'</span>'
                         : (t.inflow ? '<span class="tx-amt in">+'+fmt(t.inflow)+'</span>' : ''))+'</td>'+
       balCell +
-      '<td style="text-align:center;"><span class="cleared-dot '+(t.cleared?"on":"")+'" data-action="toggle-clear" data-id="'+t.id+'">✓</span></td>'+
+      '<td style="text-align:center;"><span class="cleared-dot '+(t.cleared?"on":"")+'" data-action="toggle-clear" data-id="'+t.id+'" role="button" tabindex="0"'+
+        ' title="'+(t.cleared?"Confirmada no banco":"Por confirmar no banco")+'" aria-label="'+(t.cleared?"Confirmada":"Por confirmar")+' — '+esc(t.payee||"sem beneficiário")+'">✓</span></td>'+
       '<td class="row-actions">'+
-        '<button data-action="duplicate-tx" data-id="'+t.id+'" title="Duplicar">⧉</button>'+
-        '<button data-action="delete-tx" data-id="'+t.id+'" title="Eliminar">🗑</button></td></tr>';
+        '<button data-action="duplicate-tx" data-id="'+t.id+'" title="Duplicar" aria-label="Duplicar a transação de '+esc(t.payee||"sem beneficiário")+'">⧉</button>'+
+        '<button data-action="delete-tx" data-id="'+t.id+'" title="Eliminar" aria-label="Eliminar a transação de '+esc(t.payee||"sem beneficiário")+'">🗑</button></td></tr>';
   }
 
   // ---------- Seleção temporária de transações (apenas visual) ----------
@@ -2756,7 +2769,6 @@
 
     // Chega-se aqui filtrado a partir da atividade de uma categoria — sem isto não há
     // forma óbvia de voltar a ver tudo.
-    var temFiltro = !!(f.account || f.category || f.per || f.from || f.to || f.payee || (f.q||"").trim());
     // A CONTA não é mais um filtro: quando se entra por Contas → uma conta, ela é o sítio onde
     // se está. Por isso o «Limpar filtros» não lhe toca — limpava tudo e atirava a pessoa
     // para fora da conta que estava a ver, o que ninguém pede ao escrever no campo de procura.
@@ -3030,10 +3042,14 @@
       if (t.transfer && !t.categoryId) continue;          // transferência interna não é despesa nem receita
       if (isOpening(t)) continue;                          // saldo inicial não é receita/despesa real
       if (t.categoryId === INCOME) { totalIn += (t.inflow||0); porMes[mm].inc += (t.inflow||0); continue; }
-      if (t.outflow) {
+      // Uma entrada numa categoria de DESPESA é uma devolução ou um reembolso: abate ao que se
+      // gastou nessa categoria, não é rendimento novo. Sem isto, quem devolvesse metade de uma
+      // compra continuava a ver a despesa inteira no relatório.
+      var gasto = round2((t.outflow||0) - (t.inflow||0));
+      if (Math.abs(gasto) > 0.005) {
         var nome = t.categoryId ? ((lkCat(t.categoryId)||{name:"(apagada)"}).name) : "Sem categoria";
-        spend[nome] = (spend[nome]||0) + t.outflow;
-        totalOut += t.outflow; porMes[mm].out += t.outflow;
+        spend[nome] = round2((spend[nome]||0) + gasto);
+        totalOut = round2(totalOut + gasto); porMes[mm].out = round2(porMes[mm].out + gasto);
       }
     }
     var net = round2(totalIn - totalOut);
@@ -4165,7 +4181,7 @@
         '<li><b>Filtros</b> no topo do orçamento, para mostrar só as categorias que interessam. Pelo <b>alvo</b>, do mais folgado ao mais apertado: <b>🔵 com excedente</b> (têm <b>mais</b> do que o alvo pede — as candidatas a «🧹 Libertar excedente»), <b>🟢 alvo cumprido</b>, <b>🟡 abaixo do alvo</b> e <b>🔴 excedido</b>. Há ainda <b>💰 com saldo</b> (têm dinheiro disponível) e a <b>prioridade</b> (▲ ● ▼).</li>'+
         '<li>Dentro do mesmo grupo os filtros somam-se («<b>ou</b>»: 🟡 <i>ou</i> 🔴); entre grupos cruzam-se («<b>e</b>»: 🟡 abaixo do alvo <b>e</b> ▲ alta). O 🔵 é um refinamento do 🟢 — uma categoria cumprida pode ter excedente por cima. O botão <b>Limpar</b> tira todos de uma vez (no telemóvel não aparece, para a barra caber numa linha: desligue cada filtro tocando-lhe outra vez).</li>'+
         '<li><b>Reordenar</b> categorias, grupos e <b>contas</b>: arraste no computador; no telemóvel use <b>▲▼</b> dentro do ✎. As contas reordenam-se dentro do mesmo tipo (orçamento com orçamento, cartões entre si) e a ordem vale na barra lateral e no ecrã Contas.</li>'+
-        '<li><b>🗄 Arquivar</b> esconde uma conta ou categoria sem perder o histórico.</li>'+
+        '<li><b>🗄 Arquivar</b> esconde uma conta ou categoria sem perder o histórico. Se a categoria ainda tiver dinheiro, a aplicação pergunta se o quer devolver ao <b>Pronto a atribuir</b> — assim não fica preso numa categoria que deixou de ver.</li>'+
       '</ul>'+
 
       sec("Contas e transações")+
@@ -4240,7 +4256,8 @@
         '<b>Uma coluna «Valor» em vez de «Saída» e «Entrada»</b> nas listas: cada transação ou sai ou entra, por isso metade do espaço estava sempre vazio. Agora as saídas aparecem a vermelho com <b>−</b> e as entradas a verde com <b>+</b> — e a largura que sobrou foi para a coluna das <b>notas</b>. Ao registar continua a haver dois campos, que é o que evita enganos ao escrever.',
         '<b>Seis cores à escolha</b> para a aplicação, em tons apagados — verde-mar, rosa velho, azul velho, malva, ocre e telha — em <b>Dados e cópias → Definições</b>, ao lado da moeda. A escolha acompanha o orçamento e vai na sincronização.',
         '<b>Telemóvel:</b> cabeçalho refeito com botões do tamanho de um dedo (44px, mais 47% de área), sem o título do ecrã nem o botão da cor — que passou para <b>Dados e cópias → Definições</b>. As barras de filtros cabem numa linha, e a letra deixou de variar de orçamento para orçamento no iPhone.',
-        '<b>Mais rápida a cada toque</b> (só grava quando algo muda), notas compridas deixaram de esmagar as colunas, e o balão do orçamento já não dá os parabéns quando há categorias excedidas.'
+        '<b>Mais rápida a cada toque</b> (só grava quando algo muda), notas compridas deixaram de esmagar as colunas, e o balão do orçamento já não dá os parabéns quando há categorias excedidas.',
+        '<b>Revisão de ponta a ponta.</b> <b>Arquivar uma categoria com dinheiro</b> avisa e oferece devolvê-lo ao «Pronto a atribuir», em vez de o deixar preso. A <b>cópia de segurança</b> só se dá por feita depois de confirmar que o ficheiro foi mesmo guardado — se cancelar a gravação, a app já não diz que correu bem. Os <b>relatórios</b> passaram a abater os reembolsos à despesa da categoria. O aviso de <b>categorias excedidas</b> deixou de contar as arquivadas, que o «Ver quais» não mostrava. As <b>setas de reordenar</b> no topo e no fundo da lista deixaram de gastar um passo do Anular sem mexer em nada. E as cores foram todas escurecidas o suficiente para o texto branco se ler bem por cima.'
       ])+
 
       ver("1.33 – 1.51", "agosto 2026", [
@@ -4878,6 +4895,14 @@
     if(!n) return;
     toast(n+" regra"+(n===1?"":"s")+" recorrente"+(n===1?"":"s")+" usava"+(n===1?"":"m")+" esta categoria — ficou"+(n===1?"":"ram")+" em pausa até lhe dar outra.");
   }
+  // Reordenar uma conta. Se ela já está no topo (ou no fundo), não há nada a fazer — e o
+  // histórico tem de ficar exatamente como estava, sem gastar um passo de anular.
+  function mexerConta(id, dir){
+    var redoAntes = _redo.slice(), pendAntes = (state.backup && state.backup.pend) || 0;
+    pushUndo("Conta reordenada.");
+    if (moveAccount(id, dir)) { save(); render(); accountModal(accountById(id)); }
+    else desfazerPushUndo(redoAntes, pendAntes);
+  }
   var actions = {
     "prev-month": function(){ state.ui.month = shiftMonth(state.ui.month,-1); render(); },
     "next-month": function(){ state.ui.month = shiftMonth(state.ui.month, 1); render(); },
@@ -5023,7 +5048,27 @@
     "back-accounts": function(){ state.ui.view="accounts"; state.ui.txFilter=null; render(); aoTopo(); },
     "archive-account": function(id){ var a=accountById(id); if(a){ pushUndo("Conta arquivada."); a.hidden=true; if(state.ui.txFilter && state.ui.txFilter.account===id) state.ui.txFilter=null; closeModal(); save(); render(); toast("Conta arquivada — reponha em Dados e cópias → Arquivados."); } },
     "restore-account": function(id){ var a=accountById(id); if(a){ pushUndo("Conta reposta."); a.hidden=false; save(); render(); archivedModal(); } },
-    "archive-category": function(id){ var c=categoryById(id); if(c){ pushUndo("Categoria arquivada."); c.hidden=true; closeModal(); save(); render(); toast("Categoria arquivada — reponha em Dados e cópias → Arquivados."); } },
+    "archive-category": function(id){
+      var c=categoryById(id); if(!c) return;
+      // Arquivar esconde a categoria, mas o dinheiro que lá está continua a contar — e deixa de
+      // ser alcançável, porque as ferramentas de reequilibrar só olham para as visíveis. Em vez
+      // de o deixar preso em silêncio, avisa-se e oferece-se devolvê-lo.
+      var sobra = round2(availableFor(id, state.ui.month));
+      if (sobra > 0.005) {
+        if (!confirm("«"+c.name+"» tem "+fmt(sobra)+" disponível.\n\n"+
+                     "Se arquivar assim, esse dinheiro continua a contar mas deixa de estar à vista nem de poder ser movido.\n\n"+
+                     "Devolver "+fmt(sobra)+" ao «Pronto a atribuir» e arquivar?")) return;
+        var ch = id+"|"+state.ui.month;
+        pushUndo("Categoria arquivada.");
+        state.assignments[ch] = round2((state.assignments[ch]||0) - sobra);
+        if (Math.abs(state.assignments[ch]) < 0.005) delete state.assignments[ch];
+        logMove("🗄 Arquivou «"+c.name+"» — devolveu o que sobrava", -sobra);
+      } else {
+        pushUndo("Categoria arquivada.");
+      }
+      c.hidden=true; closeModal(); save(); render();
+      toast("Categoria arquivada — reponha em Dados e cópias → Arquivados.");
+    },
     "restore-category": function(id){ var c=categoryById(id); if(c){ pushUndo("Categoria reposta."); c.hidden=false; save(); render(); archivedModal(); } },
     "archived-menu": function(){ archivedModal(); },
 
@@ -5431,8 +5476,8 @@
       c.priority=PRIO_CICLO[(i+1)%PRIO_CICLO.length];
       save(); render(); toast("Prioridade "+PRIO_LABEL[c.priority].toLowerCase()+" — "+c.name);
     },
-    "move-acc-up": function(id){ pushUndo("Conta reordenada."); if(moveAccount(id,-1)){ save(); render(); accountModal(accountById(id)); } else _undo.pop(); },
-    "move-acc-down": function(id){ pushUndo("Conta reordenada."); if(moveAccount(id, 1)){ save(); render(); accountModal(accountById(id)); } else _undo.pop(); },
+    "move-acc-up": function(id){ mexerConta(id, -1); },
+    "move-acc-down": function(id){ mexerConta(id, 1); },
     // Reordenar também se anula: com listas grandes, um clique a mais na seta é fácil e
     // reencontrar a posição original à mão é chato.
     "move-cat-up": function(id){ pushUndo("Categoria reordenada."); moveCategory(id,-1); save(); render(); },
@@ -5507,6 +5552,7 @@
       transferModal({ payCard:true, to:id, from: card.payFrom||"", amount: debt<-0.005?round2(-debt):"" });
     },
     "do-transfer": function(){
+      var redoAntes=_redo.slice(), pendAntes=(state.backup&&state.backup.pend)||0;
       var from=el("tfFrom").value, to=el("tfTo").value, amt=num("tfAmt"), date=dateVal("tfDate")||todayISO(), cl=el("tfClear").checked;
       if(from===to){ toast("Escolha contas diferentes."); return; }
       if(amt<=0){ toast("Indique um valor."); return; }
@@ -5515,7 +5561,7 @@
       if(cruza && !cat){ toast("Escolha a categoria — este movimento entra ou sai do orçamento."); return; }
       pushUndo("Transferência registada.");
       if(createTransfer(from,to,amt,date,cl,cat,valLim("tfMemo", LIM_NOTA))){ closeModal(); save(); render(); toast("Transferência registada."); }
-      else { _undo.pop(); toast("Não foi possível transferir."); }
+      else { desfazerPushUndo(redoAntes, pendAntes); toast("Não foi possível transferir."); }
     },
     "save-transfer": function(pair){
       var from=el("tfFrom").value, to=el("tfTo").value, amt=num("tfAmt"), date=dateVal("tfDate")||todayISO(), cl=el("tfClear").checked;
@@ -5550,6 +5596,8 @@
     "export-view-csv": exportViewCSV,
     "export-budget-csv": exportBudgetCSV,
     "export-config-csv": exportBudgetConfigCSV,
+    "copia-ok": function(){ closeModal(); concluirCopia(false); },
+    "copia-falhou": function(){ closeModal(); toast("A cópia não foi marcada como feita — tente outra vez."); },
     "backup-now": function(){ exportJSON(); },
     "backup-later": function(){ _backupBarDismissed=true; hideBackupBar(); },
     "toggle-autobackup": function(){ state.settings.autoBackup = !(state.settings.autoBackup!==false); if(state.settings.autoBackup!==false){ try{ takeDailySnapshot(); }catch(e){} } save(); dataModal(); },
@@ -5843,7 +5891,18 @@
       var s = arr[i];
       if (s.data != null && !s.ref){
         s.ref = "s-" + _bindex.active + "-" + Date.now() + "-" + Math.random().toString(36).slice(2,8);
-        idbGuardar(s.ref, s.data);
+        // A escrita no armazém grande é assíncrona. Se falhar (navegação privada, sem espaço),
+        // a lista ficaria a apontar para um conteúdo que nunca foi escrito — um ponto de
+        // restauro que parece existir e não abre. Nesse caso apaga-se a entrada da lista e
+        // avisa-se: é preferível saber que não há rede do que julgar que há.
+        (function(entrada){
+          idbGuardar(entrada.ref, entrada.data, function(ok){
+            if (ok) return;
+            var lista = loadSnaps().filter(function(x){ return x.ref !== entrada.ref; });
+            try { localStorage.setItem(snapKey(), JSON.stringify(lista)); } catch(e){}
+            toast("Não foi possível guardar o ponto de restauro neste navegador.");
+          });
+        })(s);
         // A cópia sai da lista: é ela que pesa. Fica em memória durante esta sessão para o
         // caso de se repor logo a seguir, mas não é gravada no sítio simples.
         try { Object.defineProperty(s, "data", { value:s.data, enumerable:false, writable:true, configurable:true }); } catch(e){}
@@ -6310,14 +6369,33 @@
     var nome = "orcamentos-" + todayISO() + ".json";
     save();   // garante que o ativo está gravado antes de empacotar
     guardarFicheiro(nome, JSON.stringify(syncContainer(), null, 2), "application/json", function(via){
-      markBackupDone();
-      save(); hideBackupBar(); renderSidebar();
-      // Se o ecrã «Dados e cópias» estiver aberto (é de lá que se carrega no botão), redesenhá-lo:
-      // senão continuava a mostrar «há alterações por guardar» e o contador antigo até se fechar e
-      // reabrir a janela. O "curSel" (Moeda) só existe nesse ecrã, por isso serve de deteção.
-      if (el("curSel")) dataModal();
-      if(!silent) toast(via==="partilha" ? "Cópia de segurança guardada." : "Cópia de segurança exportada.");
+      // Pela partilha do sistema (iPhone) só se chega aqui depois de o sistema confirmar.
+      // Por transferência normal o navegador NÃO diz se o ficheiro chegou ao disco — e dar
+      // como feita uma cópia que pode não existir é pior do que não a dar: apaga o aviso de
+      // «alterações por guardar» e deixa a pessoa descansada sem razão. Por isso pergunta-se.
+      if (via === "download" && !silent) { confirmarCopia(nome); return; }
+      concluirCopia(silent);
     });
+  }
+  // Marca a cópia como feita — só quando há a certeza de que o ficheiro existe.
+  function concluirCopia(silent){
+    markBackupDone();
+    save(); hideBackupBar(); renderSidebar();
+    // Se o ecrã «Dados e cópias» estiver aberto (é de lá que se carrega no botão), redesenhá-lo:
+    // senão continuava a mostrar «há alterações por guardar» e o contador antigo até se fechar e
+    // reabrir a janela. O "curSel" (Moeda) só existe nesse ecrã, por isso serve de deteção.
+    if (el("curSel")) dataModal();
+    if(!silent) toast("Cópia de segurança guardada.");
+  }
+  function confirmarCopia(nome){
+    openModal(
+      '<div class="modal-head"><h2>💾 Cópia de segurança</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-body">'+
+        '<p style="margin-top:0;">Foi pedida a transferência de <b>'+esc(nome)+'</b>.</p>'+
+        '<p class="muted" style="margin-bottom:0;">O navegador não nos diz se o ficheiro chegou mesmo ao seu aparelho, e só faz sentido marcar a cópia como feita se ela existir de facto. Confirme, por favor.</p>'+
+      '</div>'+
+      '<div class="modal-foot"><button class="btn" data-action="copia-falhou">Não encontrei o ficheiro</button>'+
+        '<button class="btn primary" data-action="copia-ok">Sim, está guardado</button></div>');
   }
   // Uma transação por linha, sempre com as mesmas colunas e pela mesma ordem — quer se exporte
   // tudo, quer se exporte só o que está à vista. Assim os dois ficheiros abrem iguais na folha
@@ -6707,7 +6785,10 @@
       {id:uid(), nextDate: nextM+"-15", dia:15, freq:"monthly", accountId:accCO.id, toAccountId:accPoup.id, payee:"", categoryId:null, memo:"poupança automática", outflow:150, inflow:0, active:true}
     ];
 
-    state = s; save(); render(); toast("Dados de exemplo carregados.");
+    // Substitui o orçamento inteiro: o histórico de anular e as caches do anterior deixam de
+    // fazer sentido — um «anular» a seguir aos exemplos voltaria a um estado que já não existe.
+    state = s; limparHistorico(); hideUndo(); _ultimoJSON=null; _sigCache=null; _idx=null; _payees=null;
+    save(); render(); toast("Dados de exemplo carregados.");
   }
 
   // ---------- Avisos ----------
@@ -6715,6 +6796,15 @@
   function toast(msg){ var t=el("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.classList.remove("show");},2200); }
   // Guarda uma fotografia do estado ANTES de uma alteração. Chamado por eliminações E edições
   // (categoria, transação, grupo, recorrente), por isso o Anular cobre tudo isso, não só apagar.
+  // Desfaz um pushUndo que afinal não era preciso (a operação não chegou a mexer em nada).
+  // Tem de reverter TUDO o que o pushUndo faz — e ele faz três coisas, não uma. Tirar só a
+  // entrada da pilha deixava o Refazer apagado e o contador de alterações por guardar inflado,
+  // sem nada ter mudado: bastava tocar na seta ▲ da primeira conta da lista.
+  function desfazerPushUndo(redoAntes, pendAntes){
+    _undo.pop();
+    _redo = redoAntes;
+    if (state.backup) state.backup.pend = pendAntes;
+  }
   function pushUndo(desc){
     // Uma ação NOVA fecha o "futuro": o que se tinha anulado deixa de poder ser refeito, porque
     // a partir daqui a história seguiu outro caminho. Isto vivia no save() — mas o save() corre
