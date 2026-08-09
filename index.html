@@ -112,6 +112,8 @@
   body.tema-ameixa    { --primary: #86198f; --primary-dark: #701a75; --primary-soft: #f5e1f7; --accent2: #d946ef; }
   body.tema-framboesa { --primary: #be185d; --primary-dark: #9d174d; --primary-soft: #fce0ec; --accent2: #f472b6; }
   body.tema-grafite   { --primary: #334155; --primary-dark: #1e293b; --primary-soft: #e6e9ee; --accent2: #94a3b8; }
+  body.tema-cobalto   { --primary: #1e3a8a; --primary-dark: #172554; --primary-soft: #dde3f5; --accent2: #6b8ad6; }
+  body.tema-cafe      { --primary: #4a3728; --primary-dark: #33261b; --primary-soft: #ece5df; --accent2: #a08972; }
   @media (prefers-color-scheme: dark) {
     body:not([class*="tema-"]) { --primary: #3cb4d1; --primary-dark: #2793ad; --primary-soft: #10262d; --accent2: #1d6f83; }
     body.tema-azul      { --primary: #6fa1f7; --primary-dark: #4f83e0; --primary-soft: #141d2e; --accent2: #3f6bbf; }
@@ -119,6 +121,8 @@
     body.tema-ameixa    { --primary: #d07ad6; --primary-dark: #b45cbb; --primary-soft: #2a1730; --accent2: #8b3d92; }
     body.tema-framboesa { --primary: #ef7ba5; --primary-dark: #d95c8a; --primary-soft: #2d1520; --accent2: #a63f68; }
     body.tema-grafite   { --primary: #a3b2c7; --primary-dark: #8696ad; --primary-soft: #1b1f26; --accent2: #5b6b80; }
+    body.tema-cobalto   { --primary: #8fa5e0; --primary-dark: #6b85cc; --primary-soft: #151a2e; --accent2: #3f56a3; }
+    body.tema-cafe      { --primary: #c4a68c; --primary-dark: #a8886d; --primary-soft: #241d17; --accent2: #7a5f47; }
   }
   .theme-toggle { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border); background: linear-gradient(135deg, var(--primary), var(--accent2)); padding: 0; flex: 0 0 auto; cursor: pointer; transition: transform .12s; }
   .theme-toggle:hover { transform: scale(1.1); }
@@ -579,15 +583,19 @@
   .tx-sel-bar .txsel-clear:hover { border-color: var(--primary); color: var(--primary); }
   .field .hint { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; font-weight: 500; text-transform: none; letter-spacing: 0; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  /* Nas Definições as duas colunas não valem o mesmo: a das cores precisa exatamente da
-     largura da grelha e nem mais um pixel, e o vazio que sobrava até à Moeda parecia um
-     desalinhamento. Dá-se à esquerda o que ela mede, e o resto todo à direita. */
-  .grid-def { grid-template-columns: max-content 1fr; }
+  /* Nas Definições as cores levam a linha toda: oito bolas não cabem ao lado da moeda sem a
+     espremer, e espalhadas por toda a largura acabam com o vazio que ficava à direita. */
+  .grid-def { grid-template-columns: 1fr; }
   /* Bolinhas das cores. A escolhida leva um anel por fora — uma marca por dentro tapava
      precisamente a cor que se está a mostrar. */
-  /* Grelha FIXA de seis numa linha, e não uma fila que se parte quando não cabe. As seis bolas
-     pedem 230px; é o «grid-def» que garante essa largura à coluna, dando o resto à moeda. */
-  .cores { display: grid; grid-template-columns: repeat(6, 30px); gap: 10px; justify-content: start; padding: 2px 0; }
+  /* Uma fila só, sempre — nunca uma lista que se parte quando não cabe. Oito bolas de 28 com
+     8 de intervalo pedem 280px: cabem na largura da janela mesmo no iPhone mais estreito, mas
+     já não caberiam ao lado da moeda. Por isso as cores levam a linha toda e a moeda vem por
+     baixo — assim a moeda também deixa de estar apertada. As bolas espalham-se pela linha em
+     vez de se amontoarem à esquerda, que era o vazio que se notava. */
+  .cores { display: grid; grid-template-columns: repeat(8, 28px); gap: 8px;
+           justify-content: space-between; padding: 2px 0; }
+  .cor-bola { width: 28px; height: 28px; }
   .cor-bola { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--surface);
     box-shadow: 0 0 0 1px var(--border); cursor: pointer; padding: 0; transition: transform .12s; }
   .cor-bola:hover { transform: scale(1.12); }
@@ -714,9 +722,6 @@
       text-align: start; line-height: 1.35; height: auto;
     }
     .grid-2 > *, .toolbar > *, .split-line > * { min-width: 0; }
-    /* Nas Definições, a fila de seis cores pede 230px: lado a lado com a moeda não sobrava
-       largura utilizável para o seletor. Aqui empilham-se, cada uma com a largura toda. */
-    .grid-def { grid-template-columns: 1fr; }
 
     /* Lista de transações: a nota vai quase sempre vazia e roubava largura, e o texto
        a partir em duas linhas deixava as alturas das linhas todas diferentes. */
@@ -999,7 +1004,9 @@
     { id:"violeta",   nome:"Violeta",   amostra:"#7c3aed" },
     { id:"ameixa",    nome:"Ameixa",    amostra:"#86198f" },
     { id:"framboesa", nome:"Framboesa", amostra:"#be185d" },
-    { id:"grafite",   nome:"Grafite",   amostra:"#334155" }
+    { id:"grafite",   nome:"Grafite",   amostra:"#334155" },
+    { id:"cobalto",   nome:"Cobalto",   amostra:"#1e3a8a" },
+    { id:"cafe",      nome:"Café",      amostra:"#4a3728" }
   ];
   function temaAtual(){
     var t = (state.settings||{}).theme;
@@ -3702,6 +3709,12 @@
         acao('<button class="btn" data-action="import-csv" style="width:100%;justify-content:center;">📥 Importar transações do banco (.csv)</button>'+
           '<div class="hint">Acrescenta transações às existentes, no orçamento aberto.</div>')+
 
+        // A importação da configuração fica ao lado da das transações, e não junto às exportações:
+        // são as duas coisas que ENTRAM, e é por aí que se procura. Ficam pela ordem em que fazem
+        // sentido montar um orçamento — primeiro a planta, depois o que a preenche.
+        acao('<button class="btn" data-action="import-config" style="width:100%;justify-content:center;">📥 Importar configuração dos alvos (.csv)</button>'+
+          '<div class="hint">Grupos, categorias, alvos e prioridades, a partir de um ficheiro exportado aqui. <b>Não apaga nada</b>: o que já existe fica com o alvo do ficheiro, o que falta é criado.</div>')+
+
         // Sem caixa, como o botão de importar mesmo ao lado. A caixa fica reservada aos três
         // LUGARES onde os dados podem viver — é o que os distingue de uma ação qualquer.
         '<details class="field">'+
@@ -4211,7 +4224,7 @@
         '<li><b>O cabeçalho das listas fica à vista:</b> ao descer uma lista de transações, os nomes das colunas — Data, Beneficiário, Categoria… — ficam colados ao topo, para saber sempre o que está a ler. No telemóvel, como a tabela é mais larga do que o ecrã, é a <b>lista</b> que corre dentro da sua própria área em vez da página inteira.</li>'+
         '<li><b>Contas nos campos de dinheiro:</b> em qualquer campo de valor pode escrever a conta em vez do total — <b>23,45+11,90+7,15</b>. O resultado aparece por baixo enquanto escreve e substitui a conta assim que sai do campo. No <b>telemóvel</b> aparece um <b>teclado próprio</b> com <b>+</b> e <b>−</b>, sem letras nem risco de enganos. Num par <b>Saída/Entrada</b>, um <b>−</b> escrito no princípio do campo continua a passar o valor para o outro lado; depois de números, é uma subtração.</li>'+
         '<li><b>Datas e teclado:</b> as datas escrevem-se sempre em <b>dd/mm/aaaa</b>, mesmo que tenha o browser noutro idioma — pode escrever só os números, que as barras aparecem sozinhas, ou usar o 📅 para as escolher no calendário. Dentro de qualquer janela, o <b>Enter</b> vale por carregar no botão principal.</li>'+
-        '<li><b>Cor da aplicação:</b> seis à escolha, em <b>Dados e cópias → Definições</b> — basta tocar numa bolinha. Vão do petróleo ao rosa pelo lado do roxo, e nenhuma é verde nem laranja de propósito: uma cor de marca nessas zonas confunde-se, a um relance, com as barras que dizem se há dinheiro. No computador, o círculo no canto superior direito percorre-as uma a uma. A cor <b>acompanha o orçamento</b>: fica guardada com ele e vai na sincronização, como as outras definições. Os verdes e vermelhos dos valores nunca mudam — são eles que dizem se há ou não dinheiro.</li>'+
+        '<li><b>Cor da aplicação:</b> oito à escolha, em <b>Dados e cópias → Definições</b> — basta tocar numa bolinha. Vão do petróleo ao rosa pelo lado do roxo, mais um cinzento e um castanho, e nenhuma é verde nem laranja de propósito: uma cor de marca nessas zonas confunde-se, a um relance, com as barras que dizem se há dinheiro. No computador, o círculo no canto superior direito percorre-as uma a uma. A cor <b>acompanha o orçamento</b>: fica guardada com ele e vai na sincronização, como as outras definições. Os verdes e vermelhos dos valores nunca mudam — são eles que dizem se há ou não dinheiro.</li>'+
         '<li><b>Esc</b> dentro de um campo desfaz o que estava a escrever e larga o campo, sem gravar. Dentro de uma janela, é preciso carregar duas vezes: a primeira sai do campo, a segunda fecha a janela. Na <b>caixa de procura</b> das Transações o Esc <b>apaga</b> o texto (e o cursor fica lá) — o mesmo que o <b>✕</b> dentro da caixa.</li>'+
       '</ul>'+
 
@@ -4243,6 +4256,7 @@
         '<li><b>Procurar:</b> o campo no topo das Transações procura <b>apenas</b> no <b>beneficiário</b> e na <b>nota</b> — não procura em categorias, valores nem datas, que têm filtros próprios ao lado. Basta parte da palavra, e maiúsculas ou minúsculas é igual. Cruza-se com os filtros de conta, categoria e período («Confeitaria» + <i>este ano</i> + conta X).</li>'+
         '<li><b>🏷️ Beneficiários:</b> mudar um nome altera todas as transações; dar-lhe um nome que já existe <b>junta</b> os dois. O <b>📊 Ver</b> mostra tudo o que gastou nesse beneficiário — total, número de vezes, média e em que categorias entrou. Como é a lista de transações normal, pode juntar-lhe um <b>período</b> para ver só um ano, e editar as transações a partir dali.</li>'+
         '<li><b>Importar .csv</b> do banco: as linhas que já existem são detetadas e saltadas.</li>'+
+        '<li><b>Importar a configuração dos alvos</b> (em <b>Dados e cópias → Trazer e levar</b>) lê o mesmo ficheiro que sai em <b>Exportar → Configuração dos alvos</b> e reconstrói grupos, categorias, alvos, prioridades e notas — de outro orçamento seu, ou do mesmo noutra altura. <b>Não apaga nada:</b> as categorias que já tem <b>mantêm as transações e o dinheiro</b> e só lhes muda o alvo; as que faltam são criadas; as suas que não venham no ficheiro ficam como estão. Uma categoria é reconhecida pelo <b>grupo mais o nome</b>, por isso «Luz» em «Casa» e «Luz» em «Escritório» são duas coisas diferentes, como sempre foram. Mostra tudo o que vai fazer <b>antes</b> de mexer, e o <b>↩ Anular</b> desfaz a importação inteira num passo.</li>'+
         '<li><b>Exportar para folha de cálculo</b> (no computador): o <b>⬇ Exportar o que vejo</b>, nas Transações, guarda exatamente as linhas que estão à vista — com os filtros e a conta que tiver ligados. Para o orçamento inteiro, sem filtros, é em <b>Dados e cópias</b>. Nenhum deles sai do orçamento aberto, e um <b>.csv não é cópia de segurança</b> — não repõe nada.</li>'+
       '</ul>'+
 
@@ -4293,7 +4307,8 @@
         '<b>Separadores de mês nas transações</b>, como já havia nas recorrentes — e só quando a lista atravessa mais do que um mês.',
         '<b>Os números de resumo passaram a estar todos na mesma linha</b>, mesmo por cima da lista: à esquerda os que falam do dinheiro — <b>Confirmado</b>, <b>Saldo</b> e <b>Por confirmar</b>, que é a diferença entre os dois — e à direita quantas transações estão à vista. Estavam espalhados por três sítios e gastavam duas linhas; agora gastam uma — e deixam de mudar de sítio conforme o comprimento do nome da conta.',
         '<b>Uma coluna «Valor» em vez de «Saída» e «Entrada»</b> nas listas: cada transação ou sai ou entra, por isso metade do espaço estava sempre vazio. Agora as saídas aparecem a vermelho com <b>−</b> e as entradas a verde com <b>+</b> — e a largura que sobrou foi para a coluna das <b>notas</b>. Ao registar continua a haver dois campos, que é o que evita enganos ao escrever.',
-        '<b>Seis cores à escolha</b> para a aplicação — petróleo, azul, violeta, ameixa, framboesa e grafite — em <b>Dados e cópias → Definições</b>, ao lado da moeda, numa fila de bolinhas. Nenhuma é verde nem laranja: essas confundem-se com as barras que dizem se há dinheiro. Quem tinha uma das cores anteriores fica com a mais parecida. A escolha acompanha o orçamento e vai na sincronização.',
+        '<b>A configuração dos alvos passou a poder ser IMPORTADA</b>, e não só exportada: em <b>Dados e cópias → Trazer e levar</b>, lê o mesmo ficheiro que sai na exportação e reconstrói grupos, categorias, alvos, prioridades e notas. Serve para copiar a planta de um orçamento para outro, ou para repor a sua depois de a ter mexido. <b>Nunca apaga nada</b> — o que já existe mantém as transações e o dinheiro e só muda de alvo — mostra tudo o que vai fazer antes de mexer, e desfaz-se com o <b>↩</b>.',
+        '<b>Oito cores à escolha</b> para a aplicação — petróleo, azul, violeta, ameixa, framboesa, grafite, cobalto e café — em <b>Dados e cópias → Definições</b>, numa fila única de bolinhas que ocupa a linha toda. Nenhuma é verde nem laranja: essas confundem-se com as barras que dizem se há dinheiro. Quem tinha uma das cores anteriores fica com a mais parecida. A escolha acompanha o orçamento e vai na sincronização.',
         '<b>Ícone novo, em duas versões:</b> azul de fundo branco para o telemóvel em modo claro, e o desenho em azul sobre fundo escuro para o modo escuro. Como o iPhone guarda o ícone no momento em que a aplicação é <b>adicionada ao ecrã principal</b>, é preciso removê-la e voltar a adicioná-la para o ver mudar.',
         '<b>Telemóvel:</b> cabeçalho refeito com botões do tamanho de um dedo (44px, mais 47% de área), sem o título do ecrã nem o botão da cor — que passou para <b>Dados e cópias → Definições</b>. As barras de filtros cabem numa linha, e a letra deixou de variar de orçamento para orçamento no iPhone.',
         '<b>Mais rápida a cada toque</b> (só grava quando algo muda), notas compridas deixaram de esmagar as colunas, e o balão do orçamento já não dá os parabéns quando há categorias excedidas.',
@@ -5616,6 +5631,8 @@
     },
 
     "import-csv": function(){ _csv=null; importCSVModal(); },
+    "import-config": function(){ _cfg=null; importConfigModal(); },
+    "apply-config": aplicarConfig,
     "csv-toggle-dups": function(){ if(_csv){ _csv.skipDups = (_csv.skipDups===false); importCSVModal(); } },
     "apply-csv": function(){
       if(!_csv || !_csv.rows.length){ toast("Nada para importar."); return; }
@@ -6671,6 +6688,205 @@
       rd.onload=function(ev){ var raw=ev.target.result; _csv=parseCSV(raw, acc); _csv.raw=raw; _csv.accountId=acc; importCSVModal(); };
       rd.readAsText(file);
     });
+  }
+
+  // ---------- Importar a configuração dos alvos ----------
+  // Lê o MESMO ficheiro que a exportação produz e reconstrói grupos, categorias, alvos,
+  // prioridades e notas.
+  //
+  // Regra central: NUNCA apaga nem substitui. Uma categoria é identificada pelo par
+  // «grupo + nome», e o que existe é ATUALIZADO no lugar, mantendo o identificador — porque é
+  // o identificador que liga a categoria às transações já registadas e ao dinheiro que lá está.
+  // Recriar categorias do zero deixaria todo o histórico por classificar e o dinheiro perdido,
+  // que é precisamente o tipo de estrago que não se desfaz.
+  //
+  // O par «grupo + nome» também responde à pergunta dos nomes repetidos: «Luz» em «Casa» e
+  // «Luz» em «Escritório» são duas categorias diferentes, e é assim que a aplicação já as trata.
+  var _cfg = null;   // plano da importação, à espera de confirmação
+  function planearConfig(raw){
+    try {
+      var linhas = String(raw||"").replace(/^\uFEFF/, "").split(/\r?\n/);
+      var d = (linhas[0]||"").indexOf(";")>=0 ? ";" : ",";
+      // Encontra o cabeçalho: o ficheiro traz um título e uma linha em branco antes dele.
+      var iCab = -1;
+      for (var i=0;i<linhas.length && i<20;i++){
+        var c = splitCSVLine(linhas[i], d).map(normKey);
+        if (c.indexOf("grupo")>=0 && c.indexOf("categoria")>=0) { iCab=i; break; }
+      }
+      if (iCab<0) return { erro:"Não encontrei as colunas «Grupo» e «Categoria». Este ficheiro parece ser de outro tipo — o certo é o que sai em «Configuração dos alvos»." };
+      var cab = splitCSVLine(linhas[iCab], d).map(normKey);
+      function col(n){ return cab.indexOf(n); }
+      var iG=col("grupo"), iC=col("categoria"), iP=col("prioridade"),
+          iT=col("tipodealvo"), iM=col("metodo"), iV=col("valordoalvo"), iD=col("detalhe"), iN=col("nota");
+
+      var TIPOS = { mensal:"monthly", semanal:"weekly", trimestral:"quarterly",
+                    semestral:"semiannual", anual:"yearly", ateumadata:"byDate" };
+      var PRIOS = { alta:"alta", normal:"normal", baixa:"baixa" };
+      var WDAYS = ["domingo","segundafeira","tercafeira","quartafeira","quintafeira","sextafeira","sabado"];
+
+      // O que já existe, pela mesma chave que vamos usar a seguir.
+      function chave(g,c){ return normKey(g)+"\u0000"+normKey(c); }
+      var jaTenho = {}, gruposTenho = {};
+      for (var gi=0; gi<state.groups.length; gi++){
+        var grp = state.groups[gi];
+        gruposTenho[normKey(grp.name)] = grp;
+        var cs = categoriesOfGroup(grp.id);
+        for (var ci=0; ci<cs.length; ci++) jaTenho[chave(grp.name, cs[ci].name)] = cs[ci];
+      }
+
+      var plano=[], gruposNovos={}, vistos={}, avisos=[], ignoradas=0;
+      for (var L=iCab+1; L<linhas.length; L++){
+        if (!linhas[L].trim()) continue;
+        var f = splitCSVLine(linhas[L], d);
+        var gN = (f[iG]||"").trim(), cN = (f[iC]||"").trim();
+        if (!gN || !cN) { ignoradas++; continue; }
+        var k = chave(gN,cN);
+        // Duas linhas para a mesma categoria: fica a primeira. Aplicar as duas daria um
+        // resultado dependente da ordem de leitura, que ninguém consegue prever.
+        if (vistos[k]) { avisos.push("«"+cN+"» aparece mais do que uma vez em «"+gN+"» — fica a primeira."); continue; }
+        vistos[k]=1;
+
+        var tipoTxt = normKey(f[iT]||"");
+        var existente = jaTenho[k] || null;
+        // A categoria de pagamento de cartão é gerada pela aplicação a partir da conta do
+        // cartão. Importar uma criaria uma categoria solta, com ar de cartão e sem cartão
+        // nenhum por trás.
+        if (tipoTxt.indexOf("pagamentodecartao")>=0){
+          if (!existente) avisos.push("«"+cN+"» é uma categoria de cartão — essas nascem com a conta do cartão e não se importam.");
+          continue;
+        }
+        if (existente && existente.cardId){
+          avisos.push("«"+cN+"» já existe como categoria de cartão — não lhe toco.");
+          continue;
+        }
+
+        var alvo = null;
+        if (tipoTxt && tipoTxt!=="semalvo"){
+          var tipo = TIPOS[tipoTxt] || null;
+          if (!tipo) { avisos.push("«"+cN+"»: não reconheço o alvo «"+(f[iT]||"").trim()+"» — fica sem alvo."); }
+          else {
+            var valor = parseAmount(f[iV]||"");
+            if (!(valor>0)) { avisos.push("«"+cN+"»: alvo «"+(f[iT]||"").trim()+"» sem valor — fica sem alvo."); }
+            else {
+              alvo = { type:tipo, amount:round2(valor) };
+              // «Reservar» acumula sem teto; nos alvos semanais não existe, e é a própria
+              // exportação que escreve sempre «Repor» nesse caso.
+              if (normKey(f[iM]||"")==="reservar" && tipo!=="weekly") alvo.fund="setAside";
+              var det = String(f[iD]||"").trim();
+              if (tipo==="weekly"){
+                var w = WDAYS.indexOf(normKey(det.replace(/^por/i,"")));
+                alvo.weekday = w<0 ? 1 : w;
+                if (w<0 && det) avisos.push("«"+cN+"»: não percebi o dia «"+det+"» — fica à segunda-feira.");
+              } else if (tipo==="byDate"){
+                var mm = mesDeTexto(det.replace(/^at\u00e9\s*/i,""));
+                if (mm) alvo.date = mm;
+                else { avisos.push("«"+cN+"»: não percebi a data «"+det+"» — o alvo passa a mensal."); alvo.type="monthly"; }
+              } else if (alvo.fund!=="setAside" && /m\u00eas da despesa/i.test(det)){
+                var md = mesDeTexto(det.replace(/^.*?:\s*/,""));
+                if (md) alvo.due = md;
+              }
+            }
+          }
+        }
+        var prio = PRIOS[normKey(f[iP]||"")] || "normal";
+        var nota = iN>=0 ? String(f[iN]||"").trim() : "";
+        plano.push({ grupo:gN, cat:cN, alvo:alvo, prio:prio, nota:nota,
+                     existente:existente, grupoExiste: !!gruposTenho[normKey(gN)] });
+        if (!gruposTenho[normKey(gN)]) gruposNovos[normKey(gN)] = gN;
+      }
+
+      // Categorias que a aplicação tem e o ficheiro não traz. Não se apagam — apagar levaria
+      // atrás o histórico e o dinheiro. Listam-se, para o utilizador decidir depois.
+      var deFora = [];
+      for (var kk in jaTenho) if (Object.prototype.hasOwnProperty.call(jaTenho,kk) && !vistos[kk] && !jaTenho[kk].cardId)
+        deFora.push(jaTenho[kk].name);
+
+      var novas = plano.filter(function(x){ return !x.existente; }).length;
+      return { plano:plano, novas:novas, atualiza:plano.length-novas,
+               gruposNovos:Object.keys(gruposNovos).map(function(k){return gruposNovos[k];}),
+               deFora:deFora, avisos:avisos, ignoradas:ignoradas };
+    } catch(e){ return { erro:"Não consegui ler este ficheiro." }; }
+  }
+  // «Agosto 2026» / «08/2026» / «2026-08» → «2026-08»
+  function mesDeTexto(t){
+    t = String(t||"").trim(); if(!t) return null;
+    var m = t.match(/(\d{4})-(\d{2})/);            if (m) return m[1]+"-"+m[2];
+    m = t.match(/^(\d{1,2})[\/\-](\d{4})$/);       if (m) return m[2]+"-"+("0"+m[1]).slice(-2);
+    var MESES=["janeiro","fevereiro","marco","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+    m = t.match(/^([a-z\u00e0-\u00fc]+)\s+(\d{4})$/i);
+    if (m){ var i=MESES.indexOf(normKey(m[1])); if(i>=0) return m[2]+"-"+("0"+(i+1)).slice(-2); }
+    return null;
+  }
+
+  function importConfigModal(){
+    var corpo, rodape="";
+    if (_cfg && _cfg.erro){
+      corpo = '<div class="hint" style="color:var(--negative);font-weight:600;">'+esc(_cfg.erro)+'</div>';
+    } else if (_cfg && _cfg.plano){
+      if (!_cfg.plano.length){
+        corpo = '<div class="hint" style="color:var(--warning);font-weight:600;">O ficheiro não tem nenhuma categoria que eu possa importar.</div>';
+      } else {
+        function linha(t){ return '<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:12.5px;">'+t+'</div>'; }
+        var amostraNovas = _cfg.plano.filter(function(x){return !x.existente;}).slice(0,5)
+          .map(function(x){ return linha('<b>'+esc(x.cat)+'</b> <span class="muted">em '+esc(x.grupo)+'</span> <span class="pill" style="font-size:10.5px;">nova</span>'); }).join("");
+        var amostraMud = _cfg.plano.filter(function(x){return !!x.existente;}).slice(0,5)
+          .map(function(x){ return linha('<b>'+esc(x.cat)+'</b> <span class="muted">em '+esc(x.grupo)+'</span> <span class="tag" style="font-size:10.5px;">alvo atualizado</span>'); }).join("");
+        corpo =
+          '<div class="field"><label>O que vai acontecer</label>'+
+            '<div class="hint" style="margin-bottom:8px;">Nada é apagado. As categorias que já tem <b>mantêm as transações e o dinheiro</b> — só lhes muda o alvo, a prioridade e a nota.</div>'+
+            (_cfg.novas ? '<div style="font-size:12.5px;margin-bottom:4px;">➕ <b>'+_cfg.novas+'</b> '+(_cfg.novas===1?'categoria nova':'categorias novas')+
+              (_cfg.gruposNovos.length?' · <b>'+_cfg.gruposNovos.length+'</b> '+(_cfg.gruposNovos.length===1?'grupo novo':'grupos novos'):'')+'</div>' : '')+
+            (_cfg.atualiza ? '<div style="font-size:12.5px;margin-bottom:4px;">✎ <b>'+_cfg.atualiza+'</b> '+(_cfg.atualiza===1?'categoria já existente fica com o alvo do ficheiro':'categorias já existentes ficam com o alvo do ficheiro')+'</div>' : '')+
+            (_cfg.deFora.length ? '<div style="font-size:12.5px;margin-bottom:4px;">🔒 <b>'+_cfg.deFora.length+'</b> '+(_cfg.deFora.length===1?'categoria sua não vem no ficheiro e fica como está':'categorias suas não vêm no ficheiro e ficam como estão')+
+              ' <span class="muted">('+esc(_cfg.deFora.slice(0,3).join(", "))+(_cfg.deFora.length>3?"…":"")+')</span></div>' : '')+
+            (amostraNovas||amostraMud ? '<div style="margin-top:10px;">'+amostraNovas+amostraMud+'</div>' : '')+
+            (_cfg.plano.length>10 ? '<div class="muted" style="font-size:12px;padding-top:6px;">… e mais '+(_cfg.plano.length-10)+'.</div>' : '')+
+            (_cfg.ignoradas ? '<div class="hint" style="margin-top:6px;"><b>'+_cfg.ignoradas+'</b> linhas ignoradas (sem grupo ou sem categoria).</div>' : '')+
+          '</div>'+
+          (_cfg.avisos.length ? '<div class="field"><label>A rever</label><div class="hint" style="color:var(--warning);">'+
+             _cfg.avisos.slice(0,6).map(function(a){return '• '+esc(a);}).join('<br>')+
+             (_cfg.avisos.length>6?'<br>… e mais '+(_cfg.avisos.length-6)+'.':'')+'</div></div>' : '');
+        rodape = '<button class="btn primary" data-action="apply-config">Importar</button>';
+      }
+    } else {
+      corpo = '<div class="hint">Escolha o ficheiro <b>alvos-….csv</b> que saiu de <b>Exportar para folha de cálculo → Configuração dos alvos</b> — deste orçamento ou de outro.</div>';
+    }
+    openModal('<div class="modal-head"><h2>Importar configuração dos alvos</h2><button class="x" data-action="close" aria-label="Fechar">✕</button></div>'+
+      '<div class="modal-body">'+
+        '<div class="field"><label for="cfgFile">Ficheiro (.csv)</label><input type="file" id="cfgFile" accept=".csv,text/csv"></div>'+
+        corpo+
+      '</div>'+
+      '<div class="modal-foot"><span></span><span><button class="btn" data-action="close">Cancelar</button> '+rodape+'</span></div>');
+    el("cfgFile").addEventListener("change", function(e){
+      var file=e.target.files[0]; if(!file) return;
+      if(file.size>MAX_FICH_CSV){ e.target.value=""; toast("Esse ficheiro tem "+mb(file.size)+" — o limite é "+mb(MAX_FICH_CSV)+"."); return; }
+      var rd=new FileReader();
+      rd.onload=function(ev){ _cfg=planearConfig(ev.target.result); importConfigModal(); };
+      rd.readAsText(file);
+    });
+  }
+  // Aplica o plano. Já foi todo decidido e mostrado: aqui só se escreve.
+  function aplicarConfig(){
+    if(!_cfg || !_cfg.plano || !_cfg.plano.length) return;
+    pushUndo("Configuração importada.");
+    var gruposPorNome = {};
+    for (var g=0; g<state.groups.length; g++) gruposPorNome[normKey(state.groups[g].name)] = state.groups[g];
+    var nNovas=0, nMud=0;
+    for (var i=0;i<_cfg.plano.length;i++){
+      var it=_cfg.plano[i], gk=normKey(it.grupo), grp=gruposPorNome[gk];
+      if (!grp){ grp={ id:uid(), name:it.grupo }; state.groups.push(grp); gruposPorNome[gk]=grp; }
+      var cat = it.existente;
+      if (!cat){ cat={ id:uid(), name:it.cat, groupId:grp.id }; state.categories.push(cat); nNovas++; }
+      else nMud++;
+      // Um alvo em branco no ficheiro TIRA o alvo: o ficheiro é a planta, e uma categoria
+      // marcada «Sem alvo» tem mesmo de ficar sem alvo, senão importar duas vezes dava
+      // resultados diferentes.
+      if (it.alvo) cat.target = it.alvo; else delete cat.target;
+      cat.priority = it.prio;
+      if (it.nota) cat.note = it.nota; else delete cat.note;
+    }
+    _cfg=null; closeModal(); save(); render();
+    toast("Configuração importada — "+nNovas+" novas, "+nMud+" atualizadas. O ↩ desfaz tudo.");
   }
 
   function importJSON(file) {
