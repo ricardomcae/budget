@@ -222,6 +222,25 @@
   /* Lista dos movimentos recentes, dentro da janela. */
   .moves-list { max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
+  /* Texto de uma pergunta. O tom de perigo é para as que apagam dados — o botão principal
+     acompanha, para a diferença se ver antes de se carregar e não depois. */
+  .pergunta { font-size: 13.5px; line-height: 1.5; white-space: pre-line; }
+  /* Quando a pergunta envolve números, eles ficam numa mini-tabela em vez de dentro do texto:
+     é o que o utilizador vai comparar antes de decidir. */
+  .q-linhas { margin: 12px 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .q-linhas > div { display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
+    padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .q-linhas > div:last-child { border-bottom: 0; }
+  .q-linhas span { color: var(--text-muted); }
+  .q-linhas b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .q-linhas .mau { background: var(--negative-soft); }
+  .q-linhas .mau b { color: var(--negative); }
+  /* Nota lateral: o pormenor que evita uma surpresa, sem competir com a frase principal. */
+  .q-nota { margin: 10px 0 0; padding: 9px 12px; border-radius: 9px; background: var(--surface-2);
+    font-size: 12.5px; line-height: 1.45; color: var(--text-muted); }
+  .pergunta.perigo { border-inline-start: 3px solid var(--negative); padding-inline-start: 12px; }
+  .btn.perigo { background: var(--negative); border-color: var(--negative); color: #fff; font-weight: 700; }
+  .btn.perigo:hover { filter: brightness(1.08); }
   .move-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 14px; font-size: 12.5px; border-bottom: 1px solid var(--border); }
   .move-row:last-child { border-bottom: 0; }
   /* A descrição passou a ter duas linhas — o que se fez, e de onde veio o dinheiro. O «nowrap»
@@ -1986,10 +2005,38 @@
     for(var i=0;i<_bindex.list.length;i++) if(_bindex.list[i].id===id) _bindex.list[i].name=nome;
     saveIndex(_bindex); scheduleAutoSync(); render(); budgetsModal();
   }
+  // Apagar a conta a sério, depois de confirmado. Está fora do mapa de ações porque a pergunta
+  // deixou de ser síncrona: quem responde «sim» chama isto mais tarde.
+  function eliminarConta(id, a){
+    var paresTocados = {}, i, t;
+    for (i=0;i<state.transactions.length;i++){ t=state.transactions[i]; if(t.transfer && t.accountId===id) paresTocados[t.transfer]=true; }
+    pushUndo("Conta «"+a.name+"» eliminada.");
+    if (a.paymentCatId) removePaymentCategory(a);
+    state.accounts = state.accounts.filter(function(x){return x.id!==id;});
+    // Um cartão podia ter esta conta como "conta de pagamento predefinida". Sem limpar, ficava
+    // uma referência morta e o "💳 Pagar" pré-selecionava uma conta que já não existe.
+    for (var pf=0; pf<state.accounts.length; pf++) if(state.accounts[pf].payFrom===id) state.accounts[pf].payFrom=null;
+    state.transactions = state.transactions.filter(function(x){return x.accountId!==id;});
+    // A outra metade das transferências sobrevive, mas deixa de ser transferência: passa a
+    // movimento normal, senão ficava a apontar para um par que já não existe.
+    for (i=0;i<state.transactions.length;i++){ t=state.transactions[i]; if(t.transfer && paresTocados[t.transfer]) delete t.transfer; }
+    // regras recorrentes que usavam esta conta como origem OU como destino
+    state.recurring = (state.recurring||[]).filter(function(r){ return r.accountId!==id && r.toAccountId!==id; });
+    // A conta desapareceu: se a lista estava filtrada por ela, ficava a mostrar o vazio.
+    if (state.ui.txFilter && state.ui.txFilter.account===id) state.ui.txFilter=null;
+    closeModal(); save(); render(); showUndo();
+  }
   function deleteBudget(id){
     if (_bindex.list.length<=1){ toast("Tem de haver pelo menos um orçamento."); return; }
     var nome = budgetName(id);
-    if(!confirm("Eliminar o orçamento «"+nome+"» e tudo o que tem dentro?\nEsta ação não se pode anular.")) return;
+    perguntar({ titulo:"Eliminar orçamento", perigo:true, sim:"Eliminar", nao:"Ficar como está",
+      texto:'Vai apagar <b>'+esc(nome)+'</b> e tudo o que tem dentro — contas, categorias, transações e histórico.<br><br>'+
+        'Isto <b>não se pode anular</b> com o ↩. Guarda-se um ponto 🛟 antes, em «Dados e cópias».',
+      entao:function(){ eliminarOrcamento(id, nome); } });
+  }
+  // O trabalho a sério, depois de confirmado. Separado porque a pergunta deixou de ser
+  // síncrona: o que vem a seguir tem de caber numa função.
+  function eliminarOrcamento(id, nome){
     // Guarda-se o conteúdo ANTES de o apagar. O ponto de segurança tem de ir para a lista de um
     // orçamento que SOBREVIVE (a do que se elimina desaparece com ele), por isso só se escreve
     // depois de o orçamento ativo estar decidido, mais abaixo.
@@ -3330,6 +3377,30 @@
   }
   function closeModal() { escondeDica(); el("modalOverlay").classList.remove("open"); el("modal").innerHTML=""; }
 
+  // ---------- Perguntar (em vez da caixa do navegador) ----------
+  // O «confirm» do navegador tem três problemas: não se parece com a aplicação, no iPhone
+  // aparece colado ao topo e com o endereço do site, e trata da mesma maneira uma pergunta
+  // banal e uma que apaga dados para sempre. Esta faz o mesmo com a linguagem da casa.
+  //
+  // O «confirm» é SÍNCRONO e este não é: quem pergunta passa o que fazer a seguir numa
+  // função («entao»), em vez de esperar por um valor de retorno.
+  var _perg = null;
+  function perguntar(op){
+    _perg = op || {};
+    var perigo = !!_perg.perigo;
+    openModal(
+      '<div class="modal-head"><h2>'+esc(_perg.titulo||"Confirmar")+'</h2>'+
+        '<button class="x" data-action="perg-nao" aria-label="Fechar">\u00d7</button></div>'+
+      '<div class="modal-body"><div class="pergunta'+(perigo?' perigo':'')+'">'+(_perg.texto||"")+'</div></div>'+
+      '<div class="modal-foot"><span></span><span>'+
+        '<button class="btn" data-action="perg-nao">'+esc(_perg.nao||"Cancelar")+'</button> '+
+        '<button class="btn '+(perigo?'perigo':'primary')+'" data-action="perg-sim">'+esc(_perg.sim||"Continuar")+'</button>'+
+      '</span></div>');
+    // O foco vai para o botão de recuar: numa pergunta destrutiva, um Enter distraído não pode
+    // ser o que confirma.
+    setTimeout(function(){ var b=el("modal").querySelector('[data-action="perg-nao"].btn'); if(b) b.focus(); }, 50);
+  }
+
   function accountModal(acc) {
     var editing = !!acc;
     acc = acc || { name:"", type:"budget", note:"", start:0 };
@@ -4343,6 +4414,7 @@
         '<b>Separadores de mês nas transações</b>, como já havia nas recorrentes — e só quando a lista atravessa mais do que um mês.',
         '<b>Os números de resumo passaram a estar todos na mesma linha</b>, mesmo por cima da lista: à esquerda os que falam do dinheiro — <b>Confirmado</b>, <b>Saldo</b> e <b>Por confirmar</b>, que é a diferença entre os dois — e à direita quantas transações estão à vista. Estavam espalhados por três sítios e gastavam duas linhas; agora gastam uma — e deixam de mudar de sítio conforme o comprimento do nome da conta.',
         '<b>Uma coluna «Valor» em vez de «Saída» e «Entrada»</b> nas listas: cada transação ou sai ou entra, por isso metade do espaço estava sempre vazio. Agora as saídas aparecem a vermelho com <b>−</b> e as entradas a verde com <b>+</b> — e a largura que sobrou foi para a coluna das <b>notas</b>. Ao registar continua a haver dois campos, que é o que evita enganos ao escrever.',
+        '<b>As perguntas «tem a certeza?» passaram a ser janelas da aplicação.</b> Eram as caixas cinzentas do navegador — que no iPhone aparecem coladas ao topo, com o endereço do site, e tratam da mesma maneira uma pergunta banal e uma que apaga dados. Agora têm a letra e as cores da aplicação, os números aparecem lado a lado quando há contas a fazer, as que apagam alguma coisa têm botão vermelho, e o botão de recuar é o que recebe o foco — um Enter distraído não confirma nada.',
         '<b>Os 🕑 Movimentos recentes passaram a dizer DE ONDE veio o dinheiro.</b> Antes lia-se «🩹 Cobriu «Roupa»» e ficava por saber à custa de quê — que é metade da história. Agora cada linha leva por baixo, em pequeno, a origem: «de Férias 50,00 €». Vale para cobrir, financiar, libertar excedente, repor a zero e limpar atribuições; quando as origens são muitas, mostra as maiores e conta as restantes.',
         '<b>A cor por omissão apontava para uma cor que já não existia.</b> Um orçamento sem cor escolhida ficava com um nome antigo, que não corresponde a bolinha nenhuma — as Definições apareciam sem nada selecionado. Passa a cair sempre na primeira cor da lista.',
         '<b>«Trazer e levar» passou a ter duas gavetas simétricas</b> — <b>⬇ Importar</b> e <b>⬆ Exportar</b> — com as mesmas coisas pela mesma ordem em cada uma: a configuração dos alvos primeiro, as transações a seguir. Antes o que entrava eram botões soltos e o que saía estava numa gaveta, o que os fazia parecer coisas de nível diferente.',
@@ -4999,6 +5071,10 @@
     else desfazerPushUndo(redoAntes, pendAntes);
   }
   var actions = {
+    // Respostas à janela de pergunta (ver «perguntar»). O que fazer a seguir vem guardado
+    // em «_perg», porque o clique chega aqui muito depois de quem fez a pergunta ter saído.
+    "perg-sim": function(){ var f=_perg&&_perg.entao; _perg=null; closeModal(); if(f) f(); },
+    "perg-nao": function(){ var f=_perg&&_perg.senao; _perg=null; closeModal(); if(f) f(); },
     "prev-month": function(){ state.ui.month = shiftMonth(state.ui.month,-1); render(); },
     "next-month": function(){ state.ui.month = shiftMonth(state.ui.month, 1); render(); },
     "this-month": function(){ state.ui.month = nowMonthKey(); render(); },
@@ -5060,13 +5136,16 @@
       showUndo(); payeesModal();
     },
     "limpar-historico": function(){
-      if(!confirm("Apagar os pontos de histórico guardados?\nOs seus dados atuais não são afetados — perde apenas a possibilidade de voltar a um dia anterior.")) return;
-      // Também as cópias no armazém grande — senão ficavam lá a ocupar espaço sem dono.
-      try { idbApagar(loadSnaps().map(function(x){return x.ref;}).filter(Boolean)); } catch(e){}
-      try { localStorage.removeItem(snapKey()); } catch(e){}
-      _semEspaco=false;
-      if (save()) { closeModal(); render(); toast("Histórico apagado — já há espaço para guardar."); }
-      else toast("Ainda não chega. Guarde uma cópia em ficheiro e apague transações antigas.");
+      perguntar({ titulo:"Apagar o histórico", perigo:true, sim:"Apagar histórico",
+        texto:'Apaga os pontos guardados dos últimos dias.<br><br>Os seus dados atuais <b>não são tocados</b> — perde apenas a possibilidade de voltar a como estava num dia anterior.',
+        entao:function(){
+          // Também as cópias no armazém grande — senão ficavam lá a ocupar espaço sem dono.
+          try { idbApagar(loadSnaps().map(function(x){return x.ref;}).filter(Boolean)); } catch(e){}
+          try { localStorage.removeItem(snapKey()); } catch(e){}
+          _semEspaco=false;
+          if (save()) { closeModal(); render(); toast("Histórico apagado — já há espaço para guardar."); }
+          else toast("Ainda não chega. Guarde uma cópia em ficheiro e apague transações antigas.");
+        } });
     },
     "upcoming": function(){ upcomingModal(); },
     "fix-transfer": function(id){ fixTransferModal(id); },
@@ -5119,24 +5198,15 @@
       var paresTocados = {}, nOutras = 0, i, t;
       for (i=0;i<state.transactions.length;i++){ t=state.transactions[i]; if(t.transfer && t.accountId===id) paresTocados[t.transfer]=true; }
       for (i=0;i<state.transactions.length;i++){ t=state.transactions[i]; if(t.transfer && paresTocados[t.transfer] && t.accountId!==id) nOutras++; }
-      var aviso = "Eliminar a conta «"+a.name+"» e todas as suas transações?";
-      if (nOutras) aviso += "\n\n"+nOutras+" transferência"+(nOutras===1?"":"s")+" ligava"+(nOutras===1?"":"m")+
-        " esta conta a outras. A outra metade fica onde está, como movimento normal — o saldo dessas contas não muda, mas pode precisar de lhe dar categoria.";
-      if (!confirm(aviso)) return;
-      pushUndo("Conta «"+a.name+"» eliminada.");
-      if (a.paymentCatId) removePaymentCategory(a);
-      state.accounts = state.accounts.filter(function(x){return x.id!==id;});
-      // Um cartão podia ter esta conta como "conta de pagamento predefinida". Sem limpar, ficava
-      // uma referência morta e o "💳 Pagar" pré-selecionava uma conta que já não existe.
-      for (var pf=0; pf<state.accounts.length; pf++) if(state.accounts[pf].payFrom===id) state.accounts[pf].payFrom=null;
-      state.transactions = state.transactions.filter(function(x){return x.accountId!==id;});
-      for (i=0;i<state.transactions.length;i++){ t=state.transactions[i]; if(t.transfer && paresTocados[t.transfer]) delete t.transfer; }
-      // regras recorrentes que usavam esta conta como origem OU como destino
-      state.recurring = (state.recurring||[]).filter(function(r){ return r.accountId!==id && r.toAccountId!==id; });
-      // A conta desapareceu: se a lista estava filtrada por ela, ficava a mostrar o vazio.
-      if (state.ui.txFilter && state.ui.txFilter.account===id) state.ui.txFilter=null;
-      closeModal(); save(); render(); showUndo();
+      var nTx = state.transactions.filter(function(x){ return x.accountId===id; }).length;
+      perguntar({ titulo:"Eliminar conta", perigo:true, sim:"Eliminar",
+        texto:'Apaga <b>'+esc(a.name)+'</b> e as <b>'+nTx+'</b> transaç'+(nTx===1?'ão':'ões')+' dela.'+
+          (nOutras ? '<div class="q-nota">'+nOutras+' transferência'+(nOutras===1?'':'s')+' ligava'+(nOutras===1?'':'m')+
+            ' esta conta a outras. A outra metade <b>fica onde está</b>, como movimento normal — o saldo dessas contas não muda, mas pode precisar de lhe dar categoria.</div>' : '')+
+          '<br>O <b>↩</b> desfaz.',
+        entao:function(){ eliminarConta(id, a); } });
     },
+
     // Abrir uma conta é ver as transações dela: mesmo ecrã, filtro ligado. Assim pode logo
     // cruzar com um período ou uma categoria sem ter de mudar de sítio.
     "open-account": function(id){ state.ui.view="transactions"; state.ui.txFilter={account:id}; state.ui.txLimit=PAGINA; render(); aoTopo(); },
@@ -5149,20 +5219,27 @@
       // ser alcançável, porque as ferramentas de reequilibrar só olham para as visíveis. Em vez
       // de o deixar preso em silêncio, avisa-se e oferece-se devolvê-lo.
       var sobra = round2(availableFor(id, state.ui.month));
-      if (sobra > 0.005) {
-        if (!confirm("«"+c.name+"» tem "+fmt(sobra)+" disponível.\n\n"+
-                     "Se arquivar assim, esse dinheiro continua a contar mas deixa de estar à vista nem de poder ser movido.\n\n"+
-                     "Devolver "+fmt(sobra)+" ao «Pronto a atribuir» e arquivar?")) return;
+      function arquivar(devolver){
         var ch = id+"|"+state.ui.month;
         pushUndo("Categoria arquivada.");
-        state.assignments[ch] = round2((state.assignments[ch]||0) - sobra);
-        if (Math.abs(state.assignments[ch]) < 0.005) delete state.assignments[ch];
-        logMove("🗄 Arquivou «"+c.name+"» — devolveu o que sobrava", -sobra);
-      } else {
-        pushUndo("Categoria arquivada.");
+        if (devolver) {
+          state.assignments[ch] = round2((state.assignments[ch]||0) - sobra);
+          if (Math.abs(state.assignments[ch]) < 0.005) delete state.assignments[ch];
+          logMove("🗄 Arquivou «"+c.name+"» — devolveu o que sobrava", -sobra, "para o Pronto a atribuir");
+        }
+        c.hidden=true; closeModal(); save(); render();
+        toast("Categoria arquivada — reponha em Dados e cópias → Arquivados.");
       }
-      c.hidden=true; closeModal(); save(); render();
-      toast("Categoria arquivada — reponha em Dados e cópias → Arquivados.");
+      if (sobra > 0.005) {
+        perguntar({ titulo:"🗄 Arquivar «"+c.name+"»", sim:"Devolver e arquivar",
+          texto:'Esta categoria ainda tem dinheiro.'+
+            '<div class="q-linhas"><div><span>Disponível</span><b>'+fmt(sobra)+'</b></div></div>'+
+            'Arquivada, esse dinheiro <b>continua a contar</b> mas deixa de estar à vista e de poder ser movido. '+
+            'O melhor é devolvê-lo ao «Pronto a atribuir».',
+          entao:function(){ arquivar(true); } });
+        return;
+      }
+      arquivar(false);
     },
     "restore-category": function(id){ var c=categoryById(id); if(c){ pushUndo("Categoria reposta."); c.hidden=false; save(); render(); archivedModal(); } },
     "archived-menu": function(){ archivedModal(); },
@@ -5205,12 +5282,17 @@
     },
     "delete-tx": function(id){
       var t=txById(id);
-      if(!confirm(t&&t.transfer?"Eliminar esta transferência (as duas metades)?":(t&&t.split?"Eliminar esta transação dividida (todas as partes)?":"Eliminar esta transação?"))) return;
-      pushUndo("Transação eliminada.");
-      if(t&&t.transfer){ var pair=t.transfer; state.transactions=state.transactions.filter(function(x){return x.transfer!==pair;}); }
-      else if(t&&t.split){ var sp=t.split; state.transactions=state.transactions.filter(function(x){return x.split!==sp;}); }
-      else state.transactions = state.transactions.filter(function(x){return x.id!==id;});
-      closeModal(); save(); render(); showUndo();
+      perguntar({ titulo:"Eliminar transação", perigo:true, sim:"Eliminar",
+        texto: t&&t.transfer ? 'É uma <b>transferência</b>: apaga as duas metades, nas duas contas.'
+             : (t&&t.split ? 'É uma <b>transação dividida</b>: apaga todas as partes.'
+                           : 'Apaga esta transação.') + '<br><br>O <b>↩</b> desfaz.',
+        entao:function(){
+          pushUndo("Transação eliminada.");
+          if(t&&t.transfer){ var pair=t.transfer; state.transactions=state.transactions.filter(function(x){return x.transfer!==pair;}); }
+          else if(t&&t.split){ var sp=t.split; state.transactions=state.transactions.filter(function(x){return x.split!==sp;}); }
+          else state.transactions = state.transactions.filter(function(x){return x.id!==id;});
+          closeModal(); save(); render(); showUndo();
+        } });
     },
     // Confirmar/desconfirmar é uma alteração aos dados como outra qualquer: entra no Anular.
     "toggle-clear": function(id){ var t=txById(id); if(t){ pushUndo(t.cleared?"Marcou por confirmar.":"Confirmou uma transação."); t.cleared=!t.cleared; save(); render(); } },
@@ -5313,18 +5395,27 @@
       for (var q=0;q<doGrupo.length;q++) if(doGrupo[q].cardId){
         toast("Este grupo tem a categoria de pagamento de um cartão. Elimine primeiro o cartão, em Contas."); return;
       }
-      if (doGrupo.length && !confirm("O grupo tem "+doGrupo.length+" categoria"+(doGrupo.length===1?"":"s")+
-          (arquivadas?" ("+arquivadas+" arquivada"+(arquivadas===1?"":"s")+")":"")+
-          ". Eliminar o grupo e essas categorias? As transações delas ficam sem categoria e o dinheiro atribuído volta ao «Pronto a atribuir».")) return;
-      pushUndo("Grupo eliminado.");
-      state.groups=state.groups.filter(function(g){return g.id!==id;});
-      state.categories=state.categories.filter(function(c){return c.groupId!==id;});
-      // A MESMA limpeza da eliminação de uma categoria, para cada uma das que iam dentro.
-      var recG=0;
-      for (var w=0;w<doGrupo.length;w++) recG += limparRestosDaCategoria(doGrupo[w].id);
-      state.ui.lastFunding=null;
-      avisoRecorrentes(recG);
-      closeModal(); save(); render(); showUndo();
+      function eliminarGrupo(){
+        pushUndo("Grupo eliminado.");
+        state.groups=state.groups.filter(function(g){return g.id!==id;});
+        state.categories=state.categories.filter(function(c){return c.groupId!==id;});
+        // A MESMA limpeza da eliminação de uma categoria, para cada uma das que iam dentro.
+        var recG=0;
+        for (var w=0;w<doGrupo.length;w++) recG += limparRestosDaCategoria(doGrupo[w].id);
+        state.ui.lastFunding=null;
+        avisoRecorrentes(recG);
+        closeModal(); save(); render(); showUndo();
+      }
+      if (doGrupo.length) {
+        perguntar({ titulo:"Eliminar grupo", perigo:true, sim:"Eliminar grupo e categorias",
+          texto:'O grupo tem <b>'+doGrupo.length+'</b> categoria'+(doGrupo.length===1?'':'s')+
+            (arquivadas?' ('+arquivadas+' arquivada'+(arquivadas===1?'':'s')+')':'')+', que também desaparecem.'+
+            '<div class="q-nota">As transações delas <b>não são apagadas</b> — ficam por classificar. O dinheiro atribuído volta ao «Pronto a atribuir».</div>'+
+            '<br>O <b>↩</b> desfaz.',
+          entao: eliminarGrupo });
+        return;
+      }
+      eliminarGrupo();
     },
     "toggle-group": function(id){ state.collapsed[id]=!state.collapsed[id]; save(); render(); },
     "expand-all": function(){ state.collapsed={}; save(); render(); },
@@ -5395,13 +5486,16 @@
     },
     "delete-category": function(id){
       var pc=categoryById(id); if(pc&&pc.cardId){ toast("Não pode eliminar uma categoria de pagamento de cartão. Elimine o cartão."); return; }
-      if(!confirm("Eliminar esta categoria? As transações ficam sem categoria.")) return;
-      pushUndo("Categoria «"+(pc?pc.name:"")+"» eliminada.");
-      state.categories=state.categories.filter(function(c){return c.id!==id;});
-      var recAfetadas=limparRestosDaCategoria(id);
-      state.ui.lastFunding=null;
-      avisoRecorrentes(recAfetadas);
-      closeModal(); save(); render(); showUndo();
+      perguntar({ titulo:"Eliminar categoria", perigo:true, sim:"Eliminar",
+        texto:'As transações desta categoria <b>não são apagadas</b> — ficam por classificar, e o dinheiro atribuído volta ao «Pronto a atribuir».<br><br>O <b>↩</b> desfaz.',
+        entao:function(){
+          pushUndo("Categoria «"+(pc?pc.name:"")+"» eliminada.");
+          state.categories=state.categories.filter(function(c){return c.id!==id;});
+          var recAfetadas=limparRestosDaCategoria(id);
+          state.ui.lastFunding=null;
+          avisoRecorrentes(recAfetadas);
+          closeModal(); save(); render(); showUndo();
+        } });
     },
     "clear-preview": function(){ clearModal(); },
     "apply-clear": function(){
@@ -5476,23 +5570,34 @@
     "fund-one": function(id){
       var m=state.ui.month; var c=categoryById(id); if(!c) return;
       var ti=targetInfo(c,m); if(!ti||!(ti.need>0)){ toast("Alvo já cumprido."); return; }
+      var rtaDepois = round2(readyToAssign(m) - ti.need);
+      function financiar(){
+        pushUndo("Alvo financiado.");
+        var key=id+"|"+m;
+        state.ui.lastFunding={month:m, entries:[{key:key, prev: state.assignments.hasOwnProperty(key)?state.assignments[key]:null}]};
+        state.assignments[key]=round2((state.assignments[key]||0)+ti.need);
+        logMove("🎯 Financiou «"+c.name+"»", ti.need, "do Pronto a atribuir");
+        save(); render();
+        toast(rtaDepois < -0.005
+          ? ("Alvo financiado — o «Pronto a atribuir» ficou negativo em "+fmt(-rtaDepois)+".")
+          : "Alvo financiado — pode anular no topo.");
+      }
       // O 🎯 tira sempre do «Pronto a atribuir». Se não chegar, avisa ANTES — o mesmo cuidado que a
       // janela de financiar em lote já tinha. Sem isto, um toque podia pôr o mês a vermelho sem dar
       // por isso. (Deixa passar se o utilizador confirmar: às vezes é mesmo o que se quer.)
-      var rtaDepois = round2(readyToAssign(m) - ti.need);
-      if (rtaDepois < -0.005 && !confirm(
-            "Financiar «"+c.name+"» precisa de "+fmt(ti.need)+", mas só tem "+fmt(readyToAssign(m))+" por atribuir.\n\n"+
-            "O «Pronto a atribuir» ficaria negativo em "+fmt(-rtaDepois)+".\n\n"+
-            "Financiar mesmo assim?")) return;
-      pushUndo("Alvo financiado.");
-      var key=id+"|"+m;
-      state.ui.lastFunding={month:m, entries:[{key:key, prev: state.assignments.hasOwnProperty(key)?state.assignments[key]:null}]};
-      state.assignments[key]=round2((state.assignments[key]||0)+ti.need);
-      logMove("🎯 Financiou «"+c.name+"»", ti.need, "do Pronto a atribuir");
-      save(); render();
-      toast(rtaDepois < -0.005
-        ? ("Alvo financiado — o «Pronto a atribuir» ficou negativo em "+fmt(-rtaDepois)+".")
-        : "Alvo financiado — pode anular no topo.");
+      if (rtaDepois < -0.005) {
+        perguntar({ titulo:"🎯 Financiar «"+c.name+"»", sim:"Financiar mesmo assim",
+          texto:'Falta dinheiro por atribuir para cumprir este alvo.'+
+            '<div class="q-linhas">'+
+              '<div><span>Precisa de</span><b>'+fmt(ti.need)+'</b></div>'+
+              '<div><span>Tem por atribuir</span><b>'+fmt(readyToAssign(m))+'</b></div>'+
+              '<div class="mau"><span>Pronto a atribuir ficaria</span><b>'+fmt(rtaDepois)+'</b></div>'+
+            '</div>'+
+            'Pode financiar na mesma — o «Pronto a atribuir» fica negativo até repor. O <b>↩</b> desfaz.',
+          entao: financiar });
+        return;
+      }
+      financiar();
     },
     "fund-preview": function(){ if(!state.categories.length){ toast("Crie categorias com alvos primeiro."); return; } state.ui._fundMode="full"; fundModal(); },
     "recover-preview": function(){ recoverModal(); },
@@ -5551,8 +5656,9 @@
     "redo-do": function(){ doRedo(); },
     "moves": function(){ movesModal(); },
     "clear-moves": function(){
-      if(!confirm("Limpar a lista de movimentos recentes? É só o registo — o dinheiro fica onde está.")) return;
-      state.moves = []; save(); closeModal(); render(); toast("Lista limpa.");
+      perguntar({ titulo:"Limpar a lista", sim:"Limpar",
+        texto:'Apaga o <b>registo</b> dos movimentos recentes.<br><br>O dinheiro fica exatamente onde está: isto não desfaz nada.',
+        entao:function(){ state.moves=[]; save(); closeModal(); render(); toast("Lista limpa."); } });
     },
     "py-filter-clear": function(){ var i=el("pyFilter"); if(i){ i.value=""; pyFiltrar(); i.focus(); } },
 
@@ -5635,10 +5741,13 @@
       toast(posted>0?("Regra guardada — lançadas "+posted+" já em atraso."):"Regra recorrente guardada.");
     },
     "delete-recurring": function(id){
-      if(!confirm("Eliminar esta regra recorrente? As transações já lançadas mantêm-se.")) return;
-      pushUndo("Regra recorrente eliminada.");
-      state.recurring=state.recurring.filter(function(r){return r.id!==id;});
-      closeModal(); save(); render(); showUndo();
+      perguntar({ titulo:"Eliminar regra recorrente", perigo:true, sim:"Eliminar",
+        texto:'Deixa de lançar sozinha.<br><br>As transações que <b>já lançou mantêm-se</b> — são histórico real.',
+        entao:function(){
+          pushUndo("Regra recorrente eliminada.");
+          state.recurring=state.recurring.filter(function(r){return r.id!==id;});
+          closeModal(); save(); render(); showUndo();
+        } });
     },
     "toggle-recurring": function(id){ var r=recById(id); if(r){ pushUndo(r.active?"Recorrente desativada.":"Recorrente ativada."); r.active=!r.active; save(); render(); } },
     "post-recurring-now": function(id){
@@ -5738,7 +5847,11 @@
       _sync.syncedSig = vazio ? allSig() : undefined;
       saveSyncCfg(); closeModal(); toast("A ligar…"); syncNow();
     },
-    "sync-disconnect": function(){ if(!confirm("Desligar a sincronização neste aparelho? O token e a palavra-passe são apagados daqui (os dados e o gist mantêm-se).")) return; _sync={auto:false}; _gistPerdido=null; saveSyncCfg(); closeModal(); toast("Sincronização desligada."); },
+    "sync-disconnect": function(){
+      perguntar({ titulo:"Desligar sincronização", sim:"Desligar",
+        texto:'Apaga <b>deste aparelho</b> o token e a palavra-passe.<br><br>Os seus dados e o gist mantêm-se intactos — e os outros aparelhos continuam a sincronizar.',
+        entao:function(){ _sync={auto:false}; _gistPerdido=null; saveSyncCfg(); closeModal(); toast("Sincronização desligada."); } });
+    },
     "gist-use-id": function(){
       var v = el("glId") ? el("glId").value.trim() : "";
       if(!v){ toast("Cole o ID do gist que quer usar."); return; }
@@ -5748,23 +5861,40 @@
       _gistPerdido=null; closeModal(); toast("A tentar com esse ID…"); syncNow();
     },
     "gist-create-new": function(){
-      if(!confirm("Criar um gist novo a partir dos dados DESTE aparelho?\nOs outros aparelhos vão precisar do ID novo para voltarem a sincronizar.")) return;
-      closeModal();
-      (async function(){
-        try {
-          _sync.gistId=null; _sync.baseRev=0; _sync.syncedSig=undefined; saveSyncCfg();
-          await pushLocal(1);
-          _gistPerdido=null;
-          setSyncStatus("Gist novo criado ✓");
-          toast("Gist novo criado — copie o ID para os outros aparelhos.");
-          syncModal();
-        } catch(e){ toast("Não foi possível criar: "+e.message); }
-      })();
+      perguntar({ titulo:"Criar um gist novo", sim:"Criar novo",
+        texto:'O novo gist leva os dados <b>deste aparelho</b>.<br><br>Os outros aparelhos vão precisar do <b>ID novo</b> para voltarem a sincronizar — até lá, ficam de fora.',
+        entao:function(){
+          closeModal();
+          (async function(){
+            try {
+              _sync.gistId=null; _sync.baseRev=0; _sync.syncedSig=undefined; saveSyncCfg();
+              await pushLocal(1);
+              _gistPerdido=null;
+              setSyncStatus("Gist novo criado ✓");
+              toast("Gist novo criado — copie o ID para os outros aparelhos.");
+              syncModal();
+            } catch(e){ toast("Não foi possível criar: "+e.message); }
+          })();
+        } });
     },
     "sync-keep-local": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ await pushLocal(pc.remoteRev+1); setSyncStatus("Guardado na nuvem ✓"); toast("Mantido este aparelho — enviado para a nuvem."); }catch(e){ setSyncStatus("Não foi possível guardar ⚠️"); toast(msgSync(e)); } _pendingConflict=null; })(); },
     "sync-use-remote": function(){ var pc=_pendingConflict; if(!pc) return; closeModal(); (async function(){ try{ adoptRemote(await decEnvelope(pc.enc, _sync.pass), pc.remoteRev); toast("Adotada a versão da nuvem."); }catch(e){ setSyncStatus("Não foi possível adotar ⚠️"); toast(msgSync(e)); } _pendingConflict=null; })(); },
-    "load-sample": function(){ if(temDados() && !confirm("Atenção: os dados atuais serão substituídos pelos dados de exemplo. Esta ação não pode ser anulada. Pretende continuar?")) return; pontoDeSeguranca("antes de carregar os dados de exemplo"); loadSample(); },
-    "reset-data": function(){ if(confirm("Apagar TODOS os dados definitivamente? Esta ação não pode ser anulada.")){ pontoDeSeguranca("antes de apagar todos os dados"); state=JSON.parse(JSON.stringify(DEFAULT_STATE)); state.ui.month=nowMonthKey(); limparHistorico(); hideUndo(); closeModal(); save(); render(); toast("Dados apagados."); } }
+    "load-sample": function(){
+      function carregar(){ pontoDeSeguranca("antes de carregar os dados de exemplo"); loadSample(); }
+      if(!temDados()) { carregar(); return; }
+      perguntar({ titulo:"Carregar dados de exemplo", perigo:true, sim:"Substituir pelos exemplos",
+        texto:'Os dados <b>deste orçamento</b> são substituídos por um orçamento de demonstração.<br><br>'+
+          '<b>Não se pode anular</b> com o ↩ — guarda-se um ponto 🛟 antes, em «Dados e cópias».',
+        entao: carregar });
+    },
+    "reset-data": function(){
+      perguntar({ titulo:"Apagar tudo", perigo:true, sim:"Apagar tudo", nao:"Não apagar",
+        texto:'Apaga <b>todas</b> as contas, categorias e transações deste orçamento.<br><br>'+
+          '<b>Não se pode anular</b> com o ↩ — guarda-se um ponto 🛟 antes, em «Dados e cópias».',
+        entao:function(){ pontoDeSeguranca("antes de apagar todos os dados");
+          state=JSON.parse(JSON.stringify(DEFAULT_STATE)); state.ui.month=nowMonthKey();
+          limparHistorico(); hideUndo(); closeModal(); save(); render(); toast("Dados apagados."); } });
+    }
   };
 
   function txById(id){ for(var i=0;i<state.transactions.length;i++) if(state.transactions[i].id===id) return state.transactions[i]; return null; }
@@ -6103,7 +6233,13 @@
   function restoreSnapshot(idx){
     var snaps = loadSnaps(), s = snaps[idx]; if(!s) return;
     var comoEstava = s.motivo ? ("como estava "+s.motivo+" ("+fmtDate(s.day)+")") : ("tal como estava em "+fmtDate(s.day));
-    if(!confirm("Voltar ao orçamento "+comoEstava+"?\nOs dados atuais deste aparelho são substituídos por essa versão.")) return;
+    perguntar({ titulo:"🛟 Voltar atrás", perigo:true, sim:"Voltar a essa versão",
+      texto:'Repõe o orçamento <b>'+esc(comoEstava)+'</b>.<br><br>'+
+        'Os dados atuais <b>deste aparelho</b> são substituídos. Guarda-se um ponto 🛟 do estado de agora antes de o fazer, para poder voltar.',
+      entao:function(){ voltarAoPonto(s); } });
+  }
+  // O trabalho a sério, depois de confirmado.
+  function voltarAoPonto(s){
     // O ponto de segurança acrescenta uma entrada à lista, o que pode deslocar os índices.
     // Por isso o «s» já foi lido ACIMA e é esse objeto que se usa daqui para a frente —
     // reler pelo índice depois de guardar traria a entrada errada.
@@ -6952,47 +7088,68 @@
     var reader = new FileReader();
     reader.onload = function(e){
       try {
-        var obj = JSON.parse(e.target.result), qtd;
+        var obj = JSON.parse(e.target.result);
         if (obj && obj.budgets && obj.budgets.length) {          // pacote com vários orçamentos
-          if(!confirm("Isto substitui TODOS os orçamentos deste aparelho pelos "+obj.budgets.length+" do ficheiro. Continuar?")) return;
-          pontoDeSeguranca("antes de importar uma cópia");
-          // Validar e preparar TUDO antes de escrever seja o que for: se o armazenamento enchesse
-          // a meio do ciclo, ficavam alguns orçamentos já substituídos e outros não, com o índice
-          // por atualizar — uma mistura das duas cópias, e a mensagem só dizia «Ficheiro inválido».
-          var lista=[], porEscrever=[];
-          for (var i=0;i<obj.budgets.length;i++){ var b=obj.budgets[i];
-            if(!b || !b.id || !b.data || !b.data.accounts || !b.data.transactions) throw new Error("formato");
-            porEscrever.push({ chave: budKey(b.id), texto: JSON.stringify(b.data) });
-            lista.push({id:b.id,name:b.name});
-          }
-          try { for (var w=0;w<porEscrever.length;w++) localStorage.setItem(porEscrever[w].chave, porEscrever[w].texto); }
-          catch(err){ toast("Não há espaço para importar tudo — nada foi alterado. Apague dados antigos e tente de novo."); return; }
-          var act = obj.active && lista.some(function(x){return x.id===obj.active;}) ? obj.active : lista[0].id;
-          _bindex = { active:act, list:lista }; saveIndex(_bindex);
-          state = loadBudgetRaw(act); qtd = lista.length;
+          perguntar({ titulo:"Importar cópia de segurança", perigo:true, sim:"Substituir tudo",
+            texto:'O ficheiro traz <b>'+obj.budgets.length+'</b> orçamento'+(obj.budgets.length===1?'':'s')+'.'+
+              '<div class="q-nota">Substitui <b>TODOS</b> os orçamentos deste aparelho. Guarda-se um ponto 🛟 do estado de agora antes de o fazer.</div>',
+            entao:function(){ importarPacote(obj); } });
         } else if (obj && obj.accounts && obj.transactions) {    // UM só orçamento (ficheiro antigo, ou um ponto do histórico)
           // Este caminho substitui o orçamento aberto e não tinha pergunta nenhuma: bastava
           // escolher o ficheiro para os dados irem embora em silêncio. É o caminho por onde
           // entra um ficheiro «historico-…», que é fácil de descarregar — logo, fácil de
           // importar por engano.
-          if(!confirm("Isto substitui o orçamento aberto («"+(budgetName(_bindex.active)||"")+"») pelo conteúdo deste ficheiro.\nOs outros orçamentos não são tocados.\n\nContinuar?")) return;
-          pontoDeSeguranca("antes de importar um ficheiro");
-          // Normalização completa, igual à do loadBudgetRaw. Faltavam campos (sobretudo o
-          // `recurring`): criar ou apagar uma regra recorrente logo a seguir a importar um
-          // ficheiro antigo rebentava em silêncio — o botão simplesmente não fazia nada.
-          obj.settings = obj.settings || {locale:"pt-PT",currency:"EUR"};
-          obj.collapsed = obj.collapsed || {}; obj.assignments = obj.assignments || {};
-          obj.snooze = obj.snooze || {}; obj.recurring = obj.recurring || [];
-          obj.groups = obj.groups || []; obj.categories = obj.categories || [];
-          obj.backup = obj.backup || { at:null, sig:null, autoDay:null, pend:0 };
-          obj.ui = { view:"budget", month: nowMonthKey() };
-          state = obj; qtd = 1;
+          perguntar({ titulo:"Importar orçamento", perigo:true, sim:"Substituir",
+            texto:'Substitui o orçamento aberto — <b>'+esc(budgetName(_bindex.active)||"")+'</b> — pelo conteúdo deste ficheiro.'+
+              '<div class="q-nota">Os <b>outros orçamentos não são tocados</b>. Guarda-se um ponto 🛟 antes.</div>',
+            entao:function(){ importarUm(obj); } });
         } else throw new Error("formato");
-        limparHistorico(); hideUndo(); _idx=null; _payees=null; save(); closeModal(); render();
-        toast(qtd>1 ? ("Importados "+qtd+" orçamentos.") : "Cópia de segurança importada com sucesso.");
       } catch(err){ toast("Ficheiro inválido."); }
     };
     reader.readAsText(file);
+  }
+  // Substituir TODOS os orçamentos, depois de confirmado.
+  function importarPacote(obj){
+    try {
+      pontoDeSeguranca("antes de importar uma cópia");
+      // Validar e preparar TUDO antes de escrever seja o que for: se o armazenamento enchesse
+      // a meio do ciclo, ficavam alguns orçamentos já substituídos e outros não, com o índice
+      // por atualizar — uma mistura das duas cópias, e a mensagem só dizia «Ficheiro inválido».
+      var lista=[], porEscrever=[];
+      for (var i=0;i<obj.budgets.length;i++){ var b=obj.budgets[i];
+        if(!b || !b.id || !b.data || !b.data.accounts || !b.data.transactions) throw new Error("formato");
+        porEscrever.push({ chave: budKey(b.id), texto: JSON.stringify(b.data) });
+        lista.push({id:b.id,name:b.name});
+      }
+      try { for (var w=0;w<porEscrever.length;w++) localStorage.setItem(porEscrever[w].chave, porEscrever[w].texto); }
+      catch(err){ toast("Não há espaço para importar tudo — nada foi alterado. Apague dados antigos e tente de novo."); return; }
+      var act = obj.active && lista.some(function(x){return x.id===obj.active;}) ? obj.active : lista[0].id;
+      _bindex = { active:act, list:lista }; saveIndex(_bindex);
+      state = loadBudgetRaw(act);
+      limparHistorico(); hideUndo(); _idx=null; _payees=null; _ultimoJSON=null; _sigCache=null;
+      save(); closeModal(); render();
+      toast("Importados "+lista.length+" orçamentos.");
+    } catch(err){ toast("Ficheiro inválido."); }
+  }
+  // Substituir só o orçamento aberto, depois de confirmado.
+  function importarUm(obj){
+    try {
+      pontoDeSeguranca("antes de importar um ficheiro");
+      // Normalização completa, igual à do loadBudgetRaw. Faltavam campos (sobretudo o
+      // `recurring`): criar ou apagar uma regra recorrente logo a seguir a importar um
+      // ficheiro antigo rebentava em silêncio — o botão simplesmente não fazia nada.
+      obj.settings = obj.settings || {locale:"pt-PT",currency:"EUR"};
+      obj.collapsed = obj.collapsed || {}; obj.assignments = obj.assignments || {};
+      obj.snooze = obj.snooze || {}; obj.recurring = obj.recurring || [];
+      obj.groups = obj.groups || []; obj.categories = obj.categories || [];
+      obj.backup = obj.backup || { at:null, sig:null, autoDay:null, pend:0 };
+      if (!Array.isArray(obj.moves)) obj.moves = [];
+      obj.ui = { view:"budget", month: nowMonthKey() };
+      state = obj;
+      limparHistorico(); hideUndo(); _idx=null; _payees=null; _ultimoJSON=null; _sigCache=null;
+      save(); closeModal(); render();
+      toast("Cópia de segurança importada com sucesso.");
+    } catch(err){ toast("Ficheiro inválido."); }
   }
 
   // ---------- Dados de exemplo ----------
