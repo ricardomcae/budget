@@ -3706,27 +3706,32 @@
 
         seccao("Trazer e levar", "Para trabalhar com os dados <b>fora</b> da aplicação. Não substituem a cópia do <b>2</b>.")+
 
-        acao('<button class="btn" data-action="import-csv" style="width:100%;justify-content:center;">📥 Importar transações do banco (.csv)</button>'+
-          '<div class="hint">Acrescenta transações às existentes, no orçamento aberto.</div>')+
+        // Duas gavetas simétricas, uma para cada sentido: o que ENTRA e o que SAI. Antes o que
+        // entrava eram botões soltos e o que saía vivia numa gaveta, o que fazia parecer que
+        // eram coisas de nível diferente — e obrigava a ler tudo para encontrar um deles.
+        // Dentro de cada gaveta, a ordem é a de montar um orçamento: primeiro a planta,
+        // depois o que a preenche.
+        '<details class="field">'+
+          '<summary style="cursor:pointer;font-weight:600;font-size:13px;">⬇ Importar de folha de cálculo (.csv)</summary>'+
+          '<div style="padding-inline-start:4px;border-inline-start:2px solid var(--border);margin-top:8px;padding-top:2px;">'+
+          '<div class="hint" style="margin:0 0 10px 8px;">Traz dados para <b>o orçamento aberto</b> («'+esc(budgetName(_bindex.active)||"")+'»). Mostram sempre o que vão fazer <b>antes</b> de mexer, e o <b>↩</b> desfaz.</div>'+
+          '<button class="btn" data-action="import-config" style="width:100%;justify-content:center;">Configuração dos alvos</button>'+
+          '<div class="hint" style="margin:4px 0 8px;">A «planta»: grupos, categorias, alvos e prioridades. <b>Não apaga nada</b> — o que já existe fica com o alvo do ficheiro e mantém as transações, o que falta é criado.</div>'+
+          '<button class="btn" data-action="import-csv" style="width:100%;justify-content:center;">Transações do banco</button>'+
+          '<div class="hint" style="margin-top:4px;">Acrescenta às existentes. As linhas que já tem são detetadas e saltadas.</div>'+
+          '</div>'+
+        '</details>'+
 
-        // A importação da configuração fica ao lado da das transações, e não junto às exportações:
-        // são as duas coisas que ENTRAM, e é por aí que se procura. Ficam pela ordem em que fazem
-        // sentido montar um orçamento — primeiro a planta, depois o que a preenche.
-        acao('<button class="btn" data-action="import-config" style="width:100%;justify-content:center;">📥 Importar configuração dos alvos (.csv)</button>'+
-          '<div class="hint">Grupos, categorias, alvos e prioridades, a partir de um ficheiro exportado aqui. <b>Não apaga nada</b>: o que já existe fica com o alvo do ficheiro, o que falta é criado.</div>')+
-
-        // Sem caixa, como o botão de importar mesmo ao lado. A caixa fica reservada aos três
-        // LUGARES onde os dados podem viver — é o que os distingue de uma ação qualquer.
         '<details class="field">'+
           '<summary style="cursor:pointer;font-weight:600;font-size:13px;">⬆ Exportar para folha de cálculo (.csv)</summary>'+
           '<div style="padding-inline-start:4px;border-inline-start:2px solid var(--border);margin-top:8px;padding-top:2px;">'+
           '<div class="hint" style="margin:0 0 10px 8px;">Para abrir no Excel ou no Sheets e analisar à sua maneira. Exportam <b>só o orçamento aberto</b> («'+esc(budgetName(_bindex.active)||"")+'») e <b>não</b> repõem nada — para isso é a cópia <b>.json</b>.</div>'+
+          '<button class="btn" data-action="export-config-csv" style="width:100%;justify-content:center;">Configuração dos alvos</button>'+
+          '<div class="hint" style="margin:4px 0 8px;">A «planta» do orçamento: que alvo tem cada categoria, e de que tipo. É este o ficheiro que a importação ao lado lê.</div>'+
           '<button class="btn" data-action="export-csv" style="width:100%;justify-content:center;">Transações</button>'+
           '<div class="hint" style="margin:4px 0 8px;">Todas as transações do orçamento aberto, de todas as contas, uma por linha — sem filtros aplicados.</div>'+
           '<button class="btn" data-action="export-budget-csv" style="width:100%;justify-content:center;">Orçamento do mês em vista</button>'+
-          '<div class="hint" style="margin:4px 0 8px;">Os montantes de <b>'+monthLabel(state.ui.month)+'</b>, categoria a categoria.</div>'+
-          '<button class="btn" data-action="export-config-csv" style="width:100%;justify-content:center;">Configuração dos alvos</button>'+
-          '<div class="hint" style="margin-top:4px;">A «planta» do orçamento: que alvo tem cada categoria, e de que tipo.</div>'+
+          '<div class="hint" style="margin-top:4px;">Os montantes de <b>'+monthLabel(state.ui.month)+'</b>, categoria a categoria.</div>'+
           '</div>'+
         '</details>'+
 
@@ -4255,7 +4260,8 @@
         '<li><b>Notas nas transações:</b> têm coluna própria em qualquer ecrã — no telemóvel, estreita e cortada com «…», o suficiente para saber do que se trata. A nota completa vê-se ao passar o rato por cima ou abrindo a transação.</li>'+
         '<li><b>Procurar:</b> o campo no topo das Transações procura <b>apenas</b> no <b>beneficiário</b> e na <b>nota</b> — não procura em categorias, valores nem datas, que têm filtros próprios ao lado. Basta parte da palavra, e maiúsculas ou minúsculas é igual. Cruza-se com os filtros de conta, categoria e período («Confeitaria» + <i>este ano</i> + conta X).</li>'+
         '<li><b>🏷️ Beneficiários:</b> mudar um nome altera todas as transações; dar-lhe um nome que já existe <b>junta</b> os dois. O <b>📊 Ver</b> mostra tudo o que gastou nesse beneficiário — total, número de vezes, média e em que categorias entrou. Como é a lista de transações normal, pode juntar-lhe um <b>período</b> para ver só um ano, e editar as transações a partir dali.</li>'+
-        '<li><b>Importar .csv</b> do banco: as linhas que já existem são detetadas e saltadas.</li>'+
+        '<li><b>Trazer e levar</b>, em <b>Dados e cópias</b>, tem duas gavetas simétricas: <b>⬇ Importar</b> e <b>⬆ Exportar</b>, cada uma com as mesmas coisas pela mesma ordem — primeiro a <b>configuração dos alvos</b> (a «planta»), depois as <b>transações</b>. O que sai de um lado é o que entra do outro.</li>'+
+        '<li><b>Importar transações</b> do banco: as linhas que já existem são detetadas e saltadas.</li>'+
         '<li><b>Importar a configuração dos alvos</b> (em <b>Dados e cópias → Trazer e levar</b>) lê o mesmo ficheiro que sai em <b>Exportar → Configuração dos alvos</b> e reconstrói grupos, categorias, alvos, prioridades e notas — de outro orçamento seu, ou do mesmo noutra altura. <b>Não apaga nada:</b> as categorias que já tem <b>mantêm as transações e o dinheiro</b> e só lhes muda o alvo; as que faltam são criadas; as suas que não venham no ficheiro ficam como estão. Uma categoria é reconhecida pelo <b>grupo mais o nome</b>, por isso «Luz» em «Casa» e «Luz» em «Escritório» são duas coisas diferentes, como sempre foram. Mostra tudo o que vai fazer <b>antes</b> de mexer, e o <b>↩ Anular</b> desfaz a importação inteira num passo.</li>'+
         '<li><b>Exportar para folha de cálculo</b> (no computador): o <b>⬇ Exportar o que vejo</b>, nas Transações, guarda exatamente as linhas que estão à vista — com os filtros e a conta que tiver ligados. Para o orçamento inteiro, sem filtros, é em <b>Dados e cópias</b>. Nenhum deles sai do orçamento aberto, e um <b>.csv não é cópia de segurança</b> — não repõe nada.</li>'+
       '</ul>'+
@@ -4307,7 +4313,9 @@
         '<b>Separadores de mês nas transações</b>, como já havia nas recorrentes — e só quando a lista atravessa mais do que um mês.',
         '<b>Os números de resumo passaram a estar todos na mesma linha</b>, mesmo por cima da lista: à esquerda os que falam do dinheiro — <b>Confirmado</b>, <b>Saldo</b> e <b>Por confirmar</b>, que é a diferença entre os dois — e à direita quantas transações estão à vista. Estavam espalhados por três sítios e gastavam duas linhas; agora gastam uma — e deixam de mudar de sítio conforme o comprimento do nome da conta.',
         '<b>Uma coluna «Valor» em vez de «Saída» e «Entrada»</b> nas listas: cada transação ou sai ou entra, por isso metade do espaço estava sempre vazio. Agora as saídas aparecem a vermelho com <b>−</b> e as entradas a verde com <b>+</b> — e a largura que sobrou foi para a coluna das <b>notas</b>. Ao registar continua a haver dois campos, que é o que evita enganos ao escrever.',
+        '<b>«Trazer e levar» passou a ter duas gavetas simétricas</b> — <b>⬇ Importar</b> e <b>⬆ Exportar</b> — com as mesmas coisas pela mesma ordem em cada uma: a configuração dos alvos primeiro, as transações a seguir. Antes o que entrava eram botões soltos e o que saía estava numa gaveta, o que os fazia parecer coisas de nível diferente.',
         '<b>A configuração dos alvos passou a poder ser IMPORTADA</b>, e não só exportada: em <b>Dados e cópias → Trazer e levar</b>, lê o mesmo ficheiro que sai na exportação e reconstrói grupos, categorias, alvos, prioridades e notas. Serve para copiar a planta de um orçamento para outro, ou para repor a sua depois de a ter mexido. <b>Nunca apaga nada</b> — o que já existe mantém as transações e o dinheiro e só muda de alvo — mostra tudo o que vai fazer antes de mexer, e desfaz-se com o <b>↩</b>.',
+        '<b>Nomes com números deixaram de se confundir na importação.</b> Ao importar do banco, «Conta 1» e «Conta 2» — ou «Férias 2026» e «Férias 2027» — eram tratadas como o mesmo nome, e os movimentos podiam ir parar à conta ou à categoria errada, sem aviso. Os algarismos passaram a contar.',
         '<b>Oito cores à escolha</b> para a aplicação — petróleo, azul, violeta, ameixa, framboesa, grafite, cobalto e café — em <b>Dados e cópias → Definições</b>, numa fila única de bolinhas que ocupa a linha toda. Nenhuma é verde nem laranja: essas confundem-se com as barras que dizem se há dinheiro. Quem tinha uma das cores anteriores fica com a mais parecida. A escolha acompanha o orçamento e vai na sincronização.',
         '<b>Ícone novo, em duas versões:</b> azul de fundo branco para o telemóvel em modo claro, e o desenho em azul sobre fundo escuro para o modo escuro. Como o iPhone guarda o ícone no momento em que a aplicação é <b>adicionada ao ecrã principal</b>, é preciso removê-la e voltar a adicioná-la para o ver mudar.',
         '<b>Telemóvel:</b> cabeçalho refeito com botões do tamanho de um dedo (44px, mais 47% de área), sem o título do ecrã nem o botão da cor — que passou para <b>Dados e cópias → Definições</b>. As barras de filtros cabem numa linha, e a letra deixou de variar de orçamento para orçamento no iPhone.',
@@ -5344,8 +5352,13 @@
       var note=valLim("catNote", LIM_NOTA);
       var prio=el("catPrio")?el("catPrio").value:"normal";
       pushUndo(id ? "Categoria alterada." : "Categoria criada.");
-      if (id){ var c=categoryById(id); c.name=name; c.groupId=groupId; c.target=target; c.note=note; c.priority=prio; }
-      else { state.categories.push({id:uid(), name:name, groupId:groupId, target:target, note:note, priority:prio}); }
+      // Nota vazia é nota nenhuma: apaga-se o campo em vez de o guardar a "". Ter duas
+      // representações da mesma coisa dava diferenças de assinatura na sincronização — e na
+      // importação da configuração — sem nada ter mudado de facto.
+      if (id){ var c=categoryById(id); c.name=name; c.groupId=groupId; c.target=target; c.priority=prio;
+               if(note) c.note=note; else delete c.note; }
+      else { var nc={id:uid(), name:name, groupId:groupId, target:target, priority:prio};
+             if(note) nc.note=note; state.categories.push(nc); }
       closeModal(); save(); render(); toast("Categoria guardada.");
     },
     "delete-category": function(id){
@@ -6550,7 +6563,14 @@
       else { if(ch==='"') q=true; else if(ch===d){ out.push(cur); cur=""; } else cur+=ch; } }
     out.push(cur); return out;
   }
-  function normKey(s){ return String(s==null?"":s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z]/g,""); }
+  // Para PALAVRAS-CHAVE: nomes de colunas, tipos de alvo, «sim/não». Deita fora tudo o que não
+  // seja letra, e é isso que faz «Tipo de alvo» e «tipodealvo» darem no mesmo.
+  function normKey(s){ return String(s==null?"":s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z]/g,""); }
+  // Para NOMES escolhidos pelo utilizador: contas, grupos, categorias. Aqui os ALGARISMOS têm
+  // de ficar — «Conta 1» e «Conta 2», ou «Férias 2026» e «Férias 2027», são coisas diferentes,
+  // e a norma das palavras-chave transformava-as todas no mesmo texto. Continua a ignorar
+  // maiúsculas, acentos e espaços a mais, que é o que se quer ao casar nomes escritos à mão.
+  function normNome(s){ return String(s==null?"":s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,""); }
   function parseCSVDate(s){
     s=String(s==null?"":s).trim(); if(!s) return null;
     var m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return m[1]+"-"+pad(+m[2])+"-"+pad(+m[3]);
@@ -6578,8 +6598,8 @@
     if(!("data" in idx) || (!("saida" in idx) && !("entrada" in idx) && !("valor" in idx)))
       return { rows:[], skipped:0, error:"Cabeçalho não reconhecido. É necessária uma coluna «Data» e uma coluna «Valor» (ou «Saída»/«Entrada»)." };
     var accByName={}, catByName={};
-    state.accounts.forEach(function(a){ accByName[normKey(a.name)]=a.id; });
-    state.categories.forEach(function(c){ if(!c.cardId) catByName[normKey(c.name)]=c.id; });
+    state.accounts.forEach(function(a){ accByName[normNome(a.name)]=a.id; });
+    state.categories.forEach(function(c){ if(!c.cardId) catByName[normNome(c.name)]=c.id; });
     // Contagem do que já existe, por conta+data+valor. Contando (em vez de só marcar) fica
     // certo o caso de haver mesmo duas compras iguais no mesmo dia: só as que já lá estão
     // é que são assinaladas como repetidas.
@@ -6599,10 +6619,10 @@
       if("entrada" in idx){ v=parseAmount(f[idx.entrada]); if(!isNaN(v)&&Math.abs(v)>0.0001) inf=Math.abs(v); }
       if(!date || (out<0.005 && inf<0.005)){ skipped++; continue; }
       var accId=defaultAccountId;
-      if("conta" in idx){ var an=accByName[normKey(f[idx.conta])]; if(an) accId=an; }
+      if("conta" in idx){ var an=accByName[normNome(f[idx.conta])]; if(an) accId=an; }
       var catId=null;
       var accObj=lkAcc(accId), ehTrack=!!(accObj && accObj.type==="tracking");   // acompanhamento não leva categoria
-      if(!ehTrack && "categoria" in idx){ var cn=normKey(f[idx.categoria]); if(cn==="rendimento"||cn==="income") catId=INCOME; else if(catByName[cn]) catId=catByName[cn]; }
+      if(!ehTrack && "categoria" in idx){ var cn=normNome(f[idx.categoria]); if(cn==="rendimento"||cn==="income") catId=INCOME; else if(catByName[cn]) catId=catByName[cn]; }
       // Conta TODAS as linhas que ficariam por classificar (saídas e entradas), com a mesma regra
       // do resto da aplicação. Importar é em lote, por isso não se bloqueia — mas diz-se quantas
       // ficam por corrigir, e o aviso do ecrã do Orçamento continua a lembrá-lo depois.
@@ -6725,11 +6745,11 @@
       var WDAYS = ["domingo","segundafeira","tercafeira","quartafeira","quintafeira","sextafeira","sabado"];
 
       // O que já existe, pela mesma chave que vamos usar a seguir.
-      function chave(g,c){ return normKey(g)+"\u0000"+normKey(c); }
+      function chave(g,c){ return normNome(g)+"\u0000"+normNome(c); }
       var jaTenho = {}, gruposTenho = {};
       for (var gi=0; gi<state.groups.length; gi++){
         var grp = state.groups[gi];
-        gruposTenho[normKey(grp.name)] = grp;
+        gruposTenho[normNome(grp.name)] = grp;
         var cs = categoriesOfGroup(grp.id);
         for (var ci=0; ci<cs.length; ci++) jaTenho[chave(grp.name, cs[ci].name)] = cs[ci];
       }
@@ -6791,8 +6811,8 @@
         var prio = PRIOS[normKey(f[iP]||"")] || "normal";
         var nota = iN>=0 ? String(f[iN]||"").trim() : "";
         plano.push({ grupo:gN, cat:cN, alvo:alvo, prio:prio, nota:nota,
-                     existente:existente, grupoExiste: !!gruposTenho[normKey(gN)] });
-        if (!gruposTenho[normKey(gN)]) gruposNovos[normKey(gN)] = gN;
+                     existente:existente, grupoExiste: !!gruposTenho[normNome(gN)] });
+        if (!gruposTenho[normNome(gN)]) gruposNovos[normNome(gN)] = gN;
       }
 
       // Categorias que a aplicação tem e o ficheiro não traz. Não se apagam — apagar levaria
@@ -6870,10 +6890,10 @@
     if(!_cfg || !_cfg.plano || !_cfg.plano.length) return;
     pushUndo("Configuração importada.");
     var gruposPorNome = {};
-    for (var g=0; g<state.groups.length; g++) gruposPorNome[normKey(state.groups[g].name)] = state.groups[g];
+    for (var g=0; g<state.groups.length; g++) gruposPorNome[normNome(state.groups[g].name)] = state.groups[g];
     var nNovas=0, nMud=0;
     for (var i=0;i<_cfg.plano.length;i++){
-      var it=_cfg.plano[i], gk=normKey(it.grupo), grp=gruposPorNome[gk];
+      var it=_cfg.plano[i], gk=normNome(it.grupo), grp=gruposPorNome[gk];
       if (!grp){ grp={ id:uid(), name:it.grupo }; state.groups.push(grp); gruposPorNome[gk]=grp; }
       var cat = it.existente;
       if (!cat){ cat={ id:uid(), name:it.cat, groupId:grp.id }; state.categories.push(cat); nNovas++; }
@@ -6958,7 +6978,13 @@
 
     var g1={id:uid(),name:"Despesas fixas"}, g2={id:uid(),name:"Qualidade de vida"}, g3={id:uid(),name:"Poupança e objetivos"};
     s.groups=[g1,g2,g3];
-    function cat(name,gid,tgt,prio,nota){ return {id:uid(),name:name,groupId:gid,target:tgt||null,priority:prio||"normal",note:nota||""}; }
+    // Nota vazia é nota nenhuma: não se grava o campo. Guardá-lo a "" fazia a mesma categoria
+    // ter duas representações possíveis, o que dava diferenças de assinatura na sincronização
+    // (e na importação da configuração) sem nada ter mudado de facto.
+    function cat(name,gid,tgt,prio,nota){
+      var c={id:uid(),name:name,groupId:gid,target:tgt||null,priority:prio||"normal"};
+      if(nota) c.note=nota; return c;
+    }
     function mo(a){ return {type:"monthly",amount:a}; }
 
     var cRenda  = cat("Renda/Casa",           g1.id, mo(650), "alta"),
