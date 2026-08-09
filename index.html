@@ -222,9 +222,16 @@
   /* Lista dos movimentos recentes, dentro da janela. */
   .moves-list { max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
-  .move-row { display: flex; align-items: center; gap: 10px; padding: 8px 14px; font-size: 12.5px; border-bottom: 1px solid var(--border); }
+  .move-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 14px; font-size: 12.5px; border-bottom: 1px solid var(--border); }
   .move-row:last-child { border-bottom: 0; }
-  .move-row .m-desc { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* A descrição passou a ter duas linhas — o que se fez, e de onde veio o dinheiro. O «nowrap»
+     tem de sair daqui e ir para cada uma delas, senão as duas ficavam na mesma linha. */
+  /* A descrição tem duas linhas: o que se fez, e de onde veio o dinheiro. Cada uma trunca por
+     si — daí o «nowrap» estar em cada uma e não no bloco, senão ficavam ambas na mesma linha. */
+  .move-row .m-desc { flex: 1; min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .move-row .m-desc .m-de { display: block; font-size: 11px; color: var(--text-muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
   .move-row .m-amt { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
   .move-row .m-time { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
   .overspent-bar { display: flex; align-items: center; gap: 12px; margin: 10px 26px 0; padding: 11px 16px; border-radius: 12px; background: var(--negative-soft); border: 1px solid var(--negative); color: var(--negative); font-size: 13px; font-weight: 600; flex-wrap: wrap; }
@@ -1011,7 +1018,10 @@
   function temaAtual(){
     var t = (state.settings||{}).theme;
     for (var i=0;i<TEMAS.length;i++) if (TEMAS[i].id===t) return t;
-    return "verde";
+    // Sem cor escolhida, ou com uma que já não existe: a primeira da lista. Estava aqui um
+    // nome fixo («verde») que a paleta entretanto deixou de ter — e um nome que não existe não
+    // corresponde a bolinha nenhuma, pelo que as Definições apareciam sem nada selecionado.
+    return TEMAS[0].id;
   }
   var DEFAULT_STATE = {
     version: 1,
@@ -1138,10 +1148,26 @@
   // É só leitura: quem anda para trás é o ↩ Anular. Aqui o «Anulou» fica registado como mais
   // uma linha — um diário não apaga o passado, acrescenta-lhe.
   var MOVES_MAX = 30;
-  function logMove(desc, delta){
+  // «de» é a segunda linha: DE ONDE veio (ou para onde foi) o dinheiro. A pergunta que a
+  // primeira linha deixa por responder — «cobriu a Roupa», sim, mas à custa de quê? — e sem
+  // ela o registo não chega para reconstituir o raciocínio dias depois.
+  function logMove(desc, delta, de){
     if (!state.moves) state.moves = [];
-    state.moves.unshift({ desc:desc, delta:(delta==null?null:round2(delta)), t:Date.now(), m:state.ui.month });
+    var mv = { desc:desc, delta:(delta==null?null:round2(delta)), t:Date.now(), m:state.ui.month };
+    if (de) mv.de = de;
+    state.moves.unshift(mv);
     if (state.moves.length > MOVES_MAX) state.moves.length = MOVES_MAX;
+  }
+  // Lista de origens em texto: «Férias 120,00 € · Roupa 30,00 €». Acima de três, resume — a
+  // linha trunca com «…» e uma enumeração comprida não caberia de qualquer maneira.
+  function nomesDeOrigem(pares){
+    if (!pares || !pares.length) return "";
+    var ps = pares.slice().sort(function(a,b){ return Math.abs(b.valor)-Math.abs(a.valor); });
+    if (ps.length > 3) {
+      var top = ps.slice(0,2).map(function(x){ return x.nome; }).join(", ");
+      return top + " e mais " + (ps.length-2) + (ps.length-2===1?" categoria":" categorias");
+    }
+    return ps.map(function(x){ return x.nome+" "+fmt(Math.abs(x.valor)); }).join(" \u00b7 ");
   }
   var _csv = null;   // pré-visualização da importação de CSV
   var _drag = null;  // arrastar para reordenar
@@ -2430,7 +2456,11 @@
       // O mês só aparece quando NÃO é o que está a ver: senão repetia-se em todas as linhas,
       // e é precisamente quando é outro que a informação faz falta («financiei 200 €» — em quê?).
       var etq = (mv.m && mv.m !== mAtual) ? ' <span class="tag">'+monthLabel(mv.m)+'</span>' : '';
-      linhas += '<div class="move-row"><span class="m-desc">'+esc(mv.desc)+etq+'</span>'+
+      // A origem vai numa segunda linha, mais pequena e apagada: a primeira responde «o quê»,
+      // esta responde «à custa de quê». Juntá-las na mesma linha não servia — ela trunca com
+      // «…», e seria precisamente esta parte a desaparecer.
+      var de = mv.de ? '<span class="m-de">'+esc(mv.de)+'</span>' : '';
+      linhas += '<div class="move-row"><span class="m-desc">'+esc(mv.desc)+etq+de+'</span>'+
         (val?'<span class="m-amt" style="color:'+cor+'">'+val+'</span>':'')+
         '<span class="m-time">'+tempoRel(mv.t)+'</span></div>';
     }
@@ -4229,7 +4259,7 @@
         '<li><b>O cabeçalho das listas fica à vista:</b> ao descer uma lista de transações, os nomes das colunas — Data, Beneficiário, Categoria… — ficam colados ao topo, para saber sempre o que está a ler. No telemóvel, como a tabela é mais larga do que o ecrã, é a <b>lista</b> que corre dentro da sua própria área em vez da página inteira.</li>'+
         '<li><b>Contas nos campos de dinheiro:</b> em qualquer campo de valor pode escrever a conta em vez do total — <b>23,45+11,90+7,15</b>. O resultado aparece por baixo enquanto escreve e substitui a conta assim que sai do campo. No <b>telemóvel</b> aparece um <b>teclado próprio</b> com <b>+</b> e <b>−</b>, sem letras nem risco de enganos. Num par <b>Saída/Entrada</b>, um <b>−</b> escrito no princípio do campo continua a passar o valor para o outro lado; depois de números, é uma subtração.</li>'+
         '<li><b>Datas e teclado:</b> as datas escrevem-se sempre em <b>dd/mm/aaaa</b>, mesmo que tenha o browser noutro idioma — pode escrever só os números, que as barras aparecem sozinhas, ou usar o 📅 para as escolher no calendário. Dentro de qualquer janela, o <b>Enter</b> vale por carregar no botão principal.</li>'+
-        '<li><b>Cor da aplicação:</b> oito à escolha, em <b>Dados e cópias → Definições</b> — basta tocar numa bolinha. Vão do petróleo ao rosa pelo lado do roxo, mais um cinzento e um castanho, e nenhuma é verde nem laranja de propósito: uma cor de marca nessas zonas confunde-se, a um relance, com as barras que dizem se há dinheiro. No computador, o círculo no canto superior direito percorre-as uma a uma. A cor <b>acompanha o orçamento</b>: fica guardada com ele e vai na sincronização, como as outras definições. Os verdes e vermelhos dos valores nunca mudam — são eles que dizem se há ou não dinheiro.</li>'+
+        '<li><b>Cor da aplicação:</b> oito à escolha, em <b>Dados e cópias → Definições</b> — basta tocar numa bolinha. Vão do petróleo ao rosa pelo lado do roxo, mais um cinzento e um castanho, e nenhuma é verde nem laranja de propósito: uma cor de marca nessas zonas confunde-se, a um relance, com as barras que dizem se há dinheiro. No computador, o círculo no canto superior direito percorre-as uma a uma. A cor <b>é de cada orçamento</b>, e não do aparelho: fica guardada com ele e vai na sincronização, como as outras definições. Dê uma cor a cada um — verde-azulado ao <b>Pessoal</b>, framboesa ao <b>Família</b>, por exemplo — e passa a saber num relance qual está aberto, no telemóvel e no computador, sem ler o nome. Os verdes e vermelhos dos valores nunca mudam — são eles que dizem se há ou não dinheiro.</li>'+
         '<li><b>Esc</b> dentro de um campo desfaz o que estava a escrever e larga o campo, sem gravar. Dentro de uma janela, é preciso carregar duas vezes: a primeira sai do campo, a segunda fecha a janela. Na <b>caixa de procura</b> das Transações o Esc <b>apaga</b> o texto (e o cursor fica lá) — o mesmo que o <b>✕</b> dentro da caixa.</li>'+
       '</ul>'+
 
@@ -4252,7 +4282,7 @@
         '<li><b>📅 Recorrentes</b> lançam-se sozinhas na data — diária, semanal, quinzenal, mensal, semestral ou anual. Podem ser uma <b>despesa/receita</b> ou uma <b>↔ transferência</b> entre contas, útil para pôr dinheiro de lado na poupança todos os meses.</li>'+
         '<li>Clique numa transação para a editar. Transferências e divididas editam-se <b>por inteiro</b>, nunca metade.</li>'+
         '<li><b>No telemóvel, o cabeçalho</b> tem, por esta ordem: o <b>nome do orçamento</b> (toque para trocar ou gerir), <b>➕</b> nova transação, <b>🏷️</b> beneficiários, <b>💾</b> dados e cópias, <b>↩ ↪</b> anular e refazer, <b>🕑</b> movimentos recentes e <b>❓</b> esta ajuda. O título do ecrã não aparece — é a barra de baixo, com o separador aceso, que diz onde está.</li>'+
-        '<li><b>🕑 Movimentos recentes</b> (ao lado do ↩ ↪, no topo) — o registo de como tem repartido o dinheiro <b>pelas categorias</b>: mover entre categorias, 🩹 cobrir, 🎯 financiar, 🧹 libertar excedente, atribuir à mão, adiar, e também o que anulou. Guarda os <b>últimos 30</b> e acompanha o orçamento (sobrevive a fechar a aplicação e vai na sincronização). As <b>transações não entram</b> — essas têm a sua própria lista. É só para ler: para andar para trás use o <b>↩</b>.</li>'+
+        '<li><b>🕑 Movimentos recentes</b> (ao lado do ↩ ↪, no topo) — o registo de como tem repartido o dinheiro <b>pelas categorias</b>: mover entre categorias, 🩹 cobrir, 🎯 financiar, 🧹 libertar excedente, atribuir à mão, adiar, e também o que anulou. Cada linha diz <b>o que fez</b> e, por baixo, <b>de onde veio o dinheiro</b> — «Cobriu «Roupa»» e, em pequeno, «de Férias 50,00 €». Quando as origens são muitas, mostra as duas maiores e conta as restantes. Guarda os <b>últimos 30</b> e acompanha o orçamento (sobrevive a fechar a aplicação e vai na sincronização). As <b>transações não entram</b> — essas têm a sua própria lista. É só para ler: para andar para trás use o <b>↩</b>.</li>'+
         '<li><b>Somar à pressa:</b> as caixas à esquerda da data selecionam transações e mostram o total em baixo. A caixa no <b>cabeçalho</b> marca todas as que estão à vista. É só uma conta rápida — não altera nada, e a seleção desaparece ao mudar de página.</li>'+
         '<li><b>Separadores de mês</b> nas listas de transações e de recorrentes: «Agosto 2026», «Julho 2026»… Só aparecem quando a lista atravessa mais do que um mês — num filtro de «este mês» não separariam nada.</li>'+
         '<li><b>Uma coluna «Valor»</b> nas listas de transações e de recorrentes: as saídas aparecem a <b>vermelho com −</b> e as entradas a <b>verde com +</b>. Ao registar ou editar continua a haver dois campos, <b>Saída</b> e <b>Entrada</b>, que é o que evita enganos ao escrever.</li>'+
@@ -4313,6 +4343,8 @@
         '<b>Separadores de mês nas transações</b>, como já havia nas recorrentes — e só quando a lista atravessa mais do que um mês.',
         '<b>Os números de resumo passaram a estar todos na mesma linha</b>, mesmo por cima da lista: à esquerda os que falam do dinheiro — <b>Confirmado</b>, <b>Saldo</b> e <b>Por confirmar</b>, que é a diferença entre os dois — e à direita quantas transações estão à vista. Estavam espalhados por três sítios e gastavam duas linhas; agora gastam uma — e deixam de mudar de sítio conforme o comprimento do nome da conta.',
         '<b>Uma coluna «Valor» em vez de «Saída» e «Entrada»</b> nas listas: cada transação ou sai ou entra, por isso metade do espaço estava sempre vazio. Agora as saídas aparecem a vermelho com <b>−</b> e as entradas a verde com <b>+</b> — e a largura que sobrou foi para a coluna das <b>notas</b>. Ao registar continua a haver dois campos, que é o que evita enganos ao escrever.',
+        '<b>Os 🕑 Movimentos recentes passaram a dizer DE ONDE veio o dinheiro.</b> Antes lia-se «🩹 Cobriu «Roupa»» e ficava por saber à custa de quê — que é metade da história. Agora cada linha leva por baixo, em pequeno, a origem: «de Férias 50,00 €». Vale para cobrir, financiar, libertar excedente, repor a zero e limpar atribuições; quando as origens são muitas, mostra as maiores e conta as restantes.',
+        '<b>A cor por omissão apontava para uma cor que já não existia.</b> Um orçamento sem cor escolhida ficava com um nome antigo, que não corresponde a bolinha nenhuma — as Definições apareciam sem nada selecionado. Passa a cair sempre na primeira cor da lista.',
         '<b>«Trazer e levar» passou a ter duas gavetas simétricas</b> — <b>⬇ Importar</b> e <b>⬆ Exportar</b> — com as mesmas coisas pela mesma ordem em cada uma: a configuração dos alvos primeiro, as transações a seguir. Antes o que entrava eram botões soltos e o que saía estava numa gaveta, o que os fazia parecer coisas de nível diferente.',
         '<b>A configuração dos alvos passou a poder ser IMPORTADA</b>, e não só exportada: em <b>Dados e cópias → Trazer e levar</b>, lê o mesmo ficheiro que sai na exportação e reconstrói grupos, categorias, alvos, prioridades e notas. Serve para copiar a planta de um orçamento para outro, ou para repor a sua depois de a ter mexido. <b>Nunca apaga nada</b> — o que já existe mantém as transações e o dinheiro e só muda de alvo — mostra tudo o que vai fazer antes de mexer, e desfaz-se com o <b>↩</b>.',
         '<b>Nomes com números deixaram de se confundir na importação.</b> Ao importar do banco, «Conta 1» e «Conta 2» — ou «Férias 2026» e «Férias 2027» — eram tratadas como o mesmo nome, e os movimentos podiam ir parar à conta ou à categoria errada, sem aviso. Os algarismos passaram a contar.',
@@ -5383,7 +5415,8 @@
         delete state.assignments[k];
       }
       state.ui.lastFunding={month:m, entries:snap};
-      logMove("🧽 Limpou atribuições de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias"), plan.total);
+      logMove("🧽 Limpou atribuições de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias"), plan.total,
+        "de " + nomesDeOrigem(plan.entries.map(function(e){ return {nome:e.name, valor:e.add}; })));
       closeModal(); save(); render();
       toast("Devolvido "+fmt(plan.total)+" de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
     },
@@ -5422,19 +5455,20 @@
       var tot=coverTotal(sel);
       if(tot<=0.005){ toast("Escolha de onde tirar o dinheiro."); return; }
       pushUndo("Excesso coberto.");
-      var snap=[], nFontes=0;
+      var snap=[], nFontes=0, origens=[];
       function guarda(key){ snap.push({key:key, prev: state.assignments.hasOwnProperty(key)?state.assignments[key]:null}); }
       for(var id in sel){
         if(!sel.hasOwnProperty(id)) continue;
         var t=sel[id]; if(t<=0.005) continue;
         nFontes++;
+        origens.push({ nome: (id===RTA_ID ? "Pronto a atribuir" : ((categoryById(id)||{}).name||"?")), valor: t });
         // Do «Pronto a atribuir» não há nada a descontar: é dinheiro ainda sem função.
         if(id!==RTA_ID){ var kf=id+"|"+m; guarda(kf); state.assignments[kf]=round2((state.assignments[kf]||0)-t); }
       }
       var ka=alvo+"|"+m; guarda(ka); state.assignments[ka]=round2((state.assignments[ka]||0)+tot);
       state.ui.lastFunding={month:m, entries:snap};
       var nome=(categoryById(alvo)||{}).name||"";
-      logMove("🩹 Cobriu «"+nome+"»", tot);
+      logMove("🩹 Cobriu «"+nome+"»", tot, "de " + nomesDeOrigem(origens));
       _covSel=null; _covAlvo=null; _covFontes=null;
       closeModal(); save(); render();
       toast("Coberto "+fmt(tot)+" em «"+nome+"» — pode anular no topo.");
@@ -5454,7 +5488,7 @@
       var key=id+"|"+m;
       state.ui.lastFunding={month:m, entries:[{key:key, prev: state.assignments.hasOwnProperty(key)?state.assignments[key]:null}]};
       state.assignments[key]=round2((state.assignments[key]||0)+ti.need);
-      logMove("🎯 Financiou «"+c.name+"»", ti.need);
+      logMove("🎯 Financiou «"+c.name+"»", ti.need, "do Pronto a atribuir");
       save(); render();
       toast(rtaDepois < -0.005
         ? ("Alvo financiado — o «Pronto a atribuir» ficou negativo em "+fmt(-rtaDepois)+".")
@@ -5475,7 +5509,8 @@
         state.assignments[key]=round2((state.assignments[key]||0)+e.add);
       }
       state.ui.lastFunding={month:m, entries:snap};
-      logMove("🧹 Libertou excedente de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias"), plan.total);
+      logMove("🧹 Libertou excedente de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias"), plan.total,
+        "de " + nomesDeOrigem(plan.entries.map(function(e){ return {nome:e.name, valor:e.add}; })));
       closeModal(); save(); render();
       toast("Libertado "+fmt(-plan.total)+" de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
     },
@@ -5490,7 +5525,8 @@
         state.assignments[key]=round2((state.assignments[key]||0)+e.add);
       }
       state.ui.lastFunding={month:m, entries:snap};
-      logMove("↩ Repôs a zero ("+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+")", plan.total);
+      logMove("↩ Repôs a zero ("+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+")", plan.total,
+        "de " + nomesDeOrigem(plan.entries.map(function(e){ return {nome:e.name, valor:e.add}; })));
       closeModal(); save(); render();
       toast("Reposto "+fmt(-plan.total)+" a partir de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
     },
@@ -5506,7 +5542,8 @@
         state.assignments[key]=round2((state.assignments[key]||0)+e.add);
       }
       state.ui.lastFunding={month:m, entries:snap};
-      logMove("🎯 Financiou alvos ("+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+")", plan.total);
+      logMove("🎯 Financiou alvos ("+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+")", plan.total,
+        "para " + nomesDeOrigem(plan.entries.map(function(e){ return {nome:e.name, valor:e.add}; })));
       closeModal(); save(); render();
       toast("Financiado "+fmt(plan.total)+" em "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
     },
