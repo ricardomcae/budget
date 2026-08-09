@@ -553,7 +553,11 @@
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   /* Bolinhas das cores. A escolhida leva um anel por fora — uma marca por dentro tapava
      precisamente a cor que se está a mostrar. */
-  .cores { display: flex; gap: 10px; flex-wrap: wrap; padding: 2px 0; }
+  /* Grelha FIXA de 3 por linha, e não uma fila que se parte quando não cabe. A coluna da
+     esquerda do «grid-2» mede ~202px no computador, e seis bolas de 30 com 10 de intervalo
+     pedem 230: a sexta caía sozinha para a linha de baixo, o que parecia um erro. Duas linhas
+     de três são iguais em qualquer largura — e a quadrícula lê-se melhor do que uma fila. */
+  .cores { display: grid; grid-template-columns: repeat(3, 30px); gap: 10px; justify-content: start; padding: 2px 0; }
   .cor-bola { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--surface);
     box-shadow: 0 0 0 1px var(--border); cursor: pointer; padding: 0; transition: transform .12s; }
   .cor-bola:hover { transform: scale(1.12); }
