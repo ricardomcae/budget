@@ -7048,15 +7048,32 @@
   // Rodar dispara os DOIS eventos («orientationchange» e «resize»), e nem todos os Safari
   // disparam o primeiro. Marca-se uma vez e trata-se uma vez, para não correr o mesmo trabalho
   // duas e três vezes por cada rotação.
-  var _rodarT, _aRodar = false, _deitado = window.innerWidth > window.innerHeight;
+  var _rodarT = [], _aRodar = false, _deitado = window.innerWidth > window.innerHeight;
   function agendaRodar(){
     _aRodar = true;                    // cala as medições intermédias até isto assentar
-    reporTopo();                       // já, para o salto ficar escondido pela rotação
-    // A MEDIÇÃO, essa, tem mesmo de esperar: a meio da animação o iOS devolve tamanhos
-    // intermédios, e a altura da lista sairia errada. Uma só medição, quando tudo assentou.
-    clearTimeout(_rodarT);
-    _rodarT = setTimeout(function(){ _aRodar = false; medirTopo(); }, 320);
+    // Insiste-se no topo várias vezes ao longo de meio segundo, e não é exagero: o Safari
+    // restaura sozinho o deslize que a página tinha, e fá-lo DEPOIS de entregar os eventos de
+    // rotação — e nem sempre no mesmo instante. Uma tentativa isolada, por mais cedo que fosse,
+    // era desfeita por ele e ficava tudo como estava, que foi o que aconteceu à primeira versão
+    // disto. As tentativas que apanhem a página já no topo não fazem nada nem se veem.
+    reporTopo();
+    if (window.requestAnimationFrame) requestAnimationFrame(reporTopo);
+    for (var i=0;i<_rodarT.length;i++) clearTimeout(_rodarT[i]);
+    _rodarT = [ setTimeout(reporTopo, 150),
+                setTimeout(function(){ _aRodar = false; reporTopo(); medirTopo(); }, 320),
+                setTimeout(reporTopo, 600) ];
   }
+  // Se entretanto o utilizador tocar no ecrã, manda ele: as tentativas que faltam são
+  // canceladas. Sem isto, quem rodasse e começasse logo a deslizar era atirado para trás.
+  // A medição NÃO é cancelada — só as reposições de posição: deixar a lista por medir daria
+  // uma altura errada até à rotação seguinte.
+  window.addEventListener("touchstart", function(){
+    if (!_rodarT.length) return;
+    for (var i=0;i<_rodarT.length;i++) clearTimeout(_rodarT[i]);
+    _rodarT = [];
+    _aRodar = false;
+    medirTopo();
+  }, { passive:true });
   // Nem todos os Safari disparam «orientationchange»; quando o disparam, chega junto com o
   // «resize» que já é tratado acima. O «agendaRodar» é idempotente, por isso ouvir os dois é
   // seguro e cobre os dois comportamentos.
