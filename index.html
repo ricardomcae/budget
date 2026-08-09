@@ -7007,7 +7007,19 @@
   }
   window.addEventListener("scroll", escondeDica, true);
   window.addEventListener("resize", escondeDica);
-  window.addEventListener("resize", medirTopo);
+  // Durante uma rotação o iOS emite vários «resize» com tamanhos INTERMÉDIOS, ainda a meio da
+  // animação. Medir com eles dá uma altura de lista errada, logo a seguir corrigida — e via-se
+  // o cartão a mudar de tamanho duas ou três vezes. Por isso a rotação é detetada AQUI, antes
+  // de medir seja o que for: no primeiro «resize» da rotação já se sabe que é uma rotação, e
+  // salta-se a medição. Enquanto roda mede-se uma só vez, no fim. Fora de rotações, como antes.
+  window.addEventListener("resize", function(){
+    var agora = window.innerWidth > window.innerHeight;
+    // A rotação conhece-se pela troca de lados. Sem isto reagia-se ao teclado a abrir, que muda
+    // a altura da janela mas nunca a orientação — e a página saltava sempre que se tocava num
+    // campo de valor.
+    if (agora !== _deitado) { _deitado = agora; agendaRodar(); }
+    if (!_aRodar) medirTopo();
+  });
   window.addEventListener("resize", ajustarBarra);
   // ---- Rodar o telemóvel ----
   // Ao rodar, o Safari mantém o deslize da PÁGINA em píxeis. Em landscape cabe pouco de cada
@@ -7017,41 +7029,38 @@
   // Repõe-se APENAS o deslize da página, nunca o do cartão da lista: no telemóvel quem desliza
   // é o cartão, e mandá-lo ao topo faria perder o lugar numa lista de transações longa. Assim
   // reaparece o cabeçalho e continua-se a ler onde se ia.
-  function aoRodar(){
+  // O topo é o topo em qualquer orientação: não é preciso medir nada para lá chegar. Por isso
+  // isto corre JÁ, sem esperas — assim o salto acontece por baixo da animação de rotação do
+  // iOS e não se vê. Com uma espera, via-se o ecrã rodar, ficar um instante na posição antiga
+  // e só depois saltar: era esse o tremeluzir.
+  function reporTopo(){
     try {
       // Com uma janela aberta, quem desliza é o fundo escuro dela e a página fica quieta por
       // trás. Mexer-lhe aqui não se veria agora, mas devolvia o utilizador ao topo quando
       // fechasse a janela — um salto sem causa aparente. Fica como está.
       var ov = el("modalOverlay");
-      if (ov && ov.classList.contains("open")) { medirTopo(); return; }
+      if (ov && ov.classList.contains("open")) return;
       var barra = document.querySelector(".sidebar");
       var telemovel = barra && getComputedStyle(barra).position === "fixed";
       if (telemovel && (window.pageYOffset||0) > 0) window.scrollTo(0,0);
     } catch(e){}
-    medirTopo();
   }
   // Rodar dispara os DOIS eventos («orientationchange» e «resize»), e nem todos os Safari
   // disparam o primeiro. Marca-se uma vez e trata-se uma vez, para não correr o mesmo trabalho
   // duas e três vezes por cada rotação.
-  var _rodarT;
+  var _rodarT, _aRodar = false, _deitado = window.innerWidth > window.innerHeight;
   function agendaRodar(){
+    _aRodar = true;                    // cala as medições intermédias até isto assentar
+    reporTopo();                       // já, para o salto ficar escondido pela rotação
+    // A MEDIÇÃO, essa, tem mesmo de esperar: a meio da animação o iOS devolve tamanhos
+    // intermédios, e a altura da lista sairia errada. Uma só medição, quando tudo assentou.
     clearTimeout(_rodarT);
-    _rodarT = setTimeout(function(){
-      aoRodar();
-      // As animações de rotação do iOS ainda vão a meio quando os eventos chegam: uma segunda
-      // medição, já com tudo parado, evita alturas de lista erradas.
-      setTimeout(medirTopo, 300);
-    }, 120);
+    _rodarT = setTimeout(function(){ _aRodar = false; medirTopo(); }, 320);
   }
+  // Nem todos os Safari disparam «orientationchange»; quando o disparam, chega junto com o
+  // «resize» que já é tratado acima. O «agendaRodar» é idempotente, por isso ouvir os dois é
+  // seguro e cobre os dois comportamentos.
   window.addEventListener("orientationchange", agendaRodar);
-  // Na «resize», a rotação deteta-se pela troca de lados. Sem isto reagia-se ao teclado a
-  // abrir, que muda a altura da janela mas nunca a orientação — e a página saltava ao topo
-  // sempre que se tocava num campo.
-  var _deitado = window.innerWidth > window.innerHeight;
-  window.addEventListener("resize", function(){
-    var agora = window.innerWidth > window.innerHeight;
-    if (agora !== _deitado) { _deitado = agora; agendaRodar(); }
-  });
   document.addEventListener("focusout", function(e){
     if (e.target && e.target.classList && e.target.classList.contains("money")) fechaConta(e.target);
   });
