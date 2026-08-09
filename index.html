@@ -7009,7 +7009,49 @@
   window.addEventListener("resize", escondeDica);
   window.addEventListener("resize", medirTopo);
   window.addEventListener("resize", ajustarBarra);
-  window.addEventListener("orientationchange", function(){ setTimeout(medirTopo, 120); });
+  // ---- Rodar o telemóvel ----
+  // Ao rodar, o Safari mantém o deslize da PÁGINA em píxeis. Em landscape cabe pouco de cada
+  // vez, portanto está-se quase sempre deslizado; ao voltar a portrait esse mesmo deslize passa
+  // a tapar o cabeçalho — e o «Pronto a atribuir», que é o número mais importante do ecrã,
+  // ficava escondido por cima sem nada indicar que estava lá.
+  // Repõe-se APENAS o deslize da página, nunca o do cartão da lista: no telemóvel quem desliza
+  // é o cartão, e mandá-lo ao topo faria perder o lugar numa lista de transações longa. Assim
+  // reaparece o cabeçalho e continua-se a ler onde se ia.
+  function aoRodar(){
+    try {
+      // Com uma janela aberta, quem desliza é o fundo escuro dela e a página fica quieta por
+      // trás. Mexer-lhe aqui não se veria agora, mas devolvia o utilizador ao topo quando
+      // fechasse a janela — um salto sem causa aparente. Fica como está.
+      var ov = el("modalOverlay");
+      if (ov && ov.classList.contains("open")) { medirTopo(); return; }
+      var barra = document.querySelector(".sidebar");
+      var telemovel = barra && getComputedStyle(barra).position === "fixed";
+      if (telemovel && (window.pageYOffset||0) > 0) window.scrollTo(0,0);
+    } catch(e){}
+    medirTopo();
+  }
+  // Rodar dispara os DOIS eventos («orientationchange» e «resize»), e nem todos os Safari
+  // disparam o primeiro. Marca-se uma vez e trata-se uma vez, para não correr o mesmo trabalho
+  // duas e três vezes por cada rotação.
+  var _rodarT;
+  function agendaRodar(){
+    clearTimeout(_rodarT);
+    _rodarT = setTimeout(function(){
+      aoRodar();
+      // As animações de rotação do iOS ainda vão a meio quando os eventos chegam: uma segunda
+      // medição, já com tudo parado, evita alturas de lista erradas.
+      setTimeout(medirTopo, 300);
+    }, 120);
+  }
+  window.addEventListener("orientationchange", agendaRodar);
+  // Na «resize», a rotação deteta-se pela troca de lados. Sem isto reagia-se ao teclado a
+  // abrir, que muda a altura da janela mas nunca a orientação — e a página saltava ao topo
+  // sempre que se tocava num campo.
+  var _deitado = window.innerWidth > window.innerHeight;
+  window.addEventListener("resize", function(){
+    var agora = window.innerWidth > window.innerHeight;
+    if (agora !== _deitado) { _deitado = agora; agendaRodar(); }
+  });
   document.addEventListener("focusout", function(e){
     if (e.target && e.target.classList && e.target.classList.contains("money")) fechaConta(e.target);
   });
