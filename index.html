@@ -908,10 +908,10 @@
 <div class="calcpad" id="calcPad" aria-hidden="true">
   <div class="calc-head"><span class="calc-disp" id="calcDisp">0</span><button class="calc-close" data-calc="cancel" aria-label="Fechar sem guardar">×</button></div>
   <div class="calc-grid">
-    <button class="calc-key" data-calc="7">7</button><button class="calc-key" data-calc="8">8</button><button class="calc-key" data-calc="9">9</button><button class="calc-key op" data-calc="+">+</button>
-    <button class="calc-key" data-calc="4">4</button><button class="calc-key" data-calc="5">5</button><button class="calc-key" data-calc="6">6</button><button class="calc-key op" data-calc="-">−</button>
-    <button class="calc-key" data-calc="1">1</button><button class="calc-key" data-calc="2">2</button><button class="calc-key" data-calc="3">3</button><button class="calc-key op" data-calc="=">=</button>
-    <button class="calc-key" data-calc=",">,</button><button class="calc-key" data-calc="0">0</button><button class="calc-key" data-calc="back">⌫</button><button class="calc-key ok" data-calc="ok">✓</button>
+    <button class="calc-key" data-calc="7">7</button><button class="calc-key" data-calc="8">8</button><button class="calc-key" data-calc="9">9</button><button class="calc-key op" data-calc="+" aria-label="Mais">+</button>
+    <button class="calc-key" data-calc="4">4</button><button class="calc-key" data-calc="5">5</button><button class="calc-key" data-calc="6">6</button><button class="calc-key op" data-calc="-" aria-label="Menos">−</button>
+    <button class="calc-key" data-calc="1">1</button><button class="calc-key" data-calc="2">2</button><button class="calc-key" data-calc="3">3</button><button class="calc-key op" data-calc="=" aria-label="Igual">=</button>
+    <button class="calc-key" data-calc="," aria-label="Vírgula">,</button><button class="calc-key" data-calc="0">0</button><button class="calc-key" data-calc="back" aria-label="Apagar">⌫</button><button class="calc-key ok" data-calc="ok" aria-label="Concluir">✓</button>
   </div>
 </div>
 
@@ -2237,7 +2237,7 @@
     }).join("") : '<div class="muted" style="padding:14px 0;text-align:center;">Ainda não atribuiu nada neste mês. 👍</div>';
 
     openModal(
-      '<div class="modal-head"><h2>🧽 Limpar atribuições — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>🧽 Limpar atribuições — '+monthLabel(m)+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         opIntro(plan.entries.length
             ? ('Vai devolver <b>'+fmt(plan.total)+'</b> atribuídos a '+plan.entries.length+(plan.entries.length===1?' categoria':' categorias')+', para recomeçar o mês do zero.')
@@ -2486,7 +2486,7 @@
     var lista = state.moves || [], mAtual = state.ui.month;
     if (!lista.length) {
       openModal(
-        '<div class="modal-head"><h2>🕑 Movimentos recentes</h2><button class="x" data-action="close">×</button></div>'+
+        '<div class="modal-head"><h2>🕑 Movimentos recentes</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
         '<div class="modal-body">'+
           emptyState("🕑","Ainda não mexeu em dinheiro",
             "Aqui fica o registo de como reparte o dinheiro pelas categorias — mover entre categorias, cobrir um excesso, financiar alvos, libertar excedente ou atribuir à mão. As transações não entram: essas têm a sua própria lista.","")+
@@ -2512,7 +2512,7 @@
         '<span class="m-time">'+tempoRel(mv.t)+'</span></div>';
     }
     openModal(
-      '<div class="modal-head"><h2>🕑 Movimentos recentes</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>🕑 Movimentos recentes</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<p class="muted" style="margin-top:0;">Como tem repartido o dinheiro pelas categorias, do mais recente para o mais antigo (últimos '+MOVES_MAX+'). As transações não entram aqui. É só um registo — para desfazer, use o <b>↩</b> no topo.</p>'+
         '<div class="moves-list">'+linhas+'</div>'+
@@ -3406,7 +3406,7 @@
     acc = acc || { name:"", type:"budget", note:"", start:0 };
     var payFromOpts = '<option value="">— Nenhuma —</option>' + state.accounts.filter(function(a){ return a.type==="budget" && a.id!==acc.id; }).map(function(a){ return '<option value="'+a.id+'"'+(acc.payFrom===a.id?" selected":"")+'>'+esc(a.name)+'</option>'; }).join("");
     openModal(
-      '<div class="modal-head"><h2>'+(editing?"Editar conta":"Nova conta")+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>'+(editing?"Editar conta":"Nova conta")+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<div class="field"><label>Nome da conta</label><input id="acName" maxlength="60" value="'+esc(acc.name)+'" placeholder="Ex.: Conta à ordem"></div>'+
         '<div class="field"><label>Tipo</label><div class="seg" id="acType">'+
@@ -3469,7 +3469,7 @@
     var accOpts = state.accounts.filter(function(a){return !a.hidden || a.id===tx.accountId;}).map(function(a){return '<option value="'+a.id+'"'+(tx.accountId===a.id?" selected":"")+'>'+esc(a.name)+'</option>';}).join("");
     var catOpts = catOptionsHTML(tx.categoryId);
     openModal(
-      '<div class="modal-head"><h2>'+(editing?"Editar transação":"Nova transação")+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>'+(editing?"Editar transação":"Nova transação")+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<div class="grid-2">'+
           '<div class="field"><label>Data</label>'+dateField("txDate", tx.date)+'</div>'+
@@ -3607,7 +3607,7 @@
   function groupModal(grp) {
     var editing = !!grp; grp = grp || { name:"" };
     openModal(
-      '<div class="modal-head"><h2>'+(editing?"Editar grupo":"Novo grupo de categorias")+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>'+(editing?"Editar grupo":"Novo grupo de categorias")+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body"><div class="field"><label>Nome do grupo</label><input id="grpName" maxlength="60" value="'+esc(grp.name)+'" placeholder="Ex.: Despesas fixas"></div>'+
         (editing && !grp.system ? '<div class="field"><label>Ordem no orçamento</label>'+
           '<div style="display:flex;gap:8px;">'+
@@ -3634,7 +3634,7 @@
     var curFund = tg.fund || "refill";
     function opt(v,l){ return '<option value="'+v+'"'+(tType===v?" selected":"")+'>'+l+'</option>'; }
     openModal(
-      '<div class="modal-head"><h2>'+(editing?"Editar categoria":"Nova categoria")+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>'+(editing?"Editar categoria":"Nova categoria")+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<div class="field"><label>Nome</label><input id="catName" maxlength="60" value="'+esc(cat.name)+'" placeholder="Ex.: Supermercado"></div>'+
         '<div class="field"><label>Grupo</label><select id="catGroup">'+grpOpts+'</select></div>'+
@@ -3749,7 +3749,7 @@
         (sub?'<div class="hint" style="margin-top:3px;">'+sub+'</div>':'')+'</div>';
     }
     openModal(
-      '<div class="modal-head"><h2>💾 Dados e cópias</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>💾 Dados e cópias</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
 
         seccao("Onde vivem os seus dados",
@@ -3871,8 +3871,17 @@
           '<div class="hint">Fica com a aplicação vazia, como no primeiro dia.</div>')+
 
         (function(){ var e=espacoApp(); if(!e) return "";
-          return '<div class="hint" id="zonaEspaco" style="border-top:1px solid var(--border);padding-top:10px;margin-top:18px;">Espaço usado: <b>'+mb(e.total)+
+          // O número de TRANSAÇÕES é o que faz o espaço crescer, e não aparecia em lado nenhum.
+          // A partir de umas milhares a aplicação começa a notar-se — mais vale dizer-se antes de
+          // se sentir do que depois.
+          var nTx = state.transactions.length;
+          var muitas = nTx >= 6000;
+          return '<div class="hint" id="zonaEspaco" style="border-top:1px solid var(--border);padding-top:10px;margin-top:18px;">'+
+            'Este orçamento tem <b>'+nTx.toLocaleString("pt-PT")+'</b> transaç'+(nTx===1?'ão':'ões')+'.<br>'+
+            'Espaço usado: <b>'+mb(e.total)+
             '</b> de cerca de 5 MB (orçamento '+mb(e.dados)+' · lista do histórico '+mb(e.hist)+').<br>'+
+            (muitas ? '<span style="color:var(--warning);font-weight:600;">⚠️ A partir daqui a aplicação começa a ficar mais lenta a cada toque. '+
+              'Quando lhe der jeito: guarde uma <b>cópia em ficheiro</b> (fica com o histórico todo), exporte a <b>configuração dos alvos</b>, crie um orçamento novo com as contas no saldo de hoje e importe lá essa configuração. Fica com tudo o que interessa e sem o peso do que já passou.</span><br>' : '')+
             '<span id="zonaExtra" class="muted">a verificar o resto…</span></div>'; })()+
       '</div>'+
       '<div class="modal-foot"><span class="muted" style="font-size:12px;">Orçamento base-zero · <a href="#" data-action="changelog" style="color:var(--primary);cursor:pointer;">Versão '+APP_VERSION+' — novidades</a></span><button class="btn" data-action="close">Fechar</button></div>');
@@ -3944,7 +3953,7 @@
           '<div class="hint">No <b>1.º</b> aparelho deixe vazio (cria um novo). No <b>2.º</b>, cole aqui o ID que apareceu no 1.º.</div></div>';
     }
     openModal(
-      '<div class="modal-head"><h2>☁️ Sincronização entre aparelhos</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>☁️ Sincronização entre aparelhos</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+body+'</div>'+
       '<div class="modal-foot">'+
         (on ? '<span></span><button class="btn" data-action="close">Fechar</button>'
@@ -3955,7 +3964,7 @@
   function gistLostModal(){
     var g = _gistPerdido || {};
     openModal(
-      '<div class="modal-head"><h2>⚠️ Não encontrei o gist da sincronização</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>⚠️ Não encontrei o gist da sincronização</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<p style="margin-top:0;">O gist <code style="user-select:all;word-break:break-all;font-size:12px;">'+esc(g.id||"")+'</code> já não existe, ou este token deixou de lhe aceder.</p>'+
         '<div class="hint" style="margin-bottom:14px;">'+
@@ -3999,7 +4008,7 @@
         '<div class="hint" style="margin-top:6px;">Contagem aproximada: se a <b>mesma</b> transação foi editada dos dois lados, conta como existindo em ambos.</div></div>';
     }
     openModal(
-      '<div class="modal-head"><h2>⚠️ Conflito de sincronização</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>⚠️ Conflito de sincronização</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body"><p>Este aparelho tem alterações <b>e</b> a versão na nuvem também mudou desde a última sincronização.</p>'+
         linhaDatas+ linhaDif +
         '<div class="hint">Não é possível juntar as duas automaticamente sem risco de perder dados. Escolha qual manter — a outra é substituída.</div></div>'+
@@ -4021,7 +4030,7 @@
       if(cats.length) body+='<div class="field"><label>Categorias</label>'+cats.map(catRow).join("")+'</div>';
     }
     openModal(
-      '<div class="modal-head"><h2>🗄 Arquivados</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>🗄 Arquivados</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body"><p class="muted" style="margin-top:0;">Itens ocultos do orçamento e das contas. O histórico mantém-se; reponha para voltarem a aparecer.</p>'+body+'</div>'+
       '<div class="modal-foot"><span></span><button class="btn" data-action="close">Fechar</button></div>');
   }
@@ -4037,7 +4046,7 @@
         '<div class="hint" style="margin-top:6px;">Os navegadores costumam dar cerca de 5 MB por sítio.</div>'+
       '</div>') : '';
     openModal(
-      '<div class="modal-head"><h2>⚠️ Não foi possível guardar</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>⚠️ Não foi possível guardar</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<p style="margin-top:0;">O armazenamento deste navegador está cheio. <b>A última alteração não ficou gravada</b> — está apenas na memória e perde-se se fechar ou recarregar a página.</p>'+
         detalhe+
@@ -4095,7 +4104,7 @@
       }).join("") + '</div>';
     }
     openModal(
-      '<div class="modal-head"><h2>🏷 Beneficiários</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>🏷 Beneficiários</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<p class="muted" style="margin-top:0;">Os nomes que já usou, do mais frequente para o menos. São eles que alimentam as sugestões ao escrever uma transação.<br>'+
         'Mudar um nome altera <b>todas</b> as transações e regras onde aparece. Se lhe der um nome que já existe, os dois <b>juntam-se</b> num só — é assim que se corrige um «Continemte» ou se unificam variantes.</p>'+
@@ -4108,7 +4117,7 @@
     var e = payeeIndex()[k];
     if (!e) { toast("Beneficiário não encontrado."); return; }
     openModal(
-      '<div class="modal-head"><h2>Mudar nome do beneficiário</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>Mudar nome do beneficiário</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<p class="muted" style="margin-top:0;">«'+esc(e.name)+'» aparece em <b>'+e.count+'</b> transaç'+(e.count===1?'ão':'ões')+'.</p>'+
         '<div class="field"><label>Novo nome</label><input id="pyNome" maxlength="100" value="'+esc(e.name)+'">'+
@@ -4134,7 +4143,7 @@
         '</span></div>';
     }).join("");
     openModal(
-      '<div class="modal-head"><h2>📚 Os meus orçamentos</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>📚 Os meus orçamentos</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<p class="muted" style="margin-top:0;">Cada orçamento é <b>completamente separado</b> — contas, categorias e transações próprias. Troque quando quiser; se sincroniza, vão todos no <b>mesmo</b> gist.</p>'+
         linhas+
@@ -4145,7 +4154,7 @@
   function budgetNameModal(id){
     var novo = !id, atual = id ? budgetName(id) : "";
     openModal(
-      '<div class="modal-head"><h2>'+(novo?"Novo orçamento":"Mudar o nome")+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>'+(novo?"Novo orçamento":"Mudar o nome")+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body"><div class="field"><label>Nome</label>'+
         '<input id="budNome" maxlength="60" value="'+esc(atual)+'" placeholder="Ex.: Pessoal, Família"></div></div>'+
       '<div class="modal-foot"><span></span><span><button class="btn" data-action="budgets">Cancelar</button> '+
@@ -4222,7 +4231,7 @@
     }
 
     openModal(
-      '<div class="modal-head"><h2>🔍 Orçamento vs. contas — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>🔍 Orçamento vs. contas — '+monthLabel(m)+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<p class="muted" style="margin-top:0;">Num orçamento base-zero, o dinheiro nas contas de orçamento tem de ser exatamente igual ao que está por atribuir mais o disponível de todas as categorias. Quando não bate, é porque houve movimentos que o orçamento não conseguiu acompanhar.</p>'+
         corpo+
@@ -4255,7 +4264,7 @@
       '</div>';
     }
     openModal(
-      '<div class="modal-head"><h2>📅 Ainda por lançar — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>📅 Ainda por lançar — '+monthLabel(m)+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<p class="muted" style="margin-top:0;">Regras recorrentes ativas que ainda vão ser lançadas automaticamente até ao fim do mês. Serve para saber o que já está comprometido antes de atribuir dinheiro.</p>'+
         resumo+
@@ -4271,7 +4280,7 @@
     for(var i=0;i<hs.length;i++) if(hs[i].id!==t.id) outra=hs[i];
     var oa=outra?lkAcc(outra.accountId):null;
     openModal(
-      '<div class="modal-head"><h2>Categorizar transferência</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>Categorizar transferência</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<p class="muted" style="margin-top:0;">'+(saida
           ? ('Saíram <b>'+fmt(t.outflow)+'</b> do orçamento para «'+esc(oa?oa.name:"outra conta")+'». Escolha de que categoria deve sair esse dinheiro.')
@@ -4286,7 +4295,7 @@
   function helpModal() {
     function sec(t){ return '<div style="font-weight:700;color:var(--text);margin:16px 0 6px;font-size:13px;">'+t+'</div>'; }
     openModal(
-      '<div class="modal-head"><h2>❓ Como funciona</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>❓ Como funciona</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body"><div class="help-list">'+
 
       sec("O essencial")+
@@ -4380,7 +4389,7 @@
         '<li><b>Folha de cálculo não é cópia de segurança.</b> Os <b>.csv</b> de <b>Trazer e levar</b> servem para abrir no Excel ou no Sheets e olhar para os dados de outra maneira — exportam <b>só o orçamento aberto</b> e <b>não repõem</b> nada. Quem repõe é sempre o <b>.json</b> do <b>2</b>.</li>'+
         '<li><b>Os dois ficheiros .json não são a mesma coisa.</b> O <b>⬇</b> de um ponto do histórico (<code>historico-…</code>) traz <b>um</b> orçamento tal como estava <b>nesse dia</b>. O botão <b>Guardar cópia de segurança</b> (<code>orcamentos-…</code>) traz <b>todos</b> os orçamentos no estado <b>atual</b>. Ambos se voltam a abrir pelo mesmo sítio — <b>Importar cópia</b> —, e o do histórico substitui só o orçamento a que pertence.</li>'+
         '<li><b>O navegador pode apagar-lhe os dados.</b> Para não servirem de rasto, os navegadores — o do iPhone em particular — limpam sozinhos o que guardam de um site que passe uns dias sem ser usado. A aplicação <b>pede</b> para ser poupada, e o pedido costuma ser aceite em quem a tem instalada no ecrã principal. No fim de <b>Dados e cópias</b> vê se está <b>🔒 Protegido</b> — e, se estiver, é mais uma razão para ter também a cópia em ficheiro: essa não depende de navegador nenhum.</li>'+
-        '<li>Nesse mesmo sítio vê <b>quanto espaço está a ocupar</b>. São dois números: o do orçamento em si, que tem um limite apertado (~5 MB), e o do histórico, que vive numa zona à parte com espaço de sobra — por isso é normal o primeiro ser quase zero.</li>'+
+        '<li>Nesse mesmo sítio vê <b>quantas transações</b> tem e <b>quanto espaço está a ocupar</b>. O espaço são dois números: o do orçamento em si, que tem um limite apertado (~5 MB), e o do histórico, que vive numa zona à parte com espaço de sobra. A partir de umas <b>6000 transações</b> aparece um aviso: a aplicação começa a ficar mais lenta a cada toque, e vale a pena <b>recomeçar</b> — guardar uma cópia em ficheiro (que fica com o histórico todo), exportar a <b>configuração dos alvos</b>, criar um orçamento novo com as contas no saldo de hoje e importar lá essa configuração. Fica com as mesmas categorias, alvos e prioridades, e sem o peso do que já passou. Para um uso normal, isso são vários anos.</li>'+
         '<li>A <b>cópia em ficheiro guarda todos os orçamentos</b> de uma vez — por isso o aviso de «alterações por guardar» também é de todos, mesmo os que não tem abertos.</li>'+
       '</ul>'+
 
@@ -4395,7 +4404,7 @@
         '<ul style="margin:0;padding-inline-start:18px;">'+itens.map(function(i){return '<li>'+i+'</li>';}).join("")+'</ul>';
     }
     openModal(
-      '<div class="modal-head"><h2>📋 Novidades</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>📋 Novidades</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body"><div class="help-list">'+
       '<p class="muted" style="margin-top:0;">O que mudou ao longo do tempo, da versão mais recente para a mais antiga.</p>'+
 
@@ -4414,6 +4423,8 @@
         '<b>Separadores de mês nas transações</b>, como já havia nas recorrentes — e só quando a lista atravessa mais do que um mês.',
         '<b>Os números de resumo passaram a estar todos na mesma linha</b>, mesmo por cima da lista: à esquerda os que falam do dinheiro — <b>Confirmado</b>, <b>Saldo</b> e <b>Por confirmar</b>, que é a diferença entre os dois — e à direita quantas transações estão à vista. Estavam espalhados por três sítios e gastavam duas linhas; agora gastam uma — e deixam de mudar de sítio conforme o comprimento do nome da conta.',
         '<b>Uma coluna «Valor» em vez de «Saída» e «Entrada»</b> nas listas: cada transação ou sai ou entra, por isso metade do espaço estava sempre vazio. Agora as saídas aparecem a vermelho com <b>−</b> e as entradas a verde com <b>+</b> — e a largura que sobrou foi para a coluna das <b>notas</b>. Ao registar continua a haver dois campos, que é o que evita enganos ao escrever.',
+        '<b>«Dados e cópias» passou a dizer quantas transações tem</b>, e o espaço ocupado aparece em <b>KB</b> quando ainda não chegou a um MB — antes dizia sempre «0,0 MB», mesmo com anos de histórico, e portanto não avisava de nada. A partir de umas 6000 transações surge um aviso, com o caminho para recomeçar sem perder nada.',
+        '<b>Todos os botões passaram a ter nome para leitores de ecrã.</b> Faltava nos 34 botões de fechar janela e nas teclas do teclado numérico do telemóvel.',
         '<b>As perguntas «tem a certeza?» passaram a ser janelas da aplicação.</b> Eram as caixas cinzentas do navegador — que no iPhone aparecem coladas ao topo, com o endereço do site, e tratam da mesma maneira uma pergunta banal e uma que apaga dados. Agora têm a letra e as cores da aplicação, os números aparecem lado a lado quando há contas a fazer, as que apagam alguma coisa têm botão vermelho, e o botão de recuar é o que recebe o foco — um Enter distraído não confirma nada.',
         '<b>Os 🕑 Movimentos recentes passaram a dizer DE ONDE veio o dinheiro.</b> Antes lia-se «🩹 Cobriu «Roupa»» e ficava por saber à custa de quê — que é metade da história. Agora cada linha leva por baixo, em pequeno, a origem: «de Férias 50,00 €». Vale para cobrir, financiar, libertar excedente, repor a zero e limpar atribuições; quando as origens são muitas, mostra as maiores e conta as restantes.',
         '<b>A cor por omissão apontava para uma cor que já não existia.</b> Um orçamento sem cor escolhida ficava com um nome antigo, que não corresponde a bolinha nenhuma — as Definições apareciam sem nada selecionado. Passa a cair sempre na primeira cor da lista.',
@@ -4479,7 +4490,7 @@
     else rows = '<div class="muted" style="padding:14px 0;text-align:center;">Todos os alvos deste mês já estão cumpridos. 🎉</div>';
     var undoBtn = '<span></span>';   // anular/refazer pelos botões ↩ ↪ do topo
     openModal(
-      '<div class="modal-head"><h2>🎯 Financiar alvos — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>🎯 Financiar alvos — '+monthLabel(m)+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         opIntro(
           anyNeed ? ('Tem <b>'+fmt(plan.rtaBefore)+'</b> por atribuir e '+fullPlan.entries.length+
@@ -4527,7 +4538,7 @@
 
     var undoBtn = '<span></span>';   // anular/refazer pelos botões ↩ ↪ do topo
     openModal(
-      '<div class="modal-head"><h2>↩ Repor a zero — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>↩ Repor a zero — '+monthLabel(m)+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         opIntro('Atribuiu <b>'+fmt(falta)+'</b> a mais do que tinha. Isto devolve esse valor às custas das categorias com dinheiro parado, até o Pronto a atribuir voltar a zero — nenhuma fica negativa.',
           "Categorias", "Pronto a atribuir")+
@@ -4564,7 +4575,7 @@
     }).join("") : '<div class="muted" style="padding:14px 0;text-align:center;">Nenhuma categoria passou do que o alvo dela pede. 👍</div>';
 
     openModal(
-      '<div class="modal-head"><h2>🧹 Libertar excedente — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>🧹 Libertar excedente — '+monthLabel(m)+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         opIntro(plan.entries.length
             ? ('Há <b>'+fmt(totalLivre)+'</b> parado em categorias que já têm mais do que o alvo delas pede. Isto devolve essa folga para a poder usar noutro sítio.')
@@ -4600,7 +4611,7 @@
 
     if (!fontes.length) {
       openModal(
-        '<div class="modal-head"><h2>🩹 Cobrir «'+esc(cat.name)+'» — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+        '<div class="modal-head"><h2>🩹 Cobrir «'+esc(cat.name)+'» — '+monthLabel(m)+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
         '<div class="modal-body">'+
         opIntro('Gastou <b>'+fmt(falta)+'</b> a mais nesta categoria, mas <b>nenhuma outra tem dinheiro parado</b> nem há nada por atribuir.',
           "Nenhuma origem", "«"+esc(cat.name)+"»")+
@@ -4622,7 +4633,7 @@
     }).join("");
 
     openModal(
-      '<div class="modal-head"><h2>🩹 Cobrir «'+esc(cat.name)+'» — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>🩹 Cobrir «'+esc(cat.name)+'» — '+monthLabel(m)+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         opIntro('Gastou <b>'+fmt(falta)+'</b> a mais nesta categoria — o objetivo é <b>trazê-la a zero</b>. Escolha de onde tirar esse valor.',
           "Outras categorias", "«"+esc(cat.name)+"»")+
@@ -4680,7 +4691,7 @@
     var toDefault=(fromDefault===RTA_ID)?null:RTA_ID;
     var fromAvail=fromDefault===RTA_ID?readyToAssign(m):availableFor(fromDefault,m);
     openModal(
-      '<div class="modal-head"><h2>↔ Mover dinheiro — '+monthLabel(m)+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>↔ Mover dinheiro — '+monthLabel(m)+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<div class="field"><label>De</label><select id="mvFrom">'+optsFor(fromDefault)+'</select></div>'+
         '<div class="field"><label>Para</label><select id="mvTo">'+optsFor(toDefault)+'</select></div>'+
@@ -4708,7 +4719,7 @@
     function fo(v,l){ return '<option value="'+v+'"'+(s.freq===v?" selected":"")+'>'+l+'</option>'; }
     var valorTransf = round2((s.outflow||0) || (s.inflow||0));
     openModal(
-      '<div class="modal-head"><h2>'+(editing?"Editar recorrente":"Nova regra recorrente")+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>'+(editing?"Editar recorrente":"Nova regra recorrente")+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<div class="field"><label>Tipo</label><div class="seg">'+
           '<button data-action="rec-tipo" data-id="normal" class="'+(!ehTransf?"active":"")+'">Despesa / Receita</button>'+
@@ -4830,7 +4841,7 @@
     var catDefault = editPair ? (saida.categoryId||entrada.categoryId||"") : "";
     var titulo = editPair ? "✎ Editar transferência" : (payCard?"💳 Pagar cartão / dívida":"↔ Transferir entre contas");
     openModal(
-      '<div class="modal-head"><h2>'+titulo+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>'+titulo+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<div class="field"><label>'+(payCard?"Pagar a partir de":"De (sai desta conta)")+'</label><select id="tfFrom">'+opts(fromId, soOrcamento)+'</select></div>'+
         '<div class="field"><label>'+(payCard?"Cartão / dívida a pagar":"Para (entra nesta conta)")+'</label><select id="tfTo">'+opts(toId, soDivida)+'</select></div>'+
@@ -4919,7 +4930,7 @@
         '<button class="btn ghost sm" data-action="split-del-line" data-id="'+i+'" title="Remover">🗑</button></div>';
     }).join("");
     openModal(
-      '<div class="modal-head"><h2>'+(editando?"✎ Editar transação dividida":"➗ Transação dividida")+'</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>'+(editando?"✎ Editar transação dividida":"➗ Transação dividida")+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<div class="grid-2">'+
           '<div class="field"><label>Data</label>'+dateField("spDate", s.date)+'</div>'+
@@ -5027,7 +5038,13 @@
     for (var i=0;i<toks.length;i++) out += (toks[i]==="+"||toks[i]==="-") ? toks[i] : limpaValor(toks[i], false);
     return out;
   }
-  function mb(bytes){ return (bytes/1048576).toFixed(1).replace(".", ",")+" MB"; }
+  // Uma casa decimal em MB só serve para ficheiros grandes: um orçamento de três anos ocupa
+  // 0,8 MB e aparecia como «0,0 MB», o que fazia o rodapé do espaço dizer sempre zero e não
+  // avisar de nada. Abaixo de 1 MB mostra-se em KB, que é onde a app vive quase sempre.
+  function mb(bytes){
+    if (bytes < 1048576) return Math.round(bytes/1024).toLocaleString("pt-PT")+" KB";
+    return (bytes/1048576).toFixed(1).replace(".", ",")+" MB";
+  }
 
   function num(id) {
     var bruto = el(id).value, v = parseAmount(bruto);
@@ -5534,7 +5551,7 @@
         ? '<p class="muted" style="margin:.5rem 0 0;">Cobre '+fmt(tot)+' dos '+fmt(_covFalta)+' em falta — ainda ficam '+fmt(resta)+' por tapar.</p>'
         : '<p class="pos" style="margin:.5rem 0 0;">✅ Tapa o excesso por completo'+(fica>0.005?(' (sobram '+fmt(fica)+' na categoria)'):'')+'.</p>';
       openModal(
-        '<div class="modal-head"><h2>Confirmar — cobrir «'+esc(cat.name)+'»</h2><button class="x" data-action="close">×</button></div>'+
+        '<div class="modal-head"><h2>Confirmar — cobrir «'+esc(cat.name)+'»</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
         '<div class="modal-body">'+
           '<p class="muted" style="margin:0 0 .3rem;">Vai tirar <b>'+fmt(tot)+'</b> destas origens para «'+esc(cat.name)+'»:</p>'+
           '<div>'+linhas+'</div>'+ nota +
@@ -6632,7 +6649,7 @@
   }
   function confirmarCopia(nome){
     openModal(
-      '<div class="modal-head"><h2>💾 Cópia de segurança</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>💾 Cópia de segurança</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<p style="margin-top:0;">Foi pedida a transferência de <b>'+esc(nome)+'</b>.</p>'+
         '<p class="muted" style="margin-bottom:0;">O navegador não nos diz se o ficheiro chegou mesmo ao seu aparelho, e só faz sentido marcar a cópia como feita se ela existir de facto. Confirme, por favor.</p>'+
@@ -6846,7 +6863,7 @@
       prev='<div class="field"><div class="hint" style="color:var(--negative);font-weight:600;">'+esc(_csv.error)+'</div></div>';
     }
     openModal(
-      '<div class="modal-head"><h2>📥 Importar transações (.csv)</h2><button class="x" data-action="close">×</button></div>'+
+      '<div class="modal-head"><h2>📥 Importar transações (.csv)</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
         '<div class="field"><label>Estrutura esperada do ficheiro</label>'+
           '<div class="hint" style="line-height:1.6;">'+
