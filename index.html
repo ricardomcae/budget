@@ -1021,7 +1021,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.52";
+  var APP_VERSION = "1.53";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -1291,6 +1291,22 @@
       if (t.categoryId === catId && monthOf(t.date) === m) s += (t.inflow||0) - (t.outflow||0);
     }
     return round2(s);
+  }
+
+  // Total ATRIBUÍDO a uma categoria até ao mês (sem contar o que se gastou). Serve para saber
+  // se uma meta chegou a ser JUNTA, mesmo que o dinheiro já tenha sido gasto — o saldo sozinho
+  // não distingue "nunca juntei" de "juntei e gastei".
+  function assignedUpTo(catId, m) {
+    if (_idx && _idx.month === m) return round2(_idx.ac[catId] || 0);
+    var soma = 0;
+    for (var k in state.assignments) {
+      if (!state.assignments.hasOwnProperty(k)) continue;
+      var bar = k.indexOf("|"); if (bar < 0) continue;
+      if (k.slice(0,bar) !== catId) continue;
+      if (k.slice(bar+1) > m) continue;
+      soma += state.assignments[k];
+    }
+    return round2(soma);
   }
 
   function availableFor(catId, m) {
@@ -1855,6 +1871,24 @@
       }
       var diff = monthsBetween(m, target), left = diff>=0 ? diff+1 : 1;
       var remain = round2(amt - avail);
+      // PRAZO TERMINADO. O "até uma data" é uma meta ÚNICA, não uma cadência: passada a data não
+      // há mais nada a pedir. Sem esta saída, gastar o dinheiro DEPOIS do prazo punha o saldo a
+      // zero, o "falta" voltava ao valor inteiro e — com left=1 — o alvo pedia o total OUTRA VEZ,
+      // mês após mês, para uma despesa que já tinha acontecido (férias pagas em agosto voltavam a
+      // pedir 854,07 € em setembro, e em outubro, e sempre). O modo Reservar já se comportava
+      // assim ("Prazo terminado"); faltava ao Repor, e a diferença entre os dois não era
+      // intencional. O alvo NÃO se apaga sozinho — só se cala; quem o criou é que decide se o
+      // remove, se arquiva a categoria ou se estica a data.
+      if (diff < 0) {
+        // Cumprido = chegou a JUNTAR o total, mesmo que já o tenha gasto. Olhar só para o saldo
+        // dizia "faltaram 854,07" a quem juntou os 854,07 e os gastou — o oposto da verdade.
+        var juntou3 = assignedUpTo(cat.id, m);
+        var cumpriu3 = juntou3 >= amt - 0.005;
+        return { need:0, met:cumpriu3, doMes:true, expirado:true,
+          progress: cumpriu3 ? 1 : Math.max(0, Math.min(1, amt>0 ? juntou3/amt : 0)),
+          label: cumpriu3 ? ("\ud83c\udfaf Objetivo cumprido \u2014 prazo terminado ("+monthLabel(target)+")")
+                          : ("Prazo terminado ("+monthLabel(target)+") \u2014 juntou "+fmt(juntou3)+" de "+fmt(amt)) };
+      }
       // Descontar o que já foi atribuído ESTE mês, senão cada financiamento voltava a pedir uma
       // fatia nova e atribuía a mais em silêncio. Mas conta SÓ o que se PÔS (positivo): se este
       // mês se TIROU dinheiro da categoria, isso já baixou o saldo — logo já subiu o "falta
@@ -4311,7 +4345,8 @@
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li>Definem-se no <b>✎</b> de cada categoria: mensal, semanal, trimestral, semestral, anual, ou até uma data.</li>'+
         '<li>No mensal, «<b>Repor até X</b>» acrescenta só o que falta para ter X disponível; «<b>Reservar X</b>» acrescenta sempre X, mesmo que já o tenha.</li>'+
-        '<li>Trimestral, <b>semestral</b> e anual <b>param de pedir</b> quando já tiver o total. Indicando o mês da despesa, repartem o que falta até lá.</li>'+
+        '<li>Trimestral, <b>semestral</b> e anual <b>param de pedir</b> quando já tiver o total. Indicando o mês da despesa, repartem o que falta até lá. O <b>mês da despesa</b> é quando o dinheiro <b>sai da conta</b>, não a data do acontecimento — se costuma comprar no mês anterior, ponha esse. Passado o mês, o alvo <b>roda sozinho</b> para o período seguinte.</li>'+
+        '<li><b>Até uma data</b> é uma meta de <b>uma vez só</b>, não uma cadência: uma viagem, uma obra, um móvel. Passada a data, <b>deixa de pedir</b> e a linha passa a dizer <b>«prazo terminado»</b> — mesmo que já tenha gasto o dinheiro. O alvo <b>não se apaga sozinho</b>: fica lá, calado, e é quem o criou que decide se o remove, se arquiva a categoria, ou se estica a data para uma meta nova.</li>'+
         '<li><b>😴 Adiar este mês:</b> num alvo que ainda pede dinheiro, o <b>😴</b> na linha da categoria diz para <b>não chatear só este mês</b> — deixa de aparecer a amarelo e sai do «Financiar alvos». No mês seguinte volta ao normal, ou reative antes com o <b>☀️</b>. Para ver de uma vez tudo o que adiou, use o filtro <b>😴 Adiadas</b> na barra do orçamento — adiadas não são nem «abaixo do alvo» nem «cumpridas», por isso não aparecem nesses.</li>'+
       '</ul>'+
 
@@ -4412,6 +4447,9 @@
       // hoje, não a cronologia de como lá chegou — por isso o recente fica ao pormenor e o
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
+      ver("1.53", "agosto 2026", [
+        '<b>Os alvos «até uma data» deixam de pedir dinheiro depois do prazo.</b> Um alvo até uma data é uma meta de <b>uma vez só</b> — umas férias, uma obra. Só que, no método <b>Repor</b>, gastar o dinheiro depois da data punha o saldo a zero e fazia o alvo pedir o <b>valor inteiro outra vez</b>, mês após mês, para uma despesa que já tinha acontecido. Agora a linha diz <b>«prazo terminado»</b> e cala-se, distinguindo quem <b>cumpriu</b> a meta (juntou o total, ainda que já o tenha gasto) de quem <b>ficou pelo caminho</b>, e dizendo nesse caso quanto juntou de quanto. O método <b>Reservar</b> já se comportava assim; era o Repor que destoava. O alvo <b>não é apagado</b> — fica onde está, sem pedir nada, até decidir removê-lo, arquivar a categoria ou esticar a data.',
+      ])+
       ver("1.52", "agosto 2026", [
         '<b>🕑 Movimentos recentes</b>, ao lado do ↩ ↪: o registo de como tem repartido o dinheiro pelas categorias — mover, cobrir, financiar, libertar excedente, atribuir à mão, adiar, e o que anulou. Guarda os <b>últimos 30</b>, acompanha o orçamento e vai na sincronização.',
         '<b>O ↩ Anular e o ↪ Refazer ficaram de confiança.</b> O Refazer desaparecia sozinho ao navegar; agora só uma alteração a sério o fecha. E o Anular passou a cobrir mais nove coisas que não tinham volta — confirmar transações, prioridades, reordenar, arquivar e recorrentes.',
@@ -5586,7 +5624,7 @@
     },
     "fund-one": function(id){
       var m=state.ui.month; var c=categoryById(id); if(!c) return;
-      var ti=targetInfo(c,m); if(!ti||!(ti.need>0)){ toast("Alvo já cumprido."); return; }
+      var ti=targetInfo(c,m); if(!ti||!(ti.need>0)){ toast(ti&&ti.expirado ? "Prazo terminado — este alvo já não pede dinheiro." : "Alvo já cumprido."); return; }
       var rtaDepois = round2(readyToAssign(m) - ti.need);
       function financiar(){
         pushUndo("Alvo financiado.");
