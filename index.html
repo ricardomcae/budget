@@ -449,7 +449,14 @@
   table.budget td:first-child, table.budget th.first { width: auto; }
   .num { text-align: end; font-variant-numeric: tabular-nums; }
   /* Tem de parecer um campo mesmo sem lhe passar o rato por cima — no telemóvel não há rato. */
-  .assign-input { width: 108px; text-align: end; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
+  /* O símbolo da moeda do campo «Atribuído» é um elemento à parte, pousado por cima do espaço
+     interno direito do campo. Não pode viver dentro do valor: aí não teria tamanho próprio e
+     passaria a fazer parte do que se escreve. O espaço à direita do campo abre-se para o
+     número não lhe passar por baixo, e o da esquerda fecha-se — como o número está encostado
+     à direita, aquele espaço nunca fez falta. */
+  .assign-wrap { position: relative; display: inline-block; }
+  .assign-wrap .assign-cur { position: absolute; inset-inline-end: 9px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+  .assign-input { width: 108px; text-align: end; padding: 7px 24px 7px 6px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
   .assign-input:hover { border-color: var(--primary); background: var(--surface); }
   .assign-input:focus { border-color: var(--primary); background: var(--surface); outline: none; box-shadow: 0 0 0 3px var(--primary-soft); }
   .assign-input.kp-active { border-color: var(--primary); background: var(--surface); box-shadow: 0 0 0 3px var(--primary-soft); }
@@ -461,6 +468,10 @@
      valores de relance quando há vários campos empilhados (saída/entrada, parcelas de uma
      divisão). O «Atribuído» já o fazia; os restantes campos de dinheiro ficaram para trás. */
   .money { text-align: end; font-variant-numeric: tabular-nums; }
+  /* No computador o símbolo fica do tamanho do número, como sempre esteve. O espaço antes dele
+     deixou de vir do texto (o fmtC separou-os) e passa a ser margem: 0,25em é o que um espaço
+     mede nesta letra, por isso o resultado é indistinguível do que lá estava. */
+  .cur { margin-inline-start: .25em; }
   .money[readonly] { opacity: 1; cursor: pointer; caret-color: transparent; }
   /* Pontinho de estado de uma conta: verde = a par do banco; âmbar = há coisas por confirmar
      (informação, não aviso). Tamanho fixo e pequeno para não roubar largura à tabela. */
@@ -776,9 +787,22 @@
     table.budget tr.tot-row td.first { font-size: 11px; }
     .cat-actions, .grp-add { opacity: 1 !important; }
     .cat-name-cell { flex-wrap: wrap; gap: 6px; }
-    .assign-input { width: 82px; padding: 6px; }
+    /* No telemóvel o símbolo encolhe: repete-se em todas as linhas das três colunas e o que
+       interessa ler é o número. Mais pequeno e mais apagado, continua a dizer a moeda sem
+       gastar largura que faz falta ao nome da categoria. */
+    .cur { font-size: .78em; opacity: .7; margin-inline-start: .16em; }
+    .assign-wrap .assign-cur { inset-inline-end: 5px; }
+    /* 86px e não 82: com o símbolo a ocupar o lado direito, um valor de cinco dígitos
+       («12.403,99») ficava 3px acima do que cabia e passava a deslizar dentro do campo. Os 4px
+       vêm do que o selo do «Disponível» acabou de libertar, por isso o nome da categoria não
+       perde nada com a troca. */
+    .assign-input { width: 86px; padding: 6px 15px 6px 3px; }
     .grp-total { font-size: 12.5px; }
-    .avail-pill { padding: 4px 8px; }
+    /* O selo é o conteúdo mais largo da coluna, e por isso é ele que fixa a largura para
+       TODAS as linhas — incluindo os totais de grupo, que não têm selo e ficavam com o número
+       longe da coluna do lado. Apertar-lhe os lados encosta a coluna inteira. A altura e o
+       formato mantêm-se: é a mesma bolinha. */
+    .avail-pill { padding: 4px 6px; }
 
     /* Escondido no telemóvel: já existe noutro sítio, ou não cabe. */
     .hide-phone { display: none !important; }
@@ -1045,6 +1069,15 @@
 
   // Visualização universal: "." separa milhares, "," separa cêntimos (ex.: 1.234,56 €)
   var CURRENCIES = [["EUR","€"],["GBP","£"],["USD","$"],["BRL","R$"],["CHF","CHF"],["AOA","Kz"]];
+  // O mesmo valor de fmt(), mas com o símbolo da moeda num elemento próprio. Só assim se lhe
+  // pode dar tamanho ou cor diferentes do número — dentro de um texto corrido não há como
+  // separá-lo. Usa-se apenas na tabela do orçamento, onde as três colunas competem por largura;
+  // nos outros ecrãs o valor continua a ser uma linha de texto simples.
+  function fmtC(n){
+    var t = fmt(n), i = t.lastIndexOf(" ");
+    if (i < 0) return esc(t);
+    return esc(t.slice(0,i)) + '<span class="cur">' + esc(t.slice(i+1)) + '</span>';
+  }
   function currencySym(){
     var c = (state && state.settings && state.settings.currency) || "EUR";
     for (var i=0;i<CURRENCIES.length;i++) if (CURRENCIES[i][0]===c) return CURRENCIES[i][1];
@@ -2705,8 +2738,8 @@
           '<button class="grp-add" data-action="add-category" data-id="'+grp.id+'">+ categoria</button>' +
           '<button class="grp-add" data-action="edit-group" data-id="'+grp.id+'" title="Editar grupo" aria-label="Editar o grupo '+esc(grp.name)+'">✎</button>') + '</div></td>' +
         '<td class="grp-total">'+fmt(gAssigned)+'</td>' +
-        '<td class="grp-total">'+fmt(gActivity)+'</td>' +
-        '<td class="grp-total">'+fmt(gAvail)+'</td></tr>';
+        '<td class="grp-total">'+fmtC(gActivity)+'</td>' +
+        '<td class="grp-total">'+fmtC(gAvail)+'</td></tr>';
       if (collapsed) continue;
       if (!cats.length && !grp.system && !filtering) {
         rows += '<tr class="cat-row"><td colspan="4" style="padding:9px 18px;"><button class="btn ghost sm" data-action="add-category" data-id="'+grp.id+'">+ Adicionar categoria a este grupo</button></td></tr>';
@@ -2732,9 +2765,9 @@
             // Sem dívida não há nada para cobrir: a barra desaparece (fica só a nota "Sem dívida a pagar").
             (debt>0.005 ? '<div class="target-bar"><span class="'+barClsP+'" style="width:'+barP+'%"></span></div>' : '') +
             '<div class="target-note">'+pnote+'</div></td>' +
-            '<td class="num"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="none" data-assign="'+cat.id+'" value="'+amtStr2(assigned)+'" placeholder="0,00"></td>' +
-            '<td class="num activity-cell'+(Math.abs(activity)<0.005?' zero':'')+'">'+fmt(activity)+'</td>' +
-            '<td class="num"><span class="avail-pill '+pillCls+'">'+fmt(avail)+'</span></td></tr>';
+            '<td class="num"><span class="assign-wrap"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="none" data-assign="'+cat.id+'" value="'+amtStr2(assigned)+'" placeholder="0,00"><span class="cur assign-cur" aria-hidden="true">'+esc(currencySym())+'</span></span></td>' +
+            '<td class="num activity-cell'+(Math.abs(activity)<0.005?' zero':'')+'">'+fmtC(activity)+'</td>' +
+            '<td class="num"><span class="avail-pill '+pillCls+'">'+fmtC(avail)+'</span></td></tr>';
           continue;
         }
         var targetHtml = "";
@@ -2770,9 +2803,9 @@
           '</span></div>' + (cat.note?'<div class="tag" style="margin-top:3px;">📝 '+esc(cat.note)+'</div>':'') + targetHtml +
           (upc[cat.id] ? '<div class="target-note">📅 Ainda por sair este mês: '+fmt(upc[cat.id])+
             (avail < upc[cat.id]-0.005 ? ' <b style="color:var(--warning)">— faltam '+fmt(round2(upc[cat.id]-avail))+'</b>' : '')+'</div>' : '') + '</td>' +
-          '<td class="num"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="none" data-assign="'+cat.id+'" value="'+amtStr2(assigned)+'" placeholder="0,00"></td>' +
-          '<td class="num activity-cell'+(Math.abs(activity)<0.005?' zero':'')+'"><button class="btn ghost sm" data-action="cat-activity" data-id="'+cat.id+'" style="font-variant-numeric:tabular-nums;">'+fmt(activity)+'</button></td>' +
-          '<td class="num"><span class="avail-pill '+pillCls+'">'+fmt(avail)+'</span></td></tr>';
+          '<td class="num"><span class="assign-wrap"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="none" data-assign="'+cat.id+'" value="'+amtStr2(assigned)+'" placeholder="0,00"><span class="cur assign-cur" aria-hidden="true">'+esc(currencySym())+'</span></span></td>' +
+          '<td class="num activity-cell'+(Math.abs(activity)<0.005?' zero':'')+'"><button class="btn ghost sm" data-action="cat-activity" data-id="'+cat.id+'" style="font-variant-numeric:tabular-nums;">'+fmtC(activity)+'</button></td>' +
+          '<td class="num"><span class="avail-pill '+pillCls+'">'+fmtC(avail)+'</span></td></tr>';
       }
     }
     // Com dois grupos de filtros combinados é fácil chegar a zero resultados — dizê-lo.
@@ -2837,9 +2870,9 @@
         '<td class="first">Total do mês'+(tot.cartoes!==0
           ? ' <span class="tag" title="A atividade da categoria de pagamento é o espelho positivo do que se gastou com o cartão: somá-la daria zero. Os totais do cartão estão na linha do grupo dele.">sem cartões de crédito</span>'
           : '')+'</td>' +
-        '<td>'+fmt(tot.assigned)+'</td>' +
-        '<td class="'+(tot.activity<-0.005?"neg":"")+'">'+fmt(tot.activity)+'</td>' +
-        '<td class="'+(tot.avail<-0.005?"neg":(tot.avail>0.005?"pos":""))+'">'+fmt(tot.avail)+'</td>' +
+        '<td>'+fmtC(tot.assigned)+'</td>' +
+        '<td class="'+(tot.activity<-0.005?"neg":"")+'">'+fmtC(tot.activity)+'</td>' +
+        '<td class="'+(tot.avail<-0.005?"neg":(tot.avail>0.005?"pos":""))+'">'+fmtC(tot.avail)+'</td>' +
       '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   }
 
@@ -4538,6 +4571,8 @@
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
       ver("1.53", "agosto 2026", [
+        '<b>O símbolo da moeda ficou coerente nas três colunas do orçamento.</b> O campo <b>Atribuído</b> era o único sem ele; passou a tê-lo também, ao lado do número e fora do que se escreve — o valor do campo continua limpo. No <b>telemóvel</b> o símbolo é mais pequeno e mais apagado nas três colunas: repete-se em todas as linhas e o que interessa ler é o número. No computador fica como sempre esteve.',
+        '<b>Os totais de grupo deixaram de ficar tão longe da coluna do lado.</b> Era o selo colorido do <b>Disponível</b> que fixava a largura da coluna para todas as linhas, e as que não têm selo — os totais de grupo — ficavam com o número afastado sem razão visível. O selo estreitou o espaço lateral, mantendo o mesmo formato e a mesma altura.',
         '<b>Todos os campos de dinheiro passaram a mostrar o valor por extenso.</b> Ao editar uma transação de 8,50 €, o campo dizia <b>8,5</b>; um valor de mil e tal aparecia sem o ponto dos milhares. Agora lê-se <b>8,50</b> e <b>1.234,50</b> em todos eles — saída, entrada, saldo inicial, alvo, mover dinheiro, transferências, recorrentes e parcelas de uma divisão — e todos <b>alinhados à direita</b>, onde os números se comparam de relance. Continua a poder escrever como lhe der jeito: <b>8,5</b>, <b>8.50</b> ou uma conta como <b>1.234,50+500</b>.',
         '<b>As três colunas do orçamento no telemóvel ficaram por ordem de importância.</b> O <b>Disponível</b> — o número que responde a «posso gastar?» — era o mais pequeno dos três; passou para o meio, acima da <b>Atividade</b>, que é contexto. E os zeros da Atividade ficaram mais apagados: num mês típico são a maioria da coluna e estavam a competir com os números que interessam.',
         '<b>A coluna «Atribuído» mostra sempre os cêntimos e os milhares.</b> Um <b>100</b> ao lado de um <b>41,66</b> desalinhava a vírgula e fazia o olho tropeçar ao ler a coluna de alto a baixo; agora lê-se <b>100,00</b>, e um valor grande lê-se <b>4.000,00</b> como em todo o resto da aplicação. O campo vazio mantém-se vazio, com o <b>0,00</b> em cinzento a dizer o que ali cabe.',
