@@ -502,6 +502,14 @@
      zeros que competem com os números que interessam. Ficam mais apagados — continuam legíveis
      para quem os procura, mas deixam de puxar o olho. */
   .activity-cell.zero, .activity-cell.zero .btn { opacity: .45; font-weight: 400; }
+  /* A coluna «Atividade» é desenhada de três maneiras — texto simples nas linhas de grupo e do
+     cartão, e um botão nas linhas de categoria (que leva às transações dessa categoria). O
+     botão trazia 10px de espaço lateral próprio e punha o número mais à esquerda do que os
+     vizinhos: a coluna ficava com os valores desalinhados entre si, sem razão visível. Tira-se
+     esse espaço para o número assentar onde os outros assentam, e devolve-se a área de toque
+     por fora, sem ocupar largura — é o mesmo truque usado nos botões do cabeçalho. */
+  .activity-cell .btn { padding-inline: 0; position: relative; }
+  .activity-cell .btn::after { content: ""; position: absolute; top: -6px; bottom: -6px; left: -10px; right: -4px; }
   .avail-pill { display: inline-block; padding: 4px 11px; border-radius: 20px; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13.5px; }
   .avail-pill.pos { background: var(--positive-soft); color: var(--positive); }
   .avail-pill.zero { background: var(--neutral-soft); color: var(--text-muted); }
