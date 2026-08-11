@@ -2374,7 +2374,37 @@
     for (var i=0;i<TEMAS.length;i++) document.body.classList.remove("tema-"+TEMAS[i].id);
     if (t !== "verde") document.body.classList.add("tema-"+t);   // o verde é o de origem: não precisa de classe
   }
+  // No telemóvel a tabela é mais larga do que o ecrã e desliza para o lado — é assim que se
+  // chega aos botões de confirmar, duplicar e eliminar. Como o render() refaz o innerHTML
+  // inteiro, o navegador punha o deslize de volta a zero: tocar no ✓ de uma transação fazia a
+  // tabela fugir para a esquerda e obrigava a arrastar outra vez para cada linha. Guarda-se a
+  // posição antes e repõe-se depois, no mesmo ecrã e com uma tabela do mesmo tamanho — mudar de
+  // ecrã ou de filtro continua a começar do princípio, que é o que ali se espera.
+  var _desliza = null, _viewDesenhada = null;
+  function guardarDeslize(){
+    try {
+      var c = document.querySelector(".data-card, .budget-card");
+      // A vista guardada é a que está NO ECRÃ (a do render anterior) e não state.ui.view — quem
+      // muda de ecrã escreve o state.ui.view ANTES de mandar redesenhar, por isso ler dali daria
+      // sempre a vista nova e a posição do ecrã antigo seria reposta na tabela do novo.
+      _desliza = c ? { v:_viewDesenhada, x:c.scrollLeft, y:c.scrollTop, w:c.scrollWidth, h:c.scrollHeight } : null;
+    } catch(e){ _desliza = null; }
+  }
+  function reporDeslize(){
+    try {
+      var d = _desliza; _desliza = null;
+      if (!d || d.v !== state.ui.view || (!d.x && !d.y)) return;
+      var c = document.querySelector(".data-card, .budget-card");
+      // Só se a tabela continuar do mesmo tamanho: se encolheu ou cresceu, mudou de conteúdo
+      // (filtrou, mudou de mês) e repor uma posição da lista anterior aterrava em sítio errado.
+      if (!c || c.scrollWidth !== d.w || c.scrollHeight !== d.h) return;
+      if (d.x) c.scrollLeft = d.x;
+      if (d.y) c.scrollTop  = d.y;
+    } catch(e){}
+  }
+
   function render() {
+    guardarDeslize();
     _txSel = {};   // a seleção temporária de transações não sobrevive a mudanças de página
     var _sb = document.getElementById("txSelBar"); if (_sb) _sb.classList.remove("show");
     applyTheme();
@@ -2400,6 +2430,8 @@
     if (v === "reports") renderReports();
     refreshUndoButtons();
     medirTopo();
+    reporDeslize();
+    _viewDesenhada = v;
     ajustarBarra();
   }
 
@@ -3355,12 +3387,13 @@
   // Toda a página volta ao topo. Usa-se quando o que está no ecrã passa a ser OUTRA coisa —
   // outra lista, outro ecrã — e não faz sentido aterrar a meio de conteúdo que já não é o mesmo.
   function aoTopo(){
+    _desliza = null;                 // mudança deliberada de contexto: não repor a posição antiga
     try { window.scrollTo(0,0); } catch(e){}
     // No telemóvel quem desliza é o cartão da tabela, não a página: sem isto, «voltar ao topo»
     // deixava a lista na mesma altura onde estava.
     try {
-      var cs = document.querySelectorAll(".data-card");
-      for (var i=0;i<cs.length;i++) cs[i].scrollTop = 0;
+      var cs = document.querySelectorAll(".data-card, .budget-card");
+      for (var i=0;i<cs.length;i++) { cs[i].scrollTop = 0; cs[i].scrollLeft = 0; }
     } catch(e){}
   }
   // Ajusta a barra de filtros do orçamento à largura que há. Mede a largura REAL que ela
@@ -4449,6 +4482,7 @@
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
       ver("1.53", "agosto 2026", [
+        '<b>No telemóvel, a tabela deixou de fugir para a esquerda.</b> Nas Transações é preciso arrastar para o lado para chegar ao <b>✓</b>, ao <b>⧉</b> e ao <b>🗑</b> — mas ao tocar num deles a tabela voltava ao princípio, e era preciso arrastar outra vez para cada linha. Agora fica onde estava. Mudar de ecrã, filtrar ou mudar de mês continuam a começar do princípio, que é o que ali se espera.',
         '<b>Os alvos «até uma data» deixam de pedir dinheiro depois do prazo.</b> Um alvo até uma data é uma meta de <b>uma vez só</b> — umas férias, uma obra. Só que, no método <b>Repor</b>, gastar o dinheiro depois da data punha o saldo a zero e fazia o alvo pedir o <b>valor inteiro outra vez</b>, mês após mês, para uma despesa que já tinha acontecido. Agora a linha diz <b>«prazo terminado»</b> e cala-se, distinguindo quem <b>cumpriu</b> a meta (juntou o total, ainda que já o tenha gasto) de quem <b>ficou pelo caminho</b>, e dizendo nesse caso quanto juntou de quanto. O método <b>Reservar</b> já se comportava assim; era o Repor que destoava. O alvo <b>não é apagado</b> — fica onde está, sem pedir nada, até decidir removê-lo, arquivar a categoria ou esticar a data.',
       ])+
       ver("1.52", "agosto 2026", [
