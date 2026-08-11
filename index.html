@@ -519,7 +519,11 @@
      vizinhos: a coluna ficava com os valores desalinhados entre si, sem razão visível. Tira-se
      esse espaço para o número assentar onde os outros assentam, e devolve-se a área de toque
      por fora, sem ocupar largura — é o mesmo truque usado nos botões do cabeçalho. */
-  .activity-cell .btn { padding-inline: 0; position: relative; }
+  /* O gap: 7px que os botões usam para separar ícone de texto entrava aqui entre o número e o
+     símbolo da moeda, e a mesma coluna aparecia com dois espaçamentos diferentes conforme a
+     linha fosse de categoria (botão) ou de cartão (texto simples). Aqui o botão não tem ícone
+     nenhum: é só o valor. */
+  .activity-cell .btn { padding-inline: 0; position: relative; gap: 0; }
   .activity-cell .btn::after { content: ""; position: absolute; top: -6px; bottom: -6px; left: -10px; right: -4px; }
   .avail-pill { display: inline-block; padding: 4px 11px; border-radius: 20px; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13.5px; }
   .avail-pill.pos { background: var(--positive-soft); color: var(--positive); }
