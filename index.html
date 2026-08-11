@@ -396,7 +396,6 @@
   .op-fluxo .seta { color: var(--primary); font-size: 15px; }
   .op-nota { display: block; font-size: 12px; }
   .op-kpis { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; text-align: center; }
-  .op-kpi { padding: 12px 8px; }
   .cov-sum { padding: 9px 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
   .cov-list { max-height: 300px; overflow: auto; }
   .cov-row { display: grid; grid-template-columns: 1fr 132px 84px; gap: 10px; align-items: center; padding: 8px 2px; border-bottom: 1px solid var(--border); }
@@ -2720,7 +2719,7 @@
     if (!state.groups.length) {
       el("content").innerHTML = emptyState("📊", "Comece o seu orçamento",
         "Crie grupos e categorias para dar uma função a cada euro. Para experimentar com dados de exemplo, use «Dados e cópias».",
-        '<button class="btn primary" data-action="add-group">+ Novo grupo</button>');
+        '<button class="btn primary" data-action="add-group">➕ Novo grupo</button>');
       return;
     }
     var upc = upcomingTotals(m).porCat;   // o que cada categoria ainda tem por sair este mês
@@ -2839,8 +2838,8 @@
         '<div class="tb-bloco">' +
         // O «+ Grupo» leva um ícone próprio: sem texto, dois botões a começar por «+» ficavam
         // indistinguíveis um do outro.
-        '<button class="btn primary hide-phone tb-acao" data-action="add-tx" title="Nova transação">➕<span class="rot"> Nova transação</span></button>' +
-        '<button class="btn tb-acao" data-action="add-group" title="Novo grupo de categorias">🗂<span class="rot"> Grupo</span></button>' +
+        '<button class="btn primary hide-phone tb-acao" data-action="add-tx" title="Nova transação" aria-label="Nova transação">➕<span class="rot"> Nova transação</span></button>' +
+        '<button class="btn tb-acao" data-action="add-group" title="Novo grupo de categorias" aria-label="Novo grupo de categorias">🗂<span class="rot"> Grupo</span></button>' +
         '<span class="muted hide-phone tb-etiq" style="font-size:12.5px;margin-inline-start:6px;">Mostrar:</span>' +
         fBtn('f-estado f-over','budget-filter','over',bf.over,'🔵','Com excedente','Só as categorias com mais do que o alvo pede') +
         fBtn('f-estado f-ok','budget-filter','ok',bf.ok,'🟢','Alvo cumprido','Só as categorias com o alvo cumprido') +
@@ -2858,7 +2857,7 @@
         fBtn('f-prio f-alta','prio-filter','alta',bp.alta,'▲','Alta','Só as de prioridade alta') +
         fBtn('f-prio f-normal','prio-filter','normal',bp.normal,'●','Normal','Só as de prioridade normal') +
         fBtn('f-prio f-baixa','prio-filter','baixa',bp.baixa,'▼','Baixa','Só as de prioridade baixa') +
-        (filtering ? '<span class="sep"></span><button class="btn sm btn-limpar" data-action="budget-filter-clear">✕<span class="rot"> Limpar</span></button>' : '') +
+        (filtering ? '<span class="sep"></span><button class="btn sm btn-limpar" data-action="budget-filter-clear" title="Limpar filtros" aria-label="Limpar filtros">✕<span class="rot"> Limpar</span></button>' : '') +
         '<div class="spacer"></div>' +
         // A contagem está SEMPRE lá, encostada à direita — não aparece e desaparece conforme
         // se filtra, que era o que fazia a barra saltar a cada clique.
@@ -2889,7 +2888,7 @@
     var visible = state.accounts.filter(function(a){return !a.hidden;});
     if (!visible.length) {
       content.innerHTML = emptyState("🏦","Ainda não há contas","Adicione as suas contas bancárias, dinheiro, cartões de crédito ou investimentos.",
-        '<button class="btn primary" data-action="add-account">+ Adicionar conta</button>');
+        '<button class="btn primary" data-action="add-account">➕ Adicionar conta</button>');
       return;
     }
     var budgetAccs = visible.filter(function(a){return a.type==="budget";});
@@ -2909,9 +2908,9 @@
           '<td class="num muted">'+pontoConta(a.id)+fmt(cl)+'</td>'+
           '<td class="num" style="font-weight:700;'+(bal<0?"color:var(--negative)":"")+'">'+fmt(bal)+'</td>'+
           '<td class="row-actions">'+
-          (a.type!=="budget" && bal<-0.005 ? '<button data-action="pay-card" data-id="'+a.id+'" title="Pagar / abater">💳</button>' : '')+
-          '<button data-action="edit-account" data-id="'+a.id+'" title="Editar">✎</button>'+
-          '<button data-action="delete-account" data-id="'+a.id+'" title="Eliminar">🗑</button></td></tr>';
+          (a.type!=="budget" && bal<-0.005 ? '<button data-action="pay-card" data-id="'+a.id+'" title="Pagar / abater" aria-label="Pagar ou abater o cartão '+esc(a.name)+'">💳</button>' : '')+
+          '<button data-action="edit-account" data-id="'+a.id+'" title="Editar" aria-label="Editar a conta '+esc(a.name)+'">✎</button>'+
+          '<button data-action="delete-account" data-id="'+a.id+'" title="Eliminar" aria-label="Eliminar a conta '+esc(a.name)+'">🗑</button></td></tr>';
       }).join("");
       return '<h3 style="margin:18px 2px 10px;font-size:14px;">'+title+'</h3>'+
         '<div class="data-card'+(soOrcamento?' sem-tipo':'')+'"><table class="data"><thead><tr><th>Conta</th><th class="col-tipo">Tipo</th><th class="num">Confirmado</th><th class="num">Saldo</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
@@ -2920,7 +2919,7 @@
       // O «Transferir» mexe em transações, e transações criam-se aqui — faltava o par dele.
       // Sem o «Nova transação», este ecrã oferecia o caso raro (mover dinheiro entre contas) e
       // escondia o caso de todos os dias.
-      '<div class="toolbar"><button class="btn primary" data-action="add-account">+ Adicionar conta</button>'+
+      '<div class="toolbar"><button class="btn primary" data-action="add-account">➕ Adicionar conta</button>'+
       '<button class="btn" data-action="add-tx">➕ Nova transação</button>'+
       '<button class="btn" data-action="transfer">↔ Transferir</button>'+
       '<div class="spacer"></div>'+
@@ -3463,8 +3462,8 @@
         '<td class="num">'+amt+'</td>'+
         '<td style="text-align:center;"><span class="cleared-dot '+(r.active?'on':'')+'" data-action="toggle-recurring" data-id="'+r.id+'" title="Ativar / desativar">✓</span></td>'+
         '<td class="row-actions">'+
-          '<button data-action="post-recurring-now" data-id="'+r.id+'" title="Lançar já a próxima">▶</button>'+
-          '<button data-action="delete-recurring" data-id="'+r.id+'" title="Eliminar">🗑</button></td></tr>';
+          '<button data-action="post-recurring-now" data-id="'+r.id+'" title="Lançar já a próxima" aria-label="Lançar já a próxima ocorrência">▶</button>'+
+          '<button data-action="delete-recurring" data-id="'+r.id+'" title="Eliminar" aria-label="Eliminar esta regra recorrente">🗑</button></td></tr>';
     }).join("");
     el("content").innerHTML=head+'<div class="data-card"><table class="data"><thead><tr>'+
       '<th>Próxima data</th><th>Frequência</th><th>Beneficiário</th><th>Categoria</th><th>Conta</th><th class="num">Valor</th><th style="text-align:center;">Ativa</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
@@ -4301,8 +4300,8 @@
         '<span style="display:flex;gap:6px;">'+
           (ativo ? '<span class="pill budget" style="align-self:center;">aberto</span>'
                  : '<button class="btn sm" data-action="budget-switch" data-id="'+b.id+'">Abrir</button>')+
-          '<button class="btn sm" data-action="budget-rename" data-id="'+b.id+'" title="Mudar o nome">✎</button>'+
-          (_bindex.list.length>1 ? '<button class="btn sm danger" data-action="budget-delete" data-id="'+b.id+'" title="Eliminar">🗑</button>' : '')+
+          '<button class="btn sm" data-action="budget-rename" data-id="'+b.id+'" title="Mudar o nome" aria-label="Mudar o nome do orçamento '+esc(b.name)+'">✎</button>'+
+          (_bindex.list.length>1 ? '<button class="btn sm danger" data-action="budget-delete" data-id="'+b.id+'" title="Eliminar" aria-label="Eliminar o orçamento '+esc(b.name)+'">🗑</button>' : '')+
         '</span></div>';
     }).join("");
     openModal(
@@ -4310,7 +4309,7 @@
       '<div class="modal-body">'+
         '<p class="muted" style="margin-top:0;">Cada orçamento é <b>completamente separado</b> — contas, categorias e transações próprias. Troque quando quiser; se sincroniza, vão todos no <b>mesmo</b> gist.</p>'+
         linhas+
-        '<div class="field" style="margin-top:14px;"><button class="btn primary" data-action="budget-new" style="width:100%;justify-content:center;">+ Novo orçamento</button></div>'+
+        '<div class="field" style="margin-top:14px;"><button class="btn primary" data-action="budget-new" style="width:100%;justify-content:center;">➕ Novo orçamento</button></div>'+
       '</div>'+
       '<div class="modal-foot"><span></span><button class="btn" data-action="close">Fechar</button></div>');
   }
@@ -4579,6 +4578,7 @@
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
       ver("1.53", "agosto 2026", [
+        '<b>Uma passagem de pente fino por todos os ecrãs.</b> Doze botões que são só um símbolo — o ✓, o ⧉, o ✖, as setas de ordenar — não diziam nada a quem usa o leitor de ecrã do telemóvel; passaram a anunciar-se pelo nome. Três mensagens escreviam <b>«1 categorias»</b>, <b>«1 linhas»</b> e <b>«1 transações»</b> quando havia uma só. E os botões principais de criar passaram todos a usar o mesmo <b>➕</b> — uns tinham-no e outros um simples <b>+</b>.',
         '<b>O símbolo da moeda ficou coerente nas três colunas do orçamento.</b> O campo <b>Atribuído</b> era o único sem ele; passou a tê-lo também, ao lado do número e fora do que se escreve — o valor do campo continua limpo. No <b>telemóvel</b> o símbolo é mais pequeno e mais apagado nas três colunas: repete-se em todas as linhas e o que interessa ler é o número. No computador fica como sempre esteve.',
         '<b>Os totais de grupo deixaram de ficar tão longe da coluna do lado.</b> Era o selo colorido do <b>Disponível</b> que fixava a largura da coluna para todas as linhas, e as que não têm selo — os totais de grupo — ficavam com o número afastado sem razão visível. O selo estreitou o espaço lateral, mantendo o mesmo formato e a mesma altura.',
         '<b>Todos os campos de dinheiro passaram a mostrar o valor por extenso.</b> Ao editar uma transação de 8,50 €, o campo dizia <b>8,5</b>; um valor de mil e tal aparecia sem o ponto dos milhares. Agora lê-se <b>8,50</b> e <b>1.234,50</b> em todos eles — saída, entrada, saldo inicial, alvo, mover dinheiro, transferências, recorrentes e parcelas de uma divisão — e todos <b>alinhados à direita</b>, onde os números se comparam de relance. Continua a poder escrever como lhe der jeito: <b>8,5</b>, <b>8.50</b> ou uma conta como <b>1.234,50+500</b>.',
@@ -5105,7 +5105,7 @@
       return '<div class="split-line" style="display:grid;grid-template-columns:1fr 108px 36px;gap:8px;margin-bottom:8px;align-items:center;">'+
         '<select id="spCat'+i+'">'+catOptsFor(l.categoryId)+'</select>'+
         '<input id="spAmt'+i+'" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(l.amount)+'" placeholder="0,00">'+
-        '<button class="btn ghost sm" data-action="split-del-line" data-id="'+i+'" title="Remover">🗑</button></div>';
+        '<button class="btn ghost sm" data-action="split-del-line" data-id="'+i+'" title="Remover" aria-label="Remover esta parcela">🗑</button></div>';
     }).join("");
     openModal(
       '<div class="modal-head"><h2>'+(editando?"✎ Editar transação dividida":"➗ Transação dividida")+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
@@ -5122,7 +5122,7 @@
           '<button class="btn sm" data-action="split-add-line">+ Adicionar categoria</button></div>'+
         '<div class="field"><label>Nota (opcional)</label><input id="spMemo" maxlength="300" value="'+esc(s.memo)+'"></div>'+
         '<label class="opcao" style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="spClear" '+(s.cleared?"checked":"")+' style="width:auto;"> Confirmada</label>'+
-        '<div class="hint" style="margin-top:10px;font-size:13px;">Total: <b id="splitTotal">'+fmt(total)+'</b> em '+s.lines.length+' categorias.'+
+        '<div class="hint" style="margin-top:10px;font-size:13px;">Total: <b id="splitTotal">'+fmt(total)+'</b> em '+s.lines.length+(s.lines.length===1?' categoria.':' categorias.')+
           (editando?'<br>As partes são guardadas <b>todas em conjunto</b>, por isso o total nunca fica a meio. Se deixar só uma categoria com valor, deixa de ser uma transação dividida.':'')+'</div>'+
       '</div>'+
       '<div class="modal-foot">'+
@@ -6505,7 +6505,7 @@
              '<span style="font-size:12.5px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+etiq+'</span>'+
              '<span style="display:flex;gap:6px;flex-shrink:0;">'+
                '<button class="btn" data-action="snap-restore" data-id="'+i+'" style="padding:5px 9px;font-size:12px;">↩ Repor</button>'+
-               '<button class="btn" data-action="snap-download" data-id="'+i+'" style="padding:5px 9px;font-size:12px;" title="Descarregar este dia como ficheiro">⬇</button>'+
+               '<button class="btn" data-action="snap-download" data-id="'+i+'" style="padding:5px 9px;font-size:12px;" title="Descarregar este dia como ficheiro" aria-label="Descarregar este dia como ficheiro">⬇</button>'+
              '</span></div>';
     }
     return h + '</div>';
@@ -7041,7 +7041,7 @@
       var saltar=_csv.skipDups!==false;
       var aImportar=saltar ? _csv.rows.filter(function(r){return !r.dup;}).length : _csv.rows.length;
       prev='<div class="field"><label>Pré-visualização</label>'+head+body+
-        (_csv.rows.length>6?'<div class="muted" style="font-size:12px;padding-top:6px;">… e mais '+(_csv.rows.length-6)+' linhas.</div>':'')+
+        (_csv.rows.length>6?'<div class="muted" style="font-size:12px;padding-top:6px;">… e mais '+(_csv.rows.length-6)+((_csv.rows.length-6)===1?' linha.':' linhas.')+'</div>':'')+
         (_csv.dups?'<label class="opcao" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:10px;">'+
           '<input type="checkbox" data-action="csv-toggle-dups" '+(saltar?"checked":"")+' style="width:auto;"> Saltar as <b>'+_csv.dups+'</b> que já existem</label>'+
           '<div class="hint" style="margin-top:4px;">Mesma conta, mesma data e mesmo valor de transações que já tem registadas — costuma acontecer quando os extratos se sobrepõem. Desligue só se souber que são movimentos mesmo repetidos.</div>':'')+
@@ -7075,7 +7075,7 @@
       '</div>'+
       '<div class="modal-foot"><span></span><span><button class="btn" data-action="close">Cancelar</button> '+
         ((_csv&&_csv.rows.length)?'<button class="btn primary" data-action="apply-csv">Importar '+
-          ((_csv.skipDups!==false)?_csv.rows.filter(function(r){return !r.dup;}).length:_csv.rows.length)+' transações</button>':'')+'</span></div>');
+          (function(q){ return q+(q===1?' transação':' transações'); })((_csv.skipDups!==false)?_csv.rows.filter(function(r){return !r.dup;}).length:_csv.rows.length)+'</button>':'')+'</span></div>');
     if(_csv && _csv.accountId) el("csvAcc").value=_csv.accountId;
     el("csvAcc").addEventListener("change", function(){
       if(!_csv || !_csv.raw) return;
