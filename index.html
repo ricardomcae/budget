@@ -794,7 +794,11 @@
     /* No telemóvel o símbolo encolhe: repete-se em todas as linhas das três colunas e o que
        interessa ler é o número. Mais pequeno e mais apagado, continua a dizer a moeda sem
        gastar largura que faz falta ao nome da categoria. */
-    .cur { font-size: .78em; opacity: .7; margin-inline-start: .16em; }
+    /* O símbolo assenta na mesma linha de base do número, e por ser mais pequeno o seu topo
+       fica ~2px abaixo do topo dos algarismos — parece cair. Sobe-se metade dessa diferença
+       (0,1em do próprio símbolo) para ficar centrado com eles. No computador não é preciso:
+       lá o símbolo tem o mesmo tamanho do número e a linha de base já os alinha. */
+    .cur { font-size: .78em; opacity: .7; margin-inline-start: .16em; vertical-align: .1em; }
     .assign-wrap .assign-cur { inset-inline-end: 5px; }
     /* 86px e não 82: com o símbolo a ocupar o lado direito, um valor de cinco dígitos
        («12.403,99») ficava 3px acima do que cabia e passava a deslizar dentro do campo. Os 4px
