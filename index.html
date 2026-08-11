@@ -699,6 +699,11 @@
       content: ""; position: absolute; top: 0; bottom: 0; left: -3px; right: -3px; }
     .undo-redo { gap: 6px; }
     .topbar-actions { gap: 6px; }
+    /* O intervalo que separa o «o que andei a fazer» (↩ ↪ 🕑) do «o que quero fazer agora»
+       (➕ 🏷️ 💾 ❓). Sem ele os sete ícones leem-se como uma fila só e não se percebe que são
+       dois assuntos; com ele, o polegar também acerta melhor. Encolhe nos ecrãs mais estreitos
+       porque a barra não pode partir para duas linhas: mais vale ler-se pior do que dobrar. */
+    .undo-redo .sep-antes { margin-inline-start: 10px; }
     .topbar { gap: 10px; }
     /* O botão de trocar de orçamento diz o nome do orçamento aberto, com seta: um ícone sozinho
        não se percebia. O nome encolhe até caber e corta com «vâo…» — são os outros botões, de
@@ -739,6 +744,10 @@
     .hide-phone { display: none !important; }
     .so-fone { display: inline; }
     .so-fone-btn { display: inline-flex; }
+
+    /* Ecrãs estreitos (iPhone SE e afins): o separador entre os dois grupos de botões é a
+       primeira coisa a ceder, antes de a barra partir. */
+    @media (max-width: 389px) { .undo-redo .sep-antes { margin-inline-start: 3px; } }
 
     /* Campos de data: o iOS dá-lhes largura própria e centra o texto, o que os fazia
        transbordar da coluna e encavalitar no campo do lado. */
@@ -854,7 +863,7 @@
       <button data-action="add-tx"><span>➕</span> Nova transação</button>
       <button data-action="payees"><span>🏷️</span> Beneficiários</button>
       <button data-action="data-menu" id="btnData"><span>💾</span> Dados e cópias</button>
-      <button data-action="help"><span>❓</span> Como funciona</button>
+      <button data-action="help"><span>❓</span> Como funciona?</button>
     </div>
   </aside>
 
@@ -870,9 +879,6 @@
       </div>
       <div class="topbar-actions mobile-only">
         <button class="btn sm bud-chip" data-action="budgets" aria-label="Trocar ou gerir orçamentos" title="Trocar ou gerir orçamentos">💰<span id="budNameM">Orçamento</span><span class="caret">▾</span></button>
-        <button class="btn sm" data-action="add-tx" aria-label="Nova transação">➕</button>
-        <button class="btn sm" data-action="payees" aria-label="Beneficiários">🏷️</button>
-        <button class="btn sm" id="btnDataM" data-action="data-menu" aria-label="Dados e cópias de segurança" style="position:relative;">💾</button>
       </div>
       <div class="undo-redo">
         <button class="btn sm" data-action="undo-do" id="btnUndo" title="Anular" aria-label="Anular">↩</button>
@@ -883,7 +889,13 @@
         <button class="btn sm" data-action="moves" id="btnMoves" title="Movimentos recentes" aria-label="Movimentos recentes">🕑</button>
         <!-- A ajuda fecha a fila, a seguir ao anular/refazer. No computador vive na barra
              lateral, por isso aqui é só de telemóvel. -->
-        <button class="btn sm so-fone-btn" data-action="help" aria-label="Como funciona">❓</button>
+        <!-- A partir daqui é a MESMA fila e a MESMA ordem da barra lateral do computador:
+             nova transação, beneficiários, dados e cópias, como funciona. Só se separa do
+             anular/refazer por um intervalo maior, para se lerem como dois assuntos. -->
+        <button class="btn sm so-fone-btn sep-antes" data-action="add-tx" aria-label="Nova transação">➕</button>
+        <button class="btn sm so-fone-btn" data-action="payees" aria-label="Beneficiários">🏷️</button>
+        <button class="btn sm so-fone-btn" id="btnDataM" data-action="data-menu" aria-label="Dados e cópias de segurança" style="position:relative;">💾</button>
+        <button class="btn sm so-fone-btn" data-action="help" aria-label="Como funciona?">❓</button>
       </div>
       <button class="theme-toggle" data-action="toggle-theme" title="Mudar a cor da aplicação" aria-label="Mudar a cor da aplicação"></button>
     </div>
@@ -4362,7 +4374,7 @@
   function helpModal() {
     function sec(t){ return '<div style="font-weight:700;color:var(--text);margin:16px 0 6px;font-size:13px;">'+t+'</div>'; }
     openModal(
-      '<div class="modal-head"><h2>❓ Como funciona</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
+      '<div class="modal-head"><h2>❓ Como funciona?</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body"><div class="help-list">'+
 
       sec("O essencial")+
@@ -4482,6 +4494,7 @@
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
       ver("1.53", "agosto 2026", [
+        '<b>Os botões do cabeçalho do telemóvel seguem agora a ordem do computador.</b> O nome do orçamento continua à esquerda; à direita ficam primeiro o <b>↩ ↪ 🕑</b> — o que já fez — e depois, separados por um intervalo, o <b>➕ 🏷️ 💾 ❓</b>, na mesma ordem em que aparecem na barra lateral do computador. Antes o <b>❓</b> estava sozinho no fim da fila e os outros três noutro grupo, sem que a diferença tivesse razão de ser.',
         '<b>No telemóvel, a tabela deixou de fugir para a esquerda.</b> Nas Transações é preciso arrastar para o lado para chegar ao <b>✓</b>, ao <b>⧉</b> e ao <b>🗑</b> — mas ao tocar num deles a tabela voltava ao princípio, e era preciso arrastar outra vez para cada linha. Agora fica onde estava. Mudar de ecrã, filtrar ou mudar de mês continuam a começar do princípio, que é o que ali se espera.',
         '<b>Os alvos «até uma data» deixam de pedir dinheiro depois do prazo.</b> Um alvo até uma data é uma meta de <b>uma vez só</b> — umas férias, uma obra. Só que, no método <b>Repor</b>, gastar o dinheiro depois da data punha o saldo a zero e fazia o alvo pedir o <b>valor inteiro outra vez</b>, mês após mês, para uma despesa que já tinha acontecido. Agora a linha diz <b>«prazo terminado»</b> e cala-se, distinguindo quem <b>cumpriu</b> a meta (juntou o total, ainda que já o tenha gasto) de quem <b>ficou pelo caminho</b>, e dizendo nesse caso quanto juntou de quanto. O método <b>Reservar</b> já se comportava assim; era o Repor que destoava. O alvo <b>não é apagado</b> — fica onde está, sem pedir nada, até decidir removê-lo, arquivar a categoria ou esticar a data.',
       ])+
