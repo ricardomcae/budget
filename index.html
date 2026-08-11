@@ -440,6 +440,12 @@
   /* Os montantes nunca partem de linha — era o que atirava o «€» para baixo. */
   .num, .grp-total, .activity-cell, .avail-pill { white-space: nowrap; }
   table.budget td.num, table.budget th:not(.first) { width: 1%; }   /* colunas de valores: só o necessário */
+  /* ...e com o espaço lateral apertado, para se encostarem o mais à direita possível. Cada
+     píxel que se tira aqui vai para a coluna do nome, que é a única que corta com «…» — as
+     outras têm sempre o número inteiro à vista. O espaço à direita da ÚLTIMA coluna mantém-se
+     maior, senão o valor ficava colado à margem do cartão. */
+  table.budget td.num, table.budget td.grp-total, table.budget th:not(.first) { padding-inline: 12px; }
+  table.budget td:last-child, table.budget th:last-child { padding-inline-end: 18px; }
   table.budget td:first-child, table.budget th.first { width: auto; }
   .num { text-align: end; font-variant-numeric: tabular-nums; }
   /* Tem de parecer um campo mesmo sem lhe passar o rato por cima — no telemóvel não há rato. */
@@ -451,6 +457,10 @@
   /* Resultado da conta escrita no próprio campo ("120+35" mostra "= 155,00" por baixo). */
   /* Campo de dinheiro em "só leitura" no telemóvel: quem escreve é o teclado próprio. Não pode
      parecer desativado nem mostrar o cursor de texto — é um campo normal que se toca. */
+  /* Números alinham-se à direita: é onde estão as unidades, e é isso que deixa comparar
+     valores de relance quando há vários campos empilhados (saída/entrada, parcelas de uma
+     divisão). O «Atribuído» já o fazia; os restantes campos de dinheiro ficaram para trás. */
+  .money { text-align: end; font-variant-numeric: tabular-nums; }
   .money[readonly] { opacity: 1; cursor: pointer; caret-color: transparent; }
   /* Pontinho de estado de uma conta: verde = a par do banco; âmbar = há coisas por confirmar
      (informação, não aviso). Tamanho fixo e pequeno para não roubar largura à tabela. */
@@ -484,8 +494,15 @@
   .calc-key.op { background: var(--surface); color: var(--primary); }
   .calc-key.ok { background: var(--primary); color: #fff; border-color: var(--primary); }
   .calc-key.ok:active { opacity: .85; }
-  .activity-cell { color: var(--text-muted); }
-  .avail-pill { display: inline-block; padding: 4px 11px; border-radius: 20px; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 12.5px; }
+  /* A mesma escada do telemóvel — Atribuído > Disponível > Atividade — mas com degraus de meio
+     ponto em vez de um: no computador há espaço de sobra e os números não precisam de competir
+     pela atenção. O «Atribuído» fica nos 14px herdados, que é o tamanho que já tinha. */
+  .activity-cell { color: var(--text-muted); font-size: 13px; }
+  /* Num mês típico a maioria das categorias ainda não teve movimento, e a coluna enche-se de
+     zeros que competem com os números que interessam. Ficam mais apagados — continuam legíveis
+     para quem os procura, mas deixam de puxar o olho. */
+  .activity-cell.zero, .activity-cell.zero .btn { opacity: .45; font-weight: 400; }
+  .avail-pill { display: inline-block; padding: 4px 11px; border-radius: 20px; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13.5px; }
   .avail-pill.pos { background: var(--positive-soft); color: var(--positive); }
   .avail-pill.zero { background: var(--neutral-soft); color: var(--text-muted); }
   .avail-pill.neg { background: var(--negative-soft); color: var(--negative); }
@@ -734,11 +751,19 @@
        maior do que a vizinha, que é o que se quer, mas sem gritar. Só pode descer abaixo dos
        16px porque estes campos ficam em «só leitura» no toque (ver soLeituraNoToque): o iOS
        nunca faz zoom num campo assim, e quem escreve é o teclado próprio da aplicação. */
-    .assign-input { font-size: 15px; }
-    .activity-cell { font-size: 13px; }
+    /* A escada das três colunas de valores. A ordem é deliberada e segue a importância de
+       cada número: o «Atribuído» é onde se escreve, o «Disponível» é o que responde a «posso
+       gastar?», e a «Atividade» é contexto. Antes o «Disponível» era o MENOR dos três (12,5px)
+       — herdado de o selo colorido pedir letra pequena — e ficava a competir com a coluna que
+       menos informação carrega. O selo mantém o tamanho e o espaço que sempre teve. */
+    .assign-input { font-size: 14px; }
+    .avail-pill   { font-size: 13px; }
+    .activity-cell { font-size: 12px; }
 
     /* Orçamento compacto; ações sempre visíveis (não há hover no toque) */
     table.budget thead th, .grp-row td, tr.cat-row td { padding: 8px 6px; }
+    table.budget td.num, table.budget td.grp-total, table.budget th:not(.first) { padding-inline: 4px; }
+    table.budget td:last-child, table.budget th:last-child { padding-inline-end: 6px; }
     table.budget tr.tot-row td { font-size: 12.5px; padding: 6px 5px; }
     table.budget tr.tot-row td.first { font-size: 11px; }
     .cat-actions, .grp-add { opacity: 1 !important; }
@@ -2700,7 +2725,7 @@
             (debt>0.005 ? '<div class="target-bar"><span class="'+barClsP+'" style="width:'+barP+'%"></span></div>' : '') +
             '<div class="target-note">'+pnote+'</div></td>' +
             '<td class="num"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="none" data-assign="'+cat.id+'" value="'+amtStr2(assigned)+'" placeholder="0,00"></td>' +
-            '<td class="num activity-cell">'+fmt(activity)+'</td>' +
+            '<td class="num activity-cell'+(Math.abs(activity)<0.005?' zero':'')+'">'+fmt(activity)+'</td>' +
             '<td class="num"><span class="avail-pill '+pillCls+'">'+fmt(avail)+'</span></td></tr>';
           continue;
         }
@@ -2738,7 +2763,7 @@
           (upc[cat.id] ? '<div class="target-note">📅 Ainda por sair este mês: '+fmt(upc[cat.id])+
             (avail < upc[cat.id]-0.005 ? ' <b style="color:var(--warning)">— faltam '+fmt(round2(upc[cat.id]-avail))+'</b>' : '')+'</div>' : '') + '</td>' +
           '<td class="num"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="none" data-assign="'+cat.id+'" value="'+amtStr2(assigned)+'" placeholder="0,00"></td>' +
-          '<td class="num activity-cell"><button class="btn ghost sm" data-action="cat-activity" data-id="'+cat.id+'" style="font-variant-numeric:tabular-nums;">'+fmt(activity)+'</button></td>' +
+          '<td class="num activity-cell'+(Math.abs(activity)<0.005?' zero':'')+'"><button class="btn ghost sm" data-action="cat-activity" data-id="'+cat.id+'" style="font-variant-numeric:tabular-nums;">'+fmt(activity)+'</button></td>' +
           '<td class="num"><span class="avail-pill '+pillCls+'">'+fmt(avail)+'</span></td></tr>';
       }
     }
@@ -3503,7 +3528,7 @@
           '<button data-t="credit" class="'+(acc.type==="credit"?"active":"")+'">💳 Cartão</button>'+
           '<button data-t="tracking" class="'+(acc.type==="tracking"?"active":"")+'">📉 Acompanhamento</button></div>'+
           '<div class="hint">Orçamento = à ordem, poupança, dinheiro. Cartão = cartão de crédito (com categoria de pagamento automática). Acompanhamento = empréstimos, investimentos.</div></div>'+
-        (editing?'':'<div class="field"><label>Saldo inicial</label><input id="acStart" class="money" data-neg="1" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(acc.start)+'" placeholder="0,00"><div class="hint">Use valor negativo para dívidas (ex.: saldo de cartão de crédito).</div></div>')+
+        (editing?'':'<div class="field"><label>Saldo inicial</label><input id="acStart" class="money" data-neg="1" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(acc.start)+'" placeholder="0,00"><div class="hint">Use valor negativo para dívidas (ex.: saldo de cartão de crédito).</div></div>')+
         '<div class="field"><label>Nota (opcional)</label><input id="acNote" maxlength="300" value="'+esc(acc.note||"")+'"></div>'+
         '<div class="field'+((acc.type==="credit"||acc.type==="tracking")?"":" hidden")+'" id="acPayFromField"><label>Conta de pagamento predefinida</label><select id="acPayFrom">'+payFromOpts+'</select><div class="hint">Ao pagar este cartão/dívida, o dinheiro sai por predefinição desta conta.</div></div>'+
         (editing ? '<div class="field"><label>Ordem na lista</label>'+
@@ -3570,8 +3595,8 @@
           '<div class="hint hidden" id="txCatWarn">⚠️ Sem categoria, este movimento muda o saldo da conta mas fica de fora do orçamento — as contas deixam de bater certo.</div>'+
           '<div class="hint hidden" id="txCatReq" style="color:var(--warning);font-weight:600;">⚠️ No cartão de crédito a categoria é obrigatória — é ela que faz o orçamento guardar o dinheiro para pagar a dívida.</div></div>'+
         '<div class="grid-2">'+
-          '<div class="field"><label>Saída (despesa)</label><input id="txOut" class="money" data-par="txIn" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(tx.outflow)+'" placeholder="0,00"></div>'+
-          '<div class="field"><label>Entrada (receita)</label><input id="txIn" class="money" data-par="txOut" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(tx.inflow)+'" placeholder="0,00"></div>'+
+          '<div class="field"><label>Saída (despesa)</label><input id="txOut" class="money" data-par="txIn" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(tx.outflow)+'" placeholder="0,00"></div>'+
+          '<div class="field"><label>Entrada (receita)</label><input id="txIn" class="money" data-par="txOut" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(tx.inflow)+'" placeholder="0,00"></div>'+
         '</div>'+
         '<div class="field"><label>Nota (opcional)</label><input id="txMemo" maxlength="300" value="'+esc(tx.memo||"")+'"></div>'+
         '<label class="opcao" style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="txClear" '+(tx.cleared?"checked":"")+' style="width:auto;"> Confirmada (reconciliada com o banco)</label>'+
@@ -3747,7 +3772,7 @@
           opt("byDate","Até uma data — juntar um total")+
         '</select></div>'+
         '<div class="grid-2">'+
-          '<div class="field" id="catAmtField"><label id="catAmtLabel">Valor do alvo</label><input id="catTarget" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(tAmt)+'" placeholder="0,00"></div>'+
+          '<div class="field" id="catAmtField"><label id="catAmtLabel">Valor do alvo</label><input id="catTarget" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(tAmt)+'" placeholder="0,00"></div>'+
           '<div class="field hidden" id="catDateField"><label>Até ao mês</label><input id="catTargetDate" type="month" value="'+tDate+'"></div>'+
         '</div>'+
         '<div class="field hidden" id="catDueField"><label>Mês da despesa <span class="muted" style="text-transform:none;letter-spacing:0;">(opcional)</span></label>'+
@@ -4428,6 +4453,7 @@
         '<li><b>Vários orçamentos</b> (na barra lateral, ou no botão com o nome do orçamento no cabeçalho, no telemóvel): pode ter um <b>Pessoal</b> e um <b>Família</b>, por exemplo. Cada um é <b>completamente separado</b> — contas, categorias e transações próprias — e troca-se com um toque. Se sincroniza, vão <b>todos no mesmo gist</b>; só há uma coisa a saber: se editar orçamentos <b>diferentes</b> em aparelhos diferentes antes de sincronizar, a aplicação pergunta qual manter, como faria com qualquer conflito.</li>'+
         '<li><b>A barra de filtros do Orçamento encolhe com a janela.</b> À medida que o espaço aperta, os nomes dos botões vão desaparecendo pela ordem em que fazem menos falta — fica o símbolo, e o rato por cima diz sempre o que é. Se estreitar mesmo muito, a aplicação passa à vista de telemóvel, com o menu em baixo. É de propósito: assim a barra nunca se parte em duas linhas.</li>'+
         '<li><b>O cabeçalho das listas fica à vista:</b> ao descer uma lista de transações, os nomes das colunas — Data, Beneficiário, Categoria… — ficam colados ao topo, para saber sempre o que está a ler. No telemóvel, como a tabela é mais larga do que o ecrã, é a <b>lista</b> que corre dentro da sua própria área em vez da página inteira.</li>'+
+        '<li><b>Os valores mostram-se sempre por extenso</b> — <b>8,50</b> e não <b>8,5</b>, <b>1.234,50</b> e não <b>1234,5</b> — em todos os campos, alinhados à direita. Ao escrever pode usar o formato que lhe der jeito: <b>8,5</b>, <b>8.50</b> ou <b>1234,50</b>.</li>'+
         '<li><b>Contas nos campos de dinheiro:</b> em qualquer campo de valor pode escrever a conta em vez do total — <b>23,45+11,90+7,15</b>. O resultado aparece por baixo enquanto escreve e substitui a conta assim que sai do campo. No <b>telemóvel</b> aparece um <b>teclado próprio</b> com <b>+</b> e <b>−</b>, sem letras nem risco de enganos. Num par <b>Saída/Entrada</b>, um <b>−</b> escrito no princípio do campo continua a passar o valor para o outro lado; depois de números, é uma subtração.</li>'+
         '<li><b>Datas e teclado:</b> as datas escrevem-se sempre em <b>dd/mm/aaaa</b>, mesmo que tenha o browser noutro idioma — pode escrever só os números, que as barras aparecem sozinhas, ou usar o 📅 para as escolher no calendário. Dentro de qualquer janela, o <b>Enter</b> vale por carregar no botão principal.</li>'+
         '<li><b>Cor da aplicação:</b> oito à escolha, em <b>Dados e cópias → Definições</b> — basta tocar numa bolinha. Vão do petróleo ao rosa pelo lado do roxo, mais um cinzento e um castanho, e nenhuma é verde nem laranja de propósito: uma cor de marca nessas zonas confunde-se, a um relance, com as barras que dizem se há dinheiro. No computador, o círculo no canto superior direito percorre-as uma a uma. A cor <b>é de cada orçamento</b>, e não do aparelho: fica guardada com ele e vai na sincronização, como as outras definições. Dê uma cor a cada um — verde-azulado ao <b>Pessoal</b>, framboesa ao <b>Família</b>, por exemplo — e passa a saber num relance qual está aberto, no telemóvel e no computador, sem ler o nome. Os verdes e vermelhos dos valores nunca mudam — são eles que dizem se há ou não dinheiro.</li>'+
@@ -4504,6 +4530,8 @@
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
       ver("1.53", "agosto 2026", [
+        '<b>Todos os campos de dinheiro passaram a mostrar o valor por extenso.</b> Ao editar uma transação de 8,50 €, o campo dizia <b>8,5</b>; um valor de mil e tal aparecia sem o ponto dos milhares. Agora lê-se <b>8,50</b> e <b>1.234,50</b> em todos eles — saída, entrada, saldo inicial, alvo, mover dinheiro, transferências, recorrentes e parcelas de uma divisão — e todos <b>alinhados à direita</b>, onde os números se comparam de relance. Continua a poder escrever como lhe der jeito: <b>8,5</b>, <b>8.50</b> ou uma conta como <b>1.234,50+500</b>.',
+        '<b>As três colunas do orçamento no telemóvel ficaram por ordem de importância.</b> O <b>Disponível</b> — o número que responde a «posso gastar?» — era o mais pequeno dos três; passou para o meio, acima da <b>Atividade</b>, que é contexto. E os zeros da Atividade ficaram mais apagados: num mês típico são a maioria da coluna e estavam a competir com os números que interessam.',
         '<b>A coluna «Atribuído» mostra sempre os cêntimos e os milhares.</b> Um <b>100</b> ao lado de um <b>41,66</b> desalinhava a vírgula e fazia o olho tropeçar ao ler a coluna de alto a baixo; agora lê-se <b>100,00</b>, e um valor grande lê-se <b>4.000,00</b> como em todo o resto da aplicação. O campo vazio mantém-se vazio, com o <b>0,00</b> em cinzento a dizer o que ali cabe.',
         '<b>No telemóvel, o «Atribuído» deixou de gritar.</b> Estava a 16px ao lado de uma «Atividade» a 12,5px e a linha ficava desequilibrada. Passou a 15px, com a vizinha a subir para 13px — continua a ser o número que salta à vista, que é o que se quer, mas sem exagero.',
         '<b>No computador, o 🕑 passou a dizer «Movimentos».</b> O ↩ e o ↪ percebem-se sozinhos, o relógio não — e ali há espaço de sobra. No telemóvel continua só o ícone, porque a barra tem sete botões numa linha e não cabe mais nada.',
@@ -4794,7 +4822,7 @@
       '<div class="modal-body">'+
         '<div class="field"><label>De</label><select id="mvFrom">'+optsFor(fromDefault)+'</select></div>'+
         '<div class="field"><label>Para</label><select id="mvTo">'+optsFor(toDefault)+'</select></div>'+
-        '<div class="field"><label>Valor</label><input id="mvAmt" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(fromAvail>0?round2(fromAvail):"")+'" placeholder="0,00"><div class="hint" id="mvHint"></div></div>'+
+        '<div class="field"><label>Valor</label><input id="mvAmt" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(fromAvail>0?round2(fromAvail):"")+'" placeholder="0,00"><div class="hint" id="mvHint"></div></div>'+
       '</div>'+
       '<div class="modal-foot"><span></span><span><button class="btn" data-action="close">Cancelar</button> <button class="btn primary" data-action="do-move">Mover</button></span></div>');
     function upd(){ var f=el("mvFrom").value; var fa=f===RTA_ID?readyToAssign(m):availableFor(f,m); el("mvHint").textContent="Disponível na origem: "+fmt(fa); }
@@ -4835,10 +4863,10 @@
         '<div class="field'+(ehTransf?" hidden":"")+'" id="rcCatField"><label id="rcCatLabel">Categoria</label><select id="rcCat">'+catOptionsHTML(s.categoryId)+'</select>'+
           '<div class="hint" id="rcCatHint"></div></div>'+
         (ehTransf
-          ? '<div class="field"><label>Valor</label><input id="rcAmt" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(valorTransf)+'" placeholder="0,00"></div>'
+          ? '<div class="field"><label>Valor</label><input id="rcAmt" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(valorTransf)+'" placeholder="0,00"></div>'
           : '<div class="grid-2">'+
-              '<div class="field"><label>Saída (despesa)</label><input id="rcOut" class="money" data-par="rcIn" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(s.outflow)+'" placeholder="0,00"></div>'+
-              '<div class="field"><label>Entrada (receita)</label><input id="rcIn" class="money" data-par="rcOut" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(s.inflow)+'" placeholder="0,00"></div>'+
+              '<div class="field"><label>Saída (despesa)</label><input id="rcOut" class="money" data-par="rcIn" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(s.outflow)+'" placeholder="0,00"></div>'+
+              '<div class="field"><label>Entrada (receita)</label><input id="rcIn" class="money" data-par="rcOut" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(s.inflow)+'" placeholder="0,00"></div>'+
             '</div>')+
         '<div class="field"><label>Nota (opcional)</label><input id="rcMemo" maxlength="300" value="'+esc(s.memo||"")+'"></div>'+
         '<label class="opcao" style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="rcActive" '+(s.active?"checked":"")+' style="width:auto;"> Ativa (lança automaticamente na data)</label>'+
@@ -4947,7 +4975,7 @@
         '<div class="field hidden" id="tfCatField"><label id="tfCatLabel">Categoria</label><select id="tfCat">'+catOptionsHTML(catDefault)+'</select>'+
           '<div class="hint" id="tfCatHint"></div></div>'+
         '<div class="grid-2">'+
-          '<div class="field"><label>Valor</label><input id="tfAmt" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(amtDefault)+'" placeholder="0,00"></div>'+
+          '<div class="field"><label>Valor</label><input id="tfAmt" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(amtDefault)+'" placeholder="0,00"></div>'+
           '<div class="field"><label>Data</label>'+dateField("tfDate", dateDefault)+'</div>'+
         '</div>'+
         '<div class="field"><label>Nota (opcional)</label><input id="tfMemo" maxlength="300" value="'+esc(memoDefault)+'"></div>'+
@@ -5025,7 +5053,7 @@
     var lineRows=s.lines.map(function(l,i){
       return '<div class="split-line" style="display:grid;grid-template-columns:1fr 108px 36px;gap:8px;margin-bottom:8px;align-items:center;">'+
         '<select id="spCat'+i+'">'+catOptsFor(l.categoryId)+'</select>'+
-        '<input id="spAmt'+i+'" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr(l.amount)+'" placeholder="0,00" style="text-align:end;">'+
+        '<input id="spAmt'+i+'" class="money" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(l.amount)+'" placeholder="0,00">'+
         '<button class="btn ghost sm" data-action="split-del-line" data-id="'+i+'" title="Remover">🗑</button></div>';
     }).join("");
     openModal(
@@ -5097,11 +5125,12 @@
     return neg ? -v : v;
   }
   function amtStr(n){ if (n===""||n===null||n===undefined||n===0) return ""; return String(n).replace(".", ","); }
-  // O campo «Atribuído» do orçamento mostra SEMPRE os cêntimos e os milhares, como o resto da
-  // aplicação: é uma coluna de números lida de alto a baixo, e um "100" ao lado de um "41,66"
-  // desalinha a vírgula e faz o olho tropeçar. Escrever no campo não sofre com isto — quem
-  // escreve é o teclado próprio, que tem mostrador dele; o campo só apresenta o valor em
-  // repouso, e o parseAmount lê "4.000,00" sem hesitar.
+  // Formato de TODOS os campos de dinheiro em repouso: sempre os cêntimos e os milhares, como
+  // o resto da aplicação. Um "8,5" onde se esperava "8,50", ou um "1234,5" sem o ponto dos
+  // milhares, obriga a reler o número para o perceber — e num campo de edição isso é pior do
+  // que numa lista, porque é o valor que se vai confirmar. Escrever não sofre com isto: o
+  // parseAmount lê "1.234,50", "1234,5" e "1234.50" da mesma maneira, e o avaliaExpr aceita
+  // contas escritas por cima ("1.234,50+500").
   // Zero continua a mostrar o campo vazio — o cinzento "0,00" do placeholder já diz o que lá
   // cabe, e uma coluna cheia de zeros competiria com os valores que interessam.
   function amtStr2(n){
@@ -7567,7 +7596,7 @@
   function fechaConta(inp){
     if (!inp || !inp.classList || !inp.classList.contains("money")) return;
     var v = avaliaExpr(inp.value);
-    if (v !== null) inp.value = amtStr(v);
+    if (v !== null) inp.value = amtStr2(v);
     escondeDica();
     if (inp.getAttribute("data-par") && inp.value) { var op = el(inp.getAttribute("data-par")); if (op) op.value = ""; }
   }
@@ -7701,7 +7730,7 @@
     if(!_kpEl || !_kp) return;
     var v = calcValue(_kp);
     if (_kpEl.hasAttribute("data-assign")) { applyAssign(_kpEl.getAttribute("data-assign"), v); return; }
-    _kpEl.value = v ? amtStr(v) : "";
+    _kpEl.value = v ? amtStr2(v) : "";
     var par = _kpEl.getAttribute("data-par");                 // Saída/Entrada: só um dos dois lados
     if (par && _kpEl.value) { var op = el(par); if (op) op.value = ""; }
     try { _kpEl.dispatchEvent(new Event("change", {bubbles:true})); } catch(e){}
