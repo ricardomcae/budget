@@ -729,6 +729,13 @@
     /* Safari faz zoom ao focar qualquer campo com menos de 16px.
        A regra é deliberadamente abrangente para não escapar nenhum campo novo. */
     input, select, textarea, .assign-input { font-size: 16px; }
+    /* Excepção: o «Atribuído» do orçamento. Aos 16px destacava-se demasiado da coluna
+       «Atividade» ao lado (12,5px) e a linha ficava desequilibrada. Desce para 15px — continua
+       maior do que a vizinha, que é o que se quer, mas sem gritar. Só pode descer abaixo dos
+       16px porque estes campos ficam em «só leitura» no toque (ver soLeituraNoToque): o iOS
+       nunca faz zoom num campo assim, e quem escreve é o teclado próprio da aplicação. */
+    .assign-input { font-size: 15px; }
+    .activity-cell { font-size: 13px; }
 
     /* Orçamento compacto; ações sempre visíveis (não há hover no toque) */
     table.budget thead th, .grp-row td, tr.cat-row td { padding: 8px 6px; }
@@ -737,7 +744,7 @@
     .cat-actions, .grp-add { opacity: 1 !important; }
     .cat-name-cell { flex-wrap: wrap; gap: 6px; }
     .assign-input { width: 82px; padding: 6px; }
-    .activity-cell, .grp-total { font-size: 12.5px; }
+    .grp-total { font-size: 12.5px; }
     .avail-pill { padding: 4px 8px; }
 
     /* Escondido no telemóvel: já existe noutro sítio, ou não cabe. */
@@ -886,7 +893,10 @@
         <!-- Mesmo assunto do anular/refazer («o que é que eu andei a fazer»), por isso mesmo
              sítio. Vive no cabeçalho e não dentro do Orçamento: assim chega-se a ele de qualquer
              ecrã, e o Orçamento fica sem mais uma barra por baixo do balão. -->
-        <button class="btn sm" data-action="moves" id="btnMoves" title="Movimentos recentes" aria-label="Movimentos recentes">🕑</button>
+        <!-- No computador o botão diz o nome: há espaço de sobra, e um relógio sozinho não se
+             percebe (o ↩ e o ↪ ao lado são óbvios, este não). No telemóvel fica só o ícone —
+             a barra tem sete botões numa linha e não cabe mais nada. -->
+        <button class="btn sm" data-action="moves" id="btnMoves" title="Movimentos recentes" aria-label="Movimentos recentes">🕑<span class="hide-phone">Movimentos</span></button>
         <!-- A ajuda fecha a fila, a seguir ao anular/refazer. No computador vive na barra
              lateral, por isso aqui é só de telemóvel. -->
         <!-- A partir daqui é a MESMA fila e a MESMA ordem da barra lateral do computador:
@@ -2689,7 +2699,7 @@
             // Sem dívida não há nada para cobrir: a barra desaparece (fica só a nota "Sem dívida a pagar").
             (debt>0.005 ? '<div class="target-bar"><span class="'+barClsP+'" style="width:'+barP+'%"></span></div>' : '') +
             '<div class="target-note">'+pnote+'</div></td>' +
-            '<td class="num"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="none" data-assign="'+cat.id+'" value="'+amtStr(assigned)+'" placeholder="0,00"></td>' +
+            '<td class="num"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="none" data-assign="'+cat.id+'" value="'+amtStr2(assigned)+'" placeholder="0,00"></td>' +
             '<td class="num activity-cell">'+fmt(activity)+'</td>' +
             '<td class="num"><span class="avail-pill '+pillCls+'">'+fmt(avail)+'</span></td></tr>';
           continue;
@@ -2727,7 +2737,7 @@
           '</span></div>' + (cat.note?'<div class="tag" style="margin-top:3px;">📝 '+esc(cat.note)+'</div>':'') + targetHtml +
           (upc[cat.id] ? '<div class="target-note">📅 Ainda por sair este mês: '+fmt(upc[cat.id])+
             (avail < upc[cat.id]-0.005 ? ' <b style="color:var(--warning)">— faltam '+fmt(round2(upc[cat.id]-avail))+'</b>' : '')+'</div>' : '') + '</td>' +
-          '<td class="num"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="none" data-assign="'+cat.id+'" value="'+amtStr(assigned)+'" placeholder="0,00"></td>' +
+          '<td class="num"><input class="assign-input money" data-neg="1" maxlength="13" type="text" inputmode="none" data-assign="'+cat.id+'" value="'+amtStr2(assigned)+'" placeholder="0,00"></td>' +
           '<td class="num activity-cell"><button class="btn ghost sm" data-action="cat-activity" data-id="'+cat.id+'" style="font-variant-numeric:tabular-nums;">'+fmt(activity)+'</button></td>' +
           '<td class="num"><span class="avail-pill '+pillCls+'">'+fmt(avail)+'</span></td></tr>';
       }
@@ -4441,7 +4451,7 @@
         '<li><b>↔ Transferir</b> move entre contas — está no ecrã <b>Contas</b>, dentro de uma conta aberta e na janela de nova transação. Se o dinheiro sair do orçamento para uma conta de acompanhamento, leva categoria.</li>'+
         '<li><b>➗ Dividir</b> reparte uma compra por várias categorias.</li>'+
         '<li><b>📅 Recorrentes</b> lançam-se sozinhas na data — diária, semanal, quinzenal, mensal, semestral ou anual. Podem ser uma <b>despesa/receita</b> ou uma <b>↔ transferência</b> entre contas, útil para pôr dinheiro de lado na poupança todos os meses.</li>'+
-        '<li>Clique numa transação para a editar. Transferências e divididas editam-se <b>por inteiro</b>, nunca metade.</li>'+
+        '<li>Clique numa transação para a editar. Transferências e divididas tratam-se <b>por inteiro</b>, nunca metade: editar muda os dois lados, apagar leva os dois, e o <b>⧉</b> duplica o conjunto todo — a cópia fica independente da original.</li>'+
         '<li><b>No telemóvel, o cabeçalho</b> tem, por esta ordem: o <b>nome do orçamento</b> (toque para trocar ou gerir), <b>➕</b> nova transação, <b>🏷️</b> beneficiários, <b>💾</b> dados e cópias, <b>↩ ↪</b> anular e refazer, <b>🕑</b> movimentos recentes e <b>❓</b> esta ajuda. O título do ecrã não aparece — é a barra de baixo, com o separador aceso, que diz onde está.</li>'+
         '<li><b>🕑 Movimentos recentes</b> (ao lado do ↩ ↪, no topo) — o registo de como tem repartido o dinheiro <b>pelas categorias</b>: mover entre categorias, 🩹 cobrir, 🎯 financiar, 🧹 libertar excedente, atribuir à mão, adiar, e também o que anulou. Cada linha diz <b>o que fez</b> e, por baixo, <b>de onde veio o dinheiro</b> — «Cobriu «Roupa»» e, em pequeno, «de Férias 50,00 €». Quando as origens são muitas, mostra as duas maiores e conta as restantes. Guarda os <b>últimos 30</b> e acompanha o orçamento (sobrevive a fechar a aplicação e vai na sincronização). As <b>transações não entram</b> — essas têm a sua própria lista. É só para ler: para andar para trás use o <b>↩</b>.</li>'+
         '<li><b>Somar à pressa:</b> as caixas à esquerda da data selecionam transações e mostram o total em baixo. A caixa no <b>cabeçalho</b> marca todas as que estão à vista. É só uma conta rápida — não altera nada, e a seleção desaparece ao mudar de página.</li>'+
@@ -4494,6 +4504,9 @@
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
       ver("1.53", "agosto 2026", [
+        '<b>A coluna «Atribuído» mostra sempre os cêntimos e os milhares.</b> Um <b>100</b> ao lado de um <b>41,66</b> desalinhava a vírgula e fazia o olho tropeçar ao ler a coluna de alto a baixo; agora lê-se <b>100,00</b>, e um valor grande lê-se <b>4.000,00</b> como em todo o resto da aplicação. O campo vazio mantém-se vazio, com o <b>0,00</b> em cinzento a dizer o que ali cabe.',
+        '<b>No telemóvel, o «Atribuído» deixou de gritar.</b> Estava a 16px ao lado de uma «Atividade» a 12,5px e a linha ficava desequilibrada. Passou a 15px, com a vizinha a subir para 13px — continua a ser o número que salta à vista, que é o que se quer, mas sem exagero.',
+        '<b>No computador, o 🕑 passou a dizer «Movimentos».</b> O ↩ e o ↪ percebem-se sozinhos, o relógio não — e ali há espaço de sobra. No telemóvel continua só o ícone, porque a barra tem sete botões numa linha e não cabe mais nada.',
         '<b>Os botões do cabeçalho do telemóvel seguem agora a ordem do computador.</b> O nome do orçamento continua à esquerda; à direita ficam primeiro o <b>↩ ↪ 🕑</b> — o que já fez — e depois, separados por um intervalo, o <b>➕ 🏷️ 💾 ❓</b>, na mesma ordem em que aparecem na barra lateral do computador. Antes o <b>❓</b> estava sozinho no fim da fila e os outros três noutro grupo, sem que a diferença tivesse razão de ser.',
         '<b>No telemóvel, a tabela deixou de fugir para a esquerda.</b> Nas Transações é preciso arrastar para o lado para chegar ao <b>✓</b>, ao <b>⧉</b> e ao <b>🗑</b> — mas ao tocar num deles a tabela voltava ao princípio, e era preciso arrastar outra vez para cada linha. Agora fica onde estava. Mudar de ecrã, filtrar ou mudar de mês continuam a começar do princípio, que é o que ali se espera.',
         '<b>Os alvos «até uma data» deixam de pedir dinheiro depois do prazo.</b> Um alvo até uma data é uma meta de <b>uma vez só</b> — umas férias, uma obra. Só que, no método <b>Repor</b>, gastar o dinheiro depois da data punha o saldo a zero e fazia o alvo pedir o <b>valor inteiro outra vez</b>, mês após mês, para uma despesa que já tinha acontecido. Agora a linha diz <b>«prazo terminado»</b> e cala-se, distinguindo quem <b>cumpriu</b> a meta (juntou o total, ainda que já o tenha gasto) de quem <b>ficou pelo caminho</b>, e dizendo nesse caso quanto juntou de quanto. O método <b>Reservar</b> já se comportava assim; era o Repor que destoava. O alvo <b>não é apagado</b> — fica onde está, sem pedir nada, até decidir removê-lo, arquivar a categoria ou esticar a data.',
@@ -5084,6 +5097,20 @@
     return neg ? -v : v;
   }
   function amtStr(n){ if (n===""||n===null||n===undefined||n===0) return ""; return String(n).replace(".", ","); }
+  // O campo «Atribuído» do orçamento mostra SEMPRE os cêntimos e os milhares, como o resto da
+  // aplicação: é uma coluna de números lida de alto a baixo, e um "100" ao lado de um "41,66"
+  // desalinha a vírgula e faz o olho tropeçar. Escrever no campo não sofre com isto — quem
+  // escreve é o teclado próprio, que tem mostrador dele; o campo só apresenta o valor em
+  // repouso, e o parseAmount lê "4.000,00" sem hesitar.
+  // Zero continua a mostrar o campo vazio — o cinzento "0,00" do placeholder já diz o que lá
+  // cabe, e uma coluna cheia de zeros competiria com os valores que interessam.
+  function amtStr2(n){
+    if (n===""||n===null||n===undefined||n===0) return "";
+    var v = parseFloat(n); if (isNaN(v)) return "";
+    var neg = v < 0; v = Math.abs(v);
+    var partes = v.toFixed(2).split(".");
+    return (neg ? "-" : "") + partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".") + "," + partes[1];
+  }
 
   // ---------- Limites do que pode entrar ----------
   // Tudo o que se escreve vai parar ao armazenamento do navegador (~5 MB), ao ficheiro de
@@ -7750,7 +7777,9 @@
     if (!TOQUE) return;
     var ms = (raiz||document).querySelectorAll ? (raiz||document).querySelectorAll(".money") : [];
     for (var i=0;i<ms.length;i++){
-      if (ms[i].classList.contains("assign-input")) continue;   // esse tem caminho próprio
+      // O «Atribuído» também entra: abre pelo foco (e não pelo toque, como os outros), mas um
+      // campo em "só leitura" recebe foco à mesma — e é o que garante que o iOS não faz zoom
+      // por o texto ter menos de 16px. Quem escreve nele é sempre o teclado próprio.
       ms[i].readOnly = true;
       ms[i].setAttribute("inputmode","none");
     }
