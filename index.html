@@ -42,6 +42,9 @@
 </script>
 <style>
   :root {
+    /* O respiro entre a barra de cima e a faixa presa. Sem ele, o primeiro botão encosta-se à
+       barra assim que se desce e as duas coisas leem-se como uma só. */
+    --folga: 12px;
     --bg: #f1f5f9;
     --surface: #ffffff;
     --surface-2: #f8fafc;
@@ -200,7 +203,7 @@
   .month-nav .month-label { font-weight: 700; font-size: 15px; min-width: 150px; text-align: center; }
   .month-nav .today-btn { font-size: 12px; padding: 6px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font-weight: 600; }
 
-  .rta-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 20px 26px 0; padding: 16px 22px; border-radius: 14px; background: var(--primary); color: #fff; box-shadow: var(--shadow); flex-wrap: wrap; }
+  .rta-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0; padding: 16px 22px; border-radius: 14px; background: var(--primary); color: #fff; box-shadow: var(--shadow); flex-wrap: wrap; }
   .rta-banner.zero { background: linear-gradient(135deg, var(--primary), var(--accent2)); }
   .rta-banner.over { background: linear-gradient(135deg, #b91c1c, #dc2626); }
   .rta-amount { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
@@ -210,11 +213,11 @@
   .rta-actions button:hover { background: #fff; }
 
   /* Aviso de divergência entre o orçamento e o dinheiro real nas contas */
-  .integrity-bar { display: flex; align-items: center; gap: 12px; margin: 10px 26px 0; padding: 11px 16px; border-radius: 12px; background: var(--warning-soft); border: 1px solid var(--warning); color: var(--warning); font-size: 13px; font-weight: 600; flex-wrap: wrap; }
+  .integrity-bar { display: flex; align-items: center; gap: 12px; margin: 10px 0 0; padding: 11px 16px; border-radius: 12px; background: var(--warning-soft); border: 1px solid var(--warning); color: var(--warning); font-size: 13px; font-weight: 600; flex-wrap: wrap; }
   .integrity-bar .grow { flex: 1; min-width: 170px; }
   .integrity-bar button { background: var(--surface); border: 1px solid var(--warning); color: var(--warning); padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 12.5px; white-space: nowrap; }
   .integrity-bar button:hover { background: var(--warning); color: #fff; }
-  .upcoming-bar { display: flex; align-items: center; gap: 12px; margin: 10px 26px 0; padding: 10px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); font-size: 13px; font-weight: 600; flex-wrap: wrap; }
+  .upcoming-bar { display: flex; align-items: center; gap: 12px; margin: 10px 0 0; padding: 10px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); font-size: 13px; font-weight: 600; flex-wrap: wrap; }
   .upcoming-bar .grow { flex: 1; min-width: 170px; }
   .upcoming-bar b { color: var(--text); font-variant-numeric: tabular-nums; }
   .upcoming-bar button { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 12.5px; white-space: nowrap; }
@@ -253,7 +256,7 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
   .move-row .m-amt { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
   .move-row .m-time { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
-  .overspent-bar { display: flex; align-items: center; gap: 12px; margin: 10px 26px 0; padding: 11px 16px; border-radius: 12px; background: var(--negative-soft); border: 1px solid var(--negative); color: var(--negative); font-size: 13px; font-weight: 600; flex-wrap: wrap; }
+  .overspent-bar { display: flex; align-items: center; gap: 12px; margin: 10px 0 0; padding: 11px 16px; border-radius: 12px; background: var(--negative-soft); border: 1px solid var(--negative); color: var(--negative); font-size: 13px; font-weight: 600; flex-wrap: wrap; }
   .overspent-bar .grow { flex: 1; min-width: 170px; }
   .overspent-bar b { font-variant-numeric: tabular-nums; }
   .overspent-bar button { background: var(--surface); border: 1px solid var(--negative); color: var(--negative); padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 12.5px; white-space: nowrap; }
@@ -543,11 +546,11 @@
   .data-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: clip; -webkit-overflow-scrolling: touch; box-shadow: var(--shadow); }
   /* O cabeçalho pára logo abaixo de tudo o que está preso por cima dele: a barra de cima, o
      banner do «Pronto a atribuir» e a faixa de comandos. Todas essas alturas são medidas. */
-  table.data thead th { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--presos, 0px)); z-index: 6; }
+  table.data thead th { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga) + var(--presos, 0px)); z-index: 6; }
   /* No orçamento prende-se o cabeçalho E a linha de totais — vivem ambos no <thead>, e o total
      do mês é justamente o número que se quer debaixo de olho enquanto se reparte dinheiro. */
-  table.budget thead th, table.budget thead td { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--presos, 0px)); z-index: 6; background: var(--surface-2); }
-  table.budget thead tr.tot-row td { top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--presos, 0px) + var(--cabec, 38px)); z-index: 5; }
+  table.budget thead th, table.budget thead td { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga) + var(--presos, 0px)); z-index: 6; background: var(--surface-2); }
+  table.budget thead tr.tot-row td { top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga) + var(--presos, 0px) + var(--cabec, 38px)); z-index: 5; }
   table.data { width: 100%; border-collapse: collapse; }
   table.data th { text-align: start; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; padding: 11px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2); white-space: nowrap; }
   table.data td { padding: 10px 16px; vertical-align: middle; }
@@ -686,9 +689,18 @@
      número sem ver que filtro está aceso lê-o mal. Só os DADOS correm.
      A faixa é um bloco só, e não cada barra por si: assim não é preciso somar alturas à mão
      para as empilhar, e uma barra que mude de altura não desalinha as outras. */
-  .presos { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px)); z-index: 15; background: var(--bg); }
+  .presos { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga)); z-index: 15; background: var(--bg); }
+  /* A folga é espaço vazio, e por espaço vazio vê-se a lista a passar. Este remendo pinta-a
+     com o fundo da página: é filho da faixa, sobe com ela, e tapa o que passaria por trás. */
+  .presos::before { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--folga) * -1); height: var(--folga); background: var(--bg); }
+  body.sem-presos .presos::before { display: none; }
   /* O banner do «Pronto a atribuir» vive fora da zona de conteúdo, e por isso prende-se sozinho,
      já colado à barra de cima. É a única peça com ordem própria. */
+  /* O espaço à volta do banner vive AQUI, e não no banner: um invólucro sem enchimento deixa a
+     margem do filho escapar-lhe por cima, e a altura medida ficaria menor do que o espaço
+     realmente ocupado — desalinhando tudo o que se prende por baixo. Assim o que se mede é o
+     que se vê, e o enchimento de cima faz de folga quando isto fica preso. */
+  #rtaWrap:not(:empty) { padding: 20px 26px 0; }
   #rtaWrap { position: sticky; top: var(--topo, 64px); z-index: 16; background: var(--bg); }
   /* Cada peça presa é altura roubada à lista. Num ecrã baixo — telemóvel deitado, ou uma janela
      apertada — prender tudo deixaria quatro linhas à vista, que é pior do que não prender nada.
@@ -836,8 +848,9 @@
 
     /* Conteúdo com espaço para a barra inferior + área segura do iPhone */
     .content { padding: 16px calc(13px + env(safe-area-inset-right)) calc(88px + env(safe-area-inset-bottom)) calc(13px + env(safe-area-inset-left)); }
-    .rta-banner { margin: 14px 13px 0; padding: 14px 16px; }
-    .integrity-bar, .upcoming-bar, .overspent-bar { margin: 10px 13px 0; }
+    #rtaWrap { padding: 14px 13px 0; }
+    .rta-banner { padding: 14px 16px; }
+    .integrity-bar, .upcoming-bar, .overspent-bar { margin: 10px 0 0; }
     .rta-amount { font-size: 22px; }
 
     /* Safari faz zoom ao focar qualquer campo com menos de 16px.
@@ -1213,7 +1226,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.61";
+  var APP_VERSION = "1.62";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -4768,14 +4781,9 @@
       // Regra de escrita: UMA frase diz o que mudou; no m\u00e1ximo mais uma diz porqu\u00ea, e s\u00f3 quando
       // o porqu\u00ea muda a forma de usar. O relato detalhado de como se l\u00e1 chegou vive nos
       // coment\u00e1rios do c\u00f3digo e nos requisitos \u2014 aqui rouba a vista ao que interessa.
-      ver("1.61", "agosto 2026", [
-        'Os <b>comandos deixaram de fugir do ecrã</b> ao descer uma lista. Ficam presos em cima os botões, os filtros e o resumo do que se está a ver — no <b>Orçamento</b> tamb\u00e9m o «Pronto a atribuir» e a <b>linha de totais</b>, e nas <b>Transa\u00e7\u00f5es</b> e <b>Recorrentes</b> o cabe\u00e7alho da lista. Num ecr\u00e3 baixo, como o telem\u00f3vel deitado, a faixa volta a correr para n\u00e3o sufocar a lista.',
+      ver("1.59 – 1.62", "agosto 2026", [
+        'Os <b>comandos deixaram de fugir do ecrã</b> ao descer uma lista. Ficam presos em cima os botões, os filtros e o resumo do que se está a ver — no <b>Orçamento</b> tamb\u00e9m o «Pronto a atribuir» e a <b>linha de totais</b>, e nas <b>Transa\u00e7\u00f5es</b> e <b>Recorrentes</b> o cabe\u00e7alho da lista. Num ecr\u00e3 baixo, como o telem\u00f3vel deitado, a faixa volta a correr para n\u00e3o sufocar a lista. A faixa pára uma folga abaixo da barra do título, em vez de encostada a ela.',
         'No ecr\u00e3 <b>Contas</b>, os dois cart\u00f5es \u2014 contas de or\u00e7amento e cart\u00f5es/acompanhamento \u2014 deixaram de ter deslize pr\u00f3prio. Desliza a p\u00e1gina, e cada cabe\u00e7alho prende-se \u00e0 vez.',
-      ])+
-      ver("1.60", "agosto 2026", [
-        'As <b>Novidades</b> foram reescritas mais curtas: cada entrada diz <b>o que mudou</b>, e o porquê só quando muda a maneira de usar. Eram sete mil caracteres de justificações; o relato detalhado vive nos comentários do código.',
-      ])+
-      ver("1.59", "agosto 2026", [
         'As <b>categorias escolhidas nos Relat\u00f3rios</b> passaram a acompanhar o or\u00e7amento e chegam aos outros aparelhos. O <b>per\u00edodo</b> e o modo <b>Gasto/Atribu\u00eddo</b> continuam a ser de cada aparelho.',
         'O <b>\u2753 Como funciona?</b> ganhou uma sec\u00e7\u00e3o sobre os <b>Relat\u00f3rios</b>, que n\u00e3o tinha, e outra sobre <b>o que viaja</b> na sincroniza\u00e7\u00e3o.',
       ])+
