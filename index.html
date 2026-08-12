@@ -1236,7 +1236,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.67";
+  var APP_VERSION = "1.69";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -3195,8 +3195,23 @@
 
     var perOpts = PERIODOS.map(function(p){ return '<option value="'+p[0]+'"'+((f.per||"")===p[0]?" selected":"")+'>'+p[1]+'</option>'; }).join("");
     var accOpts = '<option value="">Todas as contas</option>' + state.accounts.map(function(a){return '<option value="'+a.id+'"'+(f.account===a.id?" selected":"")+'>'+esc(a.name)+'</option>';}).join("");
-    var catOpts = '<option value="">Todas as categorias</option><option value="'+INCOME+'"'+(f.category===INCOME?" selected":"")+'>Rendimento</option>' +
-      state.categories.filter(function(c){return !c.cardId;}).map(function(c){return '<option value="'+c.id+'"'+(f.category===c.id?" selected":"")+'>'+esc(c.name)+'</option>';}).join("");
+    // Pela ordem do ecrã Orçamento — grupos e categorias tal como lá estão — e não pela ordem
+    // em que foram criadas, que a ninguém diz nada. As arquivadas ficam à parte, no fim: já não
+    // aparecem no Orçamento, mas continuam a ter transações antigas para procurar.
+    var catOpts = '<option value="">Todas as categorias</option><option value="'+INCOME+'"'+(f.category===INCOME?" selected":"")+'>Rendimento</option>';
+    for (var gci=0; gci<state.groups.length; gci++){
+      var gcs = categoriesOfGroup(state.groups[gci].id).filter(function(c){ return !c.cardId; });
+      if (!gcs.length) continue;
+      catOpts += '<optgroup label="'+esc(state.groups[gci].name)+'">';
+      for (var gcj=0; gcj<gcs.length; gcj++) catOpts += '<option value="'+gcs[gcj].id+'"'+(f.category===gcs[gcj].id?" selected":"")+'>'+esc(gcs[gcj].name)+'</option>';
+      catOpts += '</optgroup>';
+    }
+    var catArq = state.categories.filter(function(c){ return c.hidden && !c.cardId; });
+    if (catArq.length){
+      catOpts += '<optgroup label="Arquivadas">';
+      for (var cai=0; cai<catArq.length; cai++) catOpts += '<option value="'+catArq[cai].id+'"'+(f.category===catArq[cai].id?" selected":"")+'>'+esc(catArq[cai].name)+'</option>';
+      catOpts += '</optgroup>';
+    }
 
     // Chega-se aqui filtrado a partir da atividade de uma categoria — sem isto não há
     // forma óbvia de voltar a ver tudo.
@@ -4805,34 +4820,28 @@
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.69", "agosto 2026", [
+        'A caixa <b>«Todas as categorias»</b> das Transações passou a listar as categorias pela <b>ordem do ecrã Orçamento</b>, grupo a grupo, em vez da ordem por que foram criadas. As arquivadas ficam no fim, à parte.',
+      ])+
+      ver("1.68", "agosto 2026", [
+        'As <b>categorias escolhidas nos Relatórios</b> gravavam e iam no pacote, mas a sincronização nunca chegava a enviá-lo: escolhê-las não era contado como uma alteração, e a aplicação concluía que não havia nada de novo. Agora conta — e chegam aos outros aparelhos.',
+        '<b>Da primeira vez que sincronizar depois desta atualização</b>, o segundo aparelho pode mostrar o ecrã de <b>conflito</b> sem diferenças nenhumas em transações. É esperado e acontece uma só vez: escolha o lado que tiver as categorias certas nos Relatórios.',
+      ])+
       ver("1.67", "agosto 2026", [
         'Nos <b>Relatórios</b>, escolher uma categoria no gráfico deixou de atirar a página para cima. Acontecia só à <b>primeira</b> escolha: ligar uma categoria muda a altura do gráfico, e a posição só era guardada quando o conteúdo ficava do mesmo tamanho.',
         'E as categorias do gráfico passaram a aparecer pela <b>ordem do ecrã Orçamento</b> — grupo a grupo — em vez da ordem por que foram criadas. Uma categoria nova ia para o fim da fila, longe das do seu grupo.',
       ])+
-      ver("1.66", "agosto 2026", [
+      // Sete números para o mesmo assunto — o desenho novo dos ecrãs e as afinações que ele
+      // pediu, tudo no mesmo dia. Quem lê hoje quer saber o que a aplicação faz, não a ordem
+      // por que lá se chegou; e havia texto da 1.60 que já era falso, porque a 1.61 desfez o
+      // que ele anunciava. Juntos num bloco só, escritos como estão agora.
+      ver("1.60 – 1.66", "agosto 2026", [
+        'Todos os ecrãs passaram a ter o <b>mesmo desenho</b>: uma <b>faixa</b> em cima, que não se mexe — botões, filtros e o resumo do que se está a ver — e um <b>cartão</b> por baixo, que é a única coisa que desliza. O contorno arredondado fica parado e só o conteúdo corre lá dentro. A página em si deixou de deslizar, no telemóvel e no computador.',
+        'No <b>Orçamento</b>, as categorias correm dentro do cartão com a linha <b>Categoria · Atribuído · Atividade · Disponível</b> sempre à vista. No ecrã <b>Contas</b>, cada um dos dois cartões trata do seu deslize para o lado, e o de cima e baixo é do ecrã — para se chegar ao segundo quando o primeiro é comprido.',
+        'O <b>«Pronto a atribuir»</b> passou a gastar <b>uma linha em vez de duas</b>: no computador a frase fica ao lado do valor, e no telemóvel sai — o número e a cor já dizem em que pé se está. Toda a altura ganha vai para a lista.',
+        'Os <b>cartões</b> chegam mais abaixo, e o «Pronto a atribuir» e as barras de aviso — como o «Ainda este mês» — <b>começam e acabam onde os cartões começam e acabam</b>, nos cinco ecrãs. Antes atravessavam a página de lado a lado.',
         'No computador, a <b>barra de cima</b> deixou de mudar ao trocar de ecrã: tem sempre a mesma altura, e o <b>↩ ↪ 🕑</b>, o selector de mês e as setas ficam sempre no mesmo sítio — independentemente do tamanho do título.',
-      ])+
-      ver("1.65", "agosto 2026", [
-        'O <b>«Pronto a atribuir»</b> e as barras de aviso — como o «Ainda este mês» — atravessavam a página de lado a lado, enquanto os cartões ficavam recolhidos. Passaram a <b>começar e acabar onde os cartões começam e acabam</b>, nos cinco ecrãs.',
-      ])+
-      ver("1.64", "agosto 2026", [
-        'Os <b>cartões</b> passaram a chegar mais abaixo, nos dois formatos: sobrava uma faixa vazia no fim do ecrã que agora é altura de lista. No telemóvel, a margem de segurança do iPhone estava a ser contada <b>duas vezes</b> — uma pela barra de baixo e outra pelo conteúdo.',
-      ])+
-      ver("1.63", "agosto 2026", [
-        'No computador tinha aparecido uma <b>barra de deslize</b> ao lado do ecrã inteiro, que só servia para esconder meio banner. A altura do cartão não estava a descontar o espaço que a página reserva em baixo.',
-        'No ecrã <b>Contas</b>, os dois cartões voltaram a <b>puxar-se para o lado</b>. Cada um trata do seu deslize horizontal; o vertical é do ecrã, para se chegar ao segundo quando o primeiro é comprido.',
-      ])+
-      ver("1.62", "agosto 2026", [
-        'O <b>«Pronto a atribuir»</b> passou a gastar <b>uma linha em vez de duas</b>: no computador a frase fica ao lado do valor, e no telemóvel sai — o número e a cor já dizem em que pé se está. A altura ganha vai toda para a lista de categorias.',
-      ])+
-      ver("1.61", "agosto 2026", [
-        'Todos os ecrãs passaram a ter o <b>mesmo desenho</b>: uma <b>faixa</b> em cima, que não se mexe, e um <b>cartão</b> por baixo, que é a única coisa que desliza. O contorno arredondado fica parado e só o conteúdo corre lá dentro — como já acontecia nas Transações, agora também no <b>Orçamento</b>, nas <b>Contas</b> e nos <b>Relatórios</b>. A página em si deixou de deslizar, no telemóvel e no computador.',
-        'No <b>Orçamento</b>, as categorias passaram a correr dentro do cartão, com a linha <b>Categoria · Atribuído · Atividade · Disponível</b> sempre à vista. No telemóvel, a frase por baixo do «Pronto a atribuir» saiu — o número e a cor já dizem em que pé se está, e a frase gastava uma linha da altura que faz falta à lista.',
-      ])+
-      ver("1.60", "agosto 2026", [
-        'Os <b>comandos deixaram de fugir do ecrã</b> ao descer uma lista: ficam presos em cima os botões, os filtros e o resumo do que se está a ver, mais o <b>cabeçalho</b> da lista — no Orçamento, a linha <b>Categoria · Atribuído · Atividade · Disponível</b>. Daí para baixo é que se desliza. Num ecrã baixo, como o telemóvel deitado, a faixa volta a correr para não sufocar a lista.',
-        'No ecrã <b>Contas</b>, os dois cartões — contas de orçamento e cartões/acompanhamento — deixaram de ter deslize próprio. Desliza a página, e cada cabeçalho prende-se à vez.',
-        'As <b>categorias escolhidas nos Relatórios</b> passaram a acompanhar o orçamento e chegam aos outros aparelhos. O <b>período</b> e o modo <b>Gasto/Atribuído</b> continuam a ser de cada aparelho.',
+        'As <b>categorias escolhidas nos Relatórios</b> passaram a fazer parte do orçamento, e não do aparelho. O <b>período</b> e o modo <b>Gasto/Atribuído</b> continuam a ser de cada aparelho.',
         'O <b>\u2753 Como funciona?</b> ganhou uma secção sobre os <b>Relatórios</b>, que não tinha, e outra sobre <b>o que viaja</b> na sincronização.',
       ])+
       ver("1.54 – 1.58", "agosto 2026", [
@@ -6377,10 +6386,17 @@
     }
     return h.toString(36);
   }
+  // A assinatura diz «este orçamento mudou» — é ela que faz a sincronização enviar, e o aviso de
+  // «alterações por guardar» acender. Tem de incluir TUDO o que viaja: um campo que fique de
+  // fora grava-se no disco e vai no pacote, mas o pacote nunca chega a ser enviado, porque a
+  // aplicação conclui que não há nada de novo. Foi o que aconteceu às categorias escolhidas nos
+  // Relatórios quando passaram a acompanhar o orçamento. Quem acrescentar um campo aos dados
+  // tem de o acrescentar aqui — há um teste que percorre o estado e exige exactamente isso.
   function sigOf(st){
     try {
       var s = JSON.stringify([st.settings, st.accounts, st.groups, st.categories,
-                              st.assignments, st.snooze||{}, st.transactions, st.recurring||[]]);
+                              st.assignments, st.snooze||{}, st.transactions, st.recurring||[],
+                              st.reportCats||[]]);
       return hash32(s) + "/" + s.length;                  // o comprimento afasta colisões
     } catch(e){
       return "x/" + ((st && st.transactions) ? st.transactions.length : 0);
