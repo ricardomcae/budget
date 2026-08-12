@@ -704,7 +704,11 @@
      faixa — que é contado na altura, para o cabeçalho parar no sítio certo, mas que ninguém
      pinta: vêem-se as linhas a passar por essa frincha. Este remendo pinta-a, e como é filho da
      faixa acompanha-a. A altura vem medida, porque a margem não é a mesma em todos os ecrãs. */
-  .presos::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: var(--rodape, 0px); background: var(--bg); }
+  /* A altura leva o contorno somado. O cabeçalho pára por DENTRO do contorno do cartão, e o
+     contorno faz parte do cartão — desliza com ele. Sem esta parcela ficava exactamente UMA
+     linha de píxeis por pintar entre o que está preso e o cabeçalho, e era por aí que se via
+     passar o conteúdo das linhas. Um píxel: pouco para se localizar, que baste para se ver. */
+  .presos::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: calc(var(--rodape, 0px) + var(--borda, 1px)); background: var(--bg); }
   body.sem-presos .presos::before, body.sem-presos .presos::after { display: none; }
   /* O banner do «Pronto a atribuir» vive fora da zona de conteúdo, e por isso prende-se sozinho,
      já colado à barra de cima. É a única peça com ordem própria. */
