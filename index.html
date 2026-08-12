@@ -43,8 +43,13 @@
 <style>
   :root {
     /* O respiro entre a barra de cima e a faixa presa. Sem ele, o primeiro botão encosta-se à
-       barra assim que se desce e as duas coisas leem-se como uma só. */
-    --folga: 12px;
+       barra assim que se desce e as duas coisas leem-se como uma só.
+       O valor NÃO é escolhido à vontade: é EXACTAMENTE o espaço que a zona de conteúdo já deixa
+       por cima de si (o `padding-top` do .content). Assim a faixa fica presa no sítio onde já
+       estava e nunca chega a mexer-se — com um valor menor, encolhia essa diferença ao primeiro
+       toque no ecrã, e um salto de meia dúzia de píxeis dá-se pelo olho sem se perceber porquê.
+       Quem mexer num destes valores tem de mexer no outro (há um teste que o exige). */
+    --folga: 20px;
     --bg: #f1f5f9;
     --surface: #ffffff;
     --surface-2: #f8fafc;
@@ -847,6 +852,8 @@
     .month-nav .month-label { min-width: 120px; }
 
     /* Conteúdo com espaço para a barra inferior + área segura do iPhone */
+    /* Emparelhado com o `padding-top` do .content, aqui abaixo — ver a nota em :root. */
+    :root, body { --folga: 16px; }
     .content { padding: 16px calc(13px + env(safe-area-inset-right)) calc(88px + env(safe-area-inset-bottom)) calc(13px + env(safe-area-inset-left)); }
     #rtaWrap { padding: 14px 13px 0; }
     .rta-banner { padding: 14px 16px; }
@@ -1226,7 +1233,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.62";
+  var APP_VERSION = "1.63";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -4781,8 +4788,8 @@
       // Regra de escrita: UMA frase diz o que mudou; no m\u00e1ximo mais uma diz porqu\u00ea, e s\u00f3 quando
       // o porqu\u00ea muda a forma de usar. O relato detalhado de como se l\u00e1 chegou vive nos
       // coment\u00e1rios do c\u00f3digo e nos requisitos \u2014 aqui rouba a vista ao que interessa.
-      ver("1.59 – 1.62", "agosto 2026", [
-        'Os <b>comandos deixaram de fugir do ecrã</b> ao descer uma lista. Ficam presos em cima os botões, os filtros e o resumo do que se está a ver — no <b>Orçamento</b> tamb\u00e9m o «Pronto a atribuir» e a <b>linha de totais</b>, e nas <b>Transa\u00e7\u00f5es</b> e <b>Recorrentes</b> o cabe\u00e7alho da lista. Num ecr\u00e3 baixo, como o telem\u00f3vel deitado, a faixa volta a correr para n\u00e3o sufocar a lista. A faixa pára uma folga abaixo da barra do título, em vez de encostada a ela.',
+      ver("1.59 – 1.63", "agosto 2026", [
+        'Os <b>comandos deixaram de fugir do ecrã</b> ao descer uma lista. Ficam presos em cima os botões, os filtros e o resumo do que se está a ver — no <b>Orçamento</b> tamb\u00e9m o «Pronto a atribuir» e a <b>linha de totais</b>, e nas <b>Transa\u00e7\u00f5es</b> e <b>Recorrentes</b> o cabe\u00e7alho da lista. Num ecr\u00e3 baixo, como o telem\u00f3vel deitado, a faixa volta a correr para n\u00e3o sufocar a lista. A faixa fica à mesma distância da barra do título em que já estava, e não se mexe.',
         'No ecr\u00e3 <b>Contas</b>, os dois cart\u00f5es \u2014 contas de or\u00e7amento e cart\u00f5es/acompanhamento \u2014 deixaram de ter deslize pr\u00f3prio. Desliza a p\u00e1gina, e cada cabe\u00e7alho prende-se \u00e0 vez.',
         'As <b>categorias escolhidas nos Relat\u00f3rios</b> passaram a acompanhar o or\u00e7amento e chegam aos outros aparelhos. O <b>per\u00edodo</b> e o modo <b>Gasto/Atribu\u00eddo</b> continuam a ser de cada aparelho.',
         'O <b>\u2753 Como funciona?</b> ganhou uma sec\u00e7\u00e3o sobre os <b>Relat\u00f3rios</b>, que n\u00e3o tinha, e outra sobre <b>o que viaja</b> na sincroniza\u00e7\u00e3o.',
