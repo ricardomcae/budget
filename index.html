@@ -702,6 +702,12 @@
   .rolo { overflow: auto; max-height: var(--lista, 60vh); -webkit-overflow-scrolling: touch; }
   /* O cartão que desliza recorta pelo contorno: o conteúdo passa por dentro dos cantos. */
   .data-card.rolo, .budget-card.rolo { overflow: auto; }
+  /* Nas Contas há DOIS cartões dentro do mesmo rolo, e os dois eixos repartem-se: o rolo trata
+     do vertical (é assim que se chega ao segundo cartão quando o primeiro é comprido), e cada
+     cartão trata do seu horizontal. Sem isto o cartão recortava a tabela pelo contorno e não a
+     deixava puxar para o lado — e o rolo, por fora, não via nada que transbordasse. */
+  .rolo-y { overflow-x: hidden; }
+  .rolo-y > .data-card { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
 
   .help-list { font-size: 13px; color: var(--text-muted); }
   /* Secções dobráveis das janelas de texto longo (o «Como funciona?» e as «Novidades»).
@@ -1200,7 +1206,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.62";
+  var APP_VERSION = "1.63";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -1365,7 +1371,7 @@
       var top = ps.slice(0,2).map(function(x){ return x.nome; }).join(", ");
       return top + " e mais " + (ps.length-2) + (ps.length-2===1?" categoria":" categorias");
     }
-    return ps.map(function(x){ return x.nome+" "+fmt(Math.abs(x.valor)); }).join(" \u00b7 ");
+    return ps.map(function(x){ return x.nome+" "+fmt(Math.abs(x.valor)); }).join(" · ");
   }
   var _csv = null;   // pré-visualização da importação de CSV
   var _drag = null;  // arrastar para reordenar
@@ -2065,8 +2071,8 @@
         var cumpriu3 = juntou3 >= amt - 0.005;
         return { need:0, met:cumpriu3, doMes:true, expirado:true,
           progress: cumpriu3 ? 1 : Math.max(0, Math.min(1, amt>0 ? juntou3/amt : 0)),
-          label: cumpriu3 ? ("\ud83c\udfaf Objetivo cumprido \u2014 prazo terminado ("+monthLabel(target)+")")
-                          : ("Prazo terminado ("+monthLabel(target)+") \u2014 juntou "+fmt(juntou3)+" de "+fmt(amt)) };
+          label: cumpriu3 ? ("\ud83c\udfaf Objetivo cumprido — prazo terminado ("+monthLabel(target)+")")
+                          : ("Prazo terminado ("+monthLabel(target)+") — juntou "+fmt(juntou3)+" de "+fmt(amt)) };
       }
       // Descontar o que já foi atribuído ESTE mês, senão cada financiamento voltava a pedir uma
       // fatia nova e atribuía a mais em silêncio. Mas conta SÓ o que se PÔS (positivo): se este
@@ -3020,7 +3026,7 @@
       '<span class="muted" style="font-size:12.5px;">Património líquido: <b>'+fmt(netWorth())+'</b></span></div></div>'+
       // Dois cartões, um só rolo: com um rolo cada, chegar ao segundo obrigava a deslizar por
       // fora dos dois. Assim desliza um só, e cada cabeçalho prende-se à vez ao topo dele.
-      '<div class="rolo">'+
+      '<div class="rolo rolo-y">'+
       accTable(budgetAccs, "🏦 Contas de orçamento", true) + accTable(trackAccs, "💳 Cartões e outras contas")+
       '</div>';
   }
@@ -3615,24 +3621,32 @@
       var tb = document.querySelector(".topbar");
       if (tb) raiz.style.setProperty("--topo", tb.getBoundingClientRect().height+"px");
 
-      // A altura do ROLO \u2014 a \u00fanica coisa que desliza em cada ecr\u00e3. Mede-se, e n\u00e3o se estima:
-      // depende de onde o rolo come\u00e7a, e isso muda com a vista, com a largura da janela (a barra
-      // de filtros ganha e perde linhas) e com as barras que o navegador p\u00f5e por cima da p\u00e1gina.
+      // A altura do ROLO — a única coisa que desliza em cada ecrã. Mede-se, e não se estima:
+      // depende de onde o rolo começa, e isso muda com a vista, com a largura da janela (a barra
+      // de filtros ganha e perde linhas) e com as barras que o navegador põe por cima da página.
       var rolo = document.querySelector(".rolo");
       if (!rolo) return;
-      // O que o ecr\u00e3 tem MESMO. O visualViewport \u00e9 o \u00fanico que desconta as barras do navegador
-      // que ficam POR CIMA da p\u00e1gina \u2014 as unidades de altura do CSS contam-nas como utiliz\u00e1veis,
-      // e com o telem\u00f3vel deitado isso dava um rolo mais alto do que o espa\u00e7o que existe.
+      // O que o ecrã tem MESMO. O visualViewport é o único que desconta as barras do navegador
+      // que ficam POR CIMA da página — as unidades de altura do CSS contam-nas como utilizáveis,
+      // e com o telemóvel deitado isso dava um rolo mais alto do que o espaço que existe.
       var visivel = (window.visualViewport && window.visualViewport.height) || window.innerHeight || 0;
       if (!visivel) return;
       var acima = rolo.getBoundingClientRect().top + (window.pageYOffset||0);
-      // No telem\u00f3vel a barra de navega\u00e7\u00e3o est\u00e1 POR CIMA do fim da p\u00e1gina: o que ela ocupa tem de
-      // sair da conta, sen\u00e3o as \u00faltimas linhas ficavam escondidas atr\u00e1s dela.
+      // No telemóvel a barra de navegação está POR CIMA do fim da página: o que ela ocupa tem de
+      // sair da conta, senão as últimas linhas ficavam escondidas atrás dela.
       var barra = document.querySelector(".sidebar");
       var hb = (barra && getComputedStyle(barra).position === "fixed") ? barra.getBoundingClientRect().height : 0;
-      // O ch\u00e3o \u00e9 para ecr\u00e3s muito baixos: sem ele a conta podia dar negativo, que o navegador l\u00ea
-      // como zero \u2014 e a lista desaparecia.
-      raiz.style.setProperty("--lista", Math.max(150, visivel - acima - hb - 18)+"px");
+      // O chão é para ecrãs muito baixos: sem ele a conta podia dar negativo, que o navegador lê
+      // como zero — e a lista desaparecia.
+      // O espaço que a zona de conteúdo reserva EM BAIXO também sai da conta, e mede-se em vez
+      // de se escrever à mão: são 60px no computador e 6 no telemóvel. Com o valor fixo de 18,
+      // o rolo ficava 42px mais alto do que o espaço que sobra, e a PÁGINA passava a ter esses
+      // 42px por deslizar — uma barra ao lado do ecrã inteiro para esconder meio banner. É
+      // justamente o que este modelo existe para não acontecer.
+      var zona = document.querySelector(".content");
+      var abaixo = zona ? parseFloat((getComputedStyle(zona)||{}).paddingBottom) : 0;
+      if (!(abaixo > 0)) abaixo = 0;
+      raiz.style.setProperty("--lista", Math.max(150, visivel - acima - hb - abaixo)+"px");
       raiz.style.setProperty("--ecra", visivel+"px");
     } catch(e){}
   }
@@ -3661,7 +3675,7 @@
     var perigo = !!_perg.perigo;
     openModal(
       '<div class="modal-head"><h2>'+esc(_perg.titulo||"Confirmar")+'</h2>'+
-        '<button class="x" data-action="perg-nao" aria-label="Fechar">\u00d7</button></div>'+
+        '<button class="x" data-action="perg-nao" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body"><div class="pergunta'+(perigo?' perigo':'')+'">'+(_perg.texto||"")+'</div></div>'+
       '<div class="modal-foot"><span></span><span>'+
         '<button class="btn" data-action="perg-nao">'+esc(_perg.nao||"Cancelar")+'</button> '+
@@ -4625,14 +4639,14 @@
         '<li><b>Esc</b> dentro de um campo desfaz o que estava a escrever e larga o campo, sem gravar. Dentro de uma janela, é preciso carregar duas vezes: a primeira sai do campo, a segunda fecha a janela. Na <b>caixa de procura</b> das Transações o Esc <b>apaga</b> o texto (e o cursor fica lá) — o mesmo que o <b>✕</b> dentro da caixa.</li>'+
       '</ul>'+
 
-      sec("Relat\u00f3rios")+
+      sec("Relatórios")+
       '<ul>'+
-        '<li><b>O per\u00edodo escolhe-se em cima</b> e vale para o ecr\u00e3 todo: <b>1, 3, 6, 12 ou 24 meses</b> a contar do m\u00eas em vista, ou um intervalo \u00e0 medida (<b>de</b> / <b>at\u00e9</b>, s\u00f3 no computador).</li>'+
-        '<li><b>Os quatro n\u00fameros de topo</b> \u2014 Rendimento, Despesa, Resultado e Patrim\u00f3nio no fim \u2014 s\u00e3o do per\u00edodo escolhido. O <b>patrim\u00f3nio</b> \u00e9 tudo o que tem menos tudo o que deve, e conta tamb\u00e9m as contas de <b>acompanhamento</b>, que ficam de fora do or\u00e7amento.</li>'+
-        '<li><b>Um reembolso abate \u00e0 despesa</b>, em vez de contar como rendimento. Devolveu metade de uma compra? A categoria mostra s\u00f3 o que ficou por gastar. Rendimento \u00e9 apenas o que entra pela categoria «Rendimento»; transfer\u00eancias entre contas suas n\u00e3o s\u00e3o nem uma coisa nem outra.</li>'+
-        '<li><b>A evolu\u00e7\u00e3o por categoria</b>, no fim, p\u00f5e lado a lado as categorias que escolher, ao longo dos meses: escolhem-se nas <b>bolinhas</b> por baixo do gr\u00e1fico, e a cor de cada uma acompanha-a. Se nunca escolheu nenhuma, a aplica\u00e7\u00e3o prop\u00f5e as de maior despesa.</li>'+
-        '<li><b>Gasto ou Atribu\u00eddo:</b> o mesmo gr\u00e1fico l\u00ea-se de duas maneiras \u2014 o que <b>saiu de facto</b> em cada m\u00eas, ou o que <b>p\u00f4s l\u00e1</b> em cada m\u00eas. Ver os dois \u00e9 a maneira mais r\u00e1pida de perceber se um alvo est\u00e1 bem calibrado.</li>'+
-        '<li><b>As categorias escolhidas acompanham o or\u00e7amento</b> e chegam aos outros aparelhos. O <b>per\u00edodo</b> e o modo <b>Gasto/Atribu\u00eddo</b> ficam em cada aparelho, como o m\u00eas em que est\u00e1.</li>'+
+        '<li><b>O período escolhe-se em cima</b> e vale para o ecrã todo: <b>1, 3, 6, 12 ou 24 meses</b> a contar do mês em vista, ou um intervalo à medida (<b>de</b> / <b>até</b>, só no computador).</li>'+
+        '<li><b>Os quatro números de topo</b> — Rendimento, Despesa, Resultado e Património no fim — são do período escolhido. O <b>património</b> é tudo o que tem menos tudo o que deve, e conta também as contas de <b>acompanhamento</b>, que ficam de fora do orçamento.</li>'+
+        '<li><b>Um reembolso abate à despesa</b>, em vez de contar como rendimento. Devolveu metade de uma compra? A categoria mostra só o que ficou por gastar. Rendimento é apenas o que entra pela categoria «Rendimento»; transferências entre contas suas não são nem uma coisa nem outra.</li>'+
+        '<li><b>A evolução por categoria</b>, no fim, põe lado a lado as categorias que escolher, ao longo dos meses: escolhem-se nas <b>bolinhas</b> por baixo do gráfico, e a cor de cada uma acompanha-a. Se nunca escolheu nenhuma, a aplicação propõe as de maior despesa.</li>'+
+        '<li><b>Gasto ou Atribuído:</b> o mesmo gráfico lê-se de duas maneiras — o que <b>saiu de facto</b> em cada mês, ou o que <b>pôs lá</b> em cada mês. Ver os dois é a maneira mais rápida de perceber se um alvo está bem calibrado.</li>'+
+        '<li><b>As categorias escolhidas acompanham o orçamento</b> e chegam aos outros aparelhos. O <b>período</b> e o modo <b>Gasto/Atribuído</b> ficam em cada aparelho, como o mês em que está.</li>'+
       '</ul>'+
 
       sec("Organizar")+
@@ -4730,13 +4744,17 @@
       // hoje, não a cronologia de como lá chegou — por isso o recente fica ao pormenor e o
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
-      // Regra de escrita: UMA frase diz o que mudou; no m\u00e1ximo mais uma diz porqu\u00ea, e s\u00f3 quando
-      // o porqu\u00ea muda a forma de usar. O relato detalhado de como se l\u00e1 chegou vive nos
+      // Regra de escrita: UMA frase diz o que mudou; no máximo mais uma diz porquê, e só quando
+      // o porquê muda a forma de usar. O relato detalhado de como se lá chegou vive nos
       // comentários do código e nos requisitos — aqui rouba a vista ao que interessa.
       // Regra de NUMERAÇÃO: um número por alteração entregue, nunca por afinação. Acertar uma
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.63", "agosto 2026", [
+        'No computador tinha aparecido uma <b>barra de deslize</b> ao lado do ecrã inteiro, que só servia para esconder meio banner. A altura do cartão não estava a descontar o espaço que a página reserva em baixo.',
+        'No ecrã <b>Contas</b>, os dois cartões voltaram a <b>puxar-se para o lado</b>. Cada um trata do seu deslize horizontal; o vertical é do ecrã, para se chegar ao segundo quando o primeiro é comprido.',
+      ])+
       ver("1.62", "agosto 2026", [
         'O <b>«Pronto a atribuir»</b> passou a gastar <b>uma linha em vez de duas</b>: no computador a frase fica ao lado do valor, e no telemóvel sai — o número e a cor já dizem em que pé se está. A altura ganha vai toda para a lista de categorias.',
       ])+
@@ -4746,35 +4764,35 @@
       ])+
       ver("1.60", "agosto 2026", [
         'Os <b>comandos deixaram de fugir do ecrã</b> ao descer uma lista: ficam presos em cima os botões, os filtros e o resumo do que se está a ver, mais o <b>cabeçalho</b> da lista — no Orçamento, a linha <b>Categoria · Atribuído · Atividade · Disponível</b>. Daí para baixo é que se desliza. Num ecrã baixo, como o telemóvel deitado, a faixa volta a correr para não sufocar a lista.',
-        'No ecr\u00e3 <b>Contas</b>, os dois cart\u00f5es \u2014 contas de or\u00e7amento e cart\u00f5es/acompanhamento \u2014 deixaram de ter deslize pr\u00f3prio. Desliza a p\u00e1gina, e cada cabe\u00e7alho prende-se \u00e0 vez.',
-        'As <b>categorias escolhidas nos Relat\u00f3rios</b> passaram a acompanhar o or\u00e7amento e chegam aos outros aparelhos. O <b>per\u00edodo</b> e o modo <b>Gasto/Atribu\u00eddo</b> continuam a ser de cada aparelho.',
-        'O <b>\u2753 Como funciona?</b> ganhou uma sec\u00e7\u00e3o sobre os <b>Relat\u00f3rios</b>, que n\u00e3o tinha, e outra sobre <b>o que viaja</b> na sincroniza\u00e7\u00e3o.',
+        'No ecrã <b>Contas</b>, os dois cartões — contas de orçamento e cartões/acompanhamento — deixaram de ter deslize próprio. Desliza a página, e cada cabeçalho prende-se à vez.',
+        'As <b>categorias escolhidas nos Relatórios</b> passaram a acompanhar o orçamento e chegam aos outros aparelhos. O <b>período</b> e o modo <b>Gasto/Atribuído</b> continuam a ser de cada aparelho.',
+        'O <b>\u2753 Como funciona?</b> ganhou uma secção sobre os <b>Relatórios</b>, que não tinha, e outra sobre <b>o que viaja</b> na sincronização.',
       ])+
-      ver("1.54 \u2013 1.58", "agosto 2026", [
-        'Com o telem\u00f3vel <b>deitado</b>, a aplica\u00e7\u00e3o vestia a disposi\u00e7\u00e3o do <b>computador</b> \u2014 e por isso a tabela n\u00e3o deslizava para o lado. A culpa era do <b>zoom da p\u00e1gina</b> do Safari, que aumenta as medidas com que a aplica\u00e7\u00e3o decide onde est\u00e1.',
-        'Nas <b>Recorrentes</b>, quem desliza passou a ser a lista, e n\u00e3o a p\u00e1gina \u2014 como j\u00e1 acontecia nas Transa\u00e7\u00f5es. O <b>cabe\u00e7alho</b> da lista fica agora fixo nos dois ecr\u00e3s.',
-        'A <b>barra de cima</b> deixou de fugir para cima ao puxar a p\u00e1gina para al\u00e9m do fim. Acontecia no Or\u00e7amento, Contas, Recorrentes e Relat\u00f3rios.',
-        'A <b>altura da lista</b> no telem\u00f3vel passou a ser medida pelo espa\u00e7o que existe de facto. Deitado, sobrava-lhe altura a mais e as \u00faltimas linhas escondiam-se.',
-        'O <b>\u2753 Como funciona?</b> e as <b>\u{1f4cb} Novidades</b> passaram a sec\u00e7\u00f5es que abrem e fecham, com o n\u00famero de pontos ao lado do t\u00edtulo. Eram quarenta mil caracteres de uma vez.',
+      ver("1.54 – 1.58", "agosto 2026", [
+        'Com o telemóvel <b>deitado</b>, a aplicação vestia a disposição do <b>computador</b> — e por isso a tabela não deslizava para o lado. A culpa era do <b>zoom da página</b> do Safari, que aumenta as medidas com que a aplicação decide onde está.',
+        'Nas <b>Recorrentes</b>, quem desliza passou a ser a lista, e não a página — como já acontecia nas Transações. O <b>cabeçalho</b> da lista fica agora fixo nos dois ecrãs.',
+        'A <b>barra de cima</b> deixou de fugir para cima ao puxar a página para além do fim. Acontecia no Orçamento, Contas, Recorrentes e Relatórios.',
+        'A <b>altura da lista</b> no telemóvel passou a ser medida pelo espaço que existe de facto. Deitado, sobrava-lhe altura a mais e as últimas linhas escondiam-se.',
+        'O <b>\u2753 Como funciona?</b> e as <b>\u{1f4cb} Novidades</b> passaram a secções que abrem e fecham, com o número de pontos ao lado do título. Eram quarenta mil caracteres de uma vez.',
       ])+
       ver("1.53", "agosto 2026", [
-        'Os <b>alvos \u00abat\u00e9 uma data\u00bb</b> deixam de pedir dinheiro depois do prazo: a linha diz <b>\u00abprazo terminado\u00bb</b> e cala-se, distinguindo quem cumpriu a meta de quem ficou pelo caminho. No m\u00e9todo <b>Repor</b>, gastar o dinheiro depois da data fazia o alvo pedir o valor inteiro <b>outra vez</b>, todos os meses.',
-        'Todos os <b>campos de dinheiro</b> mostram o valor por extenso \u2014 <b>8,50</b> e <b>1.234,50</b>, nunca 8,5 \u2014 e alinhados \u00e0 direita. Continua a poder escrever como lhe der jeito, contas inclu\u00eddas.',
-        'As <b>tr\u00eas colunas do or\u00e7amento</b> no telem\u00f3vel foram reequilibradas: tamanhos por ordem de import\u00e2ncia, s\u00edmbolo da moeda nas tr\u00eas, n\u00fameros alinhados e zeros da Atividade mais apagados.',
-        'No telem\u00f3vel, a <b>tabela deixou de fugir para a esquerda</b> ao tocar no \u2713, no \u29c9 ou no \u{1f5d1} das Transa\u00e7\u00f5es.',
-        'Os <b>bot\u00f5es do cabe\u00e7alho</b> do telem\u00f3vel seguem a ordem do computador, e o <b>\u{1f551}</b> passou a dizer <b>Movimentos</b> em ecr\u00e3 largo.',
-        'Doze bot\u00f5es que s\u00e3o s\u00f3 um s\u00edmbolo passaram a anunciar-se a quem usa <b>leitor de ecr\u00e3</b>, e tr\u00eas mensagens deixaram de escrever <b>\u00ab1 categorias\u00bb</b>.',
+        'Os <b>alvos «até uma data»</b> deixam de pedir dinheiro depois do prazo: a linha diz <b>«prazo terminado»</b> e cala-se, distinguindo quem cumpriu a meta de quem ficou pelo caminho. No método <b>Repor</b>, gastar o dinheiro depois da data fazia o alvo pedir o valor inteiro <b>outra vez</b>, todos os meses.',
+        'Todos os <b>campos de dinheiro</b> mostram o valor por extenso — <b>8,50</b> e <b>1.234,50</b>, nunca 8,5 — e alinhados à direita. Continua a poder escrever como lhe der jeito, contas incluídas.',
+        'As <b>três colunas do orçamento</b> no telemóvel foram reequilibradas: tamanhos por ordem de importância, símbolo da moeda nas três, números alinhados e zeros da Atividade mais apagados.',
+        'No telemóvel, a <b>tabela deixou de fugir para a esquerda</b> ao tocar no \u2713, no \u29c9 ou no \u{1f5d1} das Transações.',
+        'Os <b>botões do cabeçalho</b> do telemóvel seguem a ordem do computador, e o <b>\u{1f551}</b> passou a dizer <b>Movimentos</b> em ecrã largo.',
+        'Doze botões que são só um símbolo passaram a anunciar-se a quem usa <b>leitor de ecrã</b>, e três mensagens deixaram de escrever <b>«1 categorias»</b>.',
       ])+
       ver("1.52", "agosto 2026", [
-        '<b>\u{1f551} Movimentos recentes</b>, ao lado do \u21a9 \u21aa: o registo de como tem repartido o dinheiro pelas categorias, com os \u00faltimos 30. Diz tamb\u00e9m <b>de onde</b> veio o dinheiro de cada opera\u00e7\u00e3o.',
-        'O <b>\u21a9 Anular</b> e o <b>\u21aa Refazer</b> ficaram de confian\u00e7a: o Refazer deixou de desaparecer sozinho, e o Anular passou a cobrir mais nove coisas que n\u00e3o tinham volta.',
-        'Duas <b>correc\u00e7\u00f5es no dinheiro</b>: eliminar um grupo deixava para tr\u00e1s, invis\u00edvel, o dinheiro das categorias dele; e a linha do cart\u00e3o de cr\u00e9dito discordava do \u00abLibertar excedente\u00bb sobre o que contar.',
-        '<b>Abrir uma conta</b> deixou de ser um ecr\u00e3 \u00e0 parte: leva \u00e0s Transa\u00e7\u00f5es j\u00e1 filtradas, com os saldos numa linha por cima da lista.',
-        'As listas passaram a ter uma coluna <b>Valor</b> em vez de Sa\u00edda e Entrada, <b>separadores de m\u00eas</b>, e a <b>nota</b> vis\u00edvel tamb\u00e9m no telem\u00f3vel.',
-        'O <b>\u2b07 Exportar o que vejo</b> respeita os filtros do ecr\u00e3. E o <b>Trazer e levar</b> ganhou duas gavetas sim\u00e9tricas, com a <b>configura\u00e7\u00e3o dos alvos</b> a poder ser importada e n\u00e3o s\u00f3 exportada.',
-        'As perguntas <b>\u00abtem a certeza?\u00bb</b> passaram a janelas da aplica\u00e7\u00e3o, e todos os bot\u00f5es ganharam nome para <b>leitores de ecr\u00e3</b>.',
-        '<b>Oito cores</b> \u00e0 escolha, <b>\u00edcone novo</b> em duas vers\u00f5es, cabe\u00e7alho do telem\u00f3vel com bot\u00f5es do tamanho de um dedo, e <b>Dados e c\u00f3pias</b> a dizer quantas transa\u00e7\u00f5es tem e quanto espa\u00e7o ocupam.',
-        'Mais r\u00e1pida a cada toque, dados de exemplo refeitos, e uma revis\u00e3o de ponta a ponta \u2014 arquivar uma categoria com dinheiro, nomes com n\u00fameros na importa\u00e7\u00e3o, cor por omiss\u00e3o que j\u00e1 n\u00e3o existia.',
+        '<b>\u{1f551} Movimentos recentes</b>, ao lado do \u21a9 \u21aa: o registo de como tem repartido o dinheiro pelas categorias, com os últimos 30. Diz também <b>de onde</b> veio o dinheiro de cada operação.',
+        'O <b>\u21a9 Anular</b> e o <b>\u21aa Refazer</b> ficaram de confiança: o Refazer deixou de desaparecer sozinho, e o Anular passou a cobrir mais nove coisas que não tinham volta.',
+        'Duas <b>correcções no dinheiro</b>: eliminar um grupo deixava para trás, invisível, o dinheiro das categorias dele; e a linha do cartão de crédito discordava do «Libertar excedente» sobre o que contar.',
+        '<b>Abrir uma conta</b> deixou de ser um ecrã à parte: leva às Transações já filtradas, com os saldos numa linha por cima da lista.',
+        'As listas passaram a ter uma coluna <b>Valor</b> em vez de Saída e Entrada, <b>separadores de mês</b>, e a <b>nota</b> visível também no telemóvel.',
+        'O <b>\u2b07 Exportar o que vejo</b> respeita os filtros do ecrã. E o <b>Trazer e levar</b> ganhou duas gavetas simétricas, com a <b>configuração dos alvos</b> a poder ser importada e não só exportada.',
+        'As perguntas <b>«tem a certeza?»</b> passaram a janelas da aplicação, e todos os botões ganharam nome para <b>leitores de ecrã</b>.',
+        '<b>Oito cores</b> à escolha, <b>ícone novo</b> em duas versões, cabeçalho do telemóvel com botões do tamanho de um dedo, e <b>Dados e cópias</b> a dizer quantas transações tem e quanto espaço ocupam.',
+        'Mais rápida a cada toque, dados de exemplo refeitos, e uma revisão de ponta a ponta — arquivar uma categoria com dinheiro, nomes com números na importação, cor por omissão que já não existia.',
       ])+
       ver("1.33 – 1.51", "agosto 2026", [
         '<b>«Dados e cópias» reorganizado</b> à volta de onde os dados vivem (navegador, ficheiro, nuvem), do que se traz e leva, e das definições. <b>Importar um ficheiro passou a perguntar antes</b> — substituía tudo em silêncio — e guarda um ponto 🛟 primeiro.',
@@ -7289,7 +7307,7 @@
       var WDAYS = ["domingo","segundafeira","tercafeira","quartafeira","quintafeira","sextafeira","sabado"];
 
       // O que já existe, pela mesma chave que vamos usar a seguir.
-      function chave(g,c){ return normNome(g)+"\u0000"+normNome(c); }
+      function chave(g,c){ return normNome(g)+" "+normNome(c); }
       var jaTenho = {}, gruposTenho = {};
       for (var gi=0; gi<state.groups.length; gi++){
         var grp = state.groups[gi];
@@ -7342,10 +7360,10 @@
                 alvo.weekday = w<0 ? 1 : w;
                 if (w<0 && det) avisos.push("«"+cN+"»: não percebi o dia «"+det+"» — fica à segunda-feira.");
               } else if (tipo==="byDate"){
-                var mm = mesDeTexto(det.replace(/^at\u00e9\s*/i,""));
+                var mm = mesDeTexto(det.replace(/^até\s*/i,""));
                 if (mm) alvo.date = mm;
                 else { avisos.push("«"+cN+"»: não percebi a data «"+det+"» — o alvo passa a mensal."); alvo.type="monthly"; }
-              } else if (alvo.fund!=="setAside" && /m\u00eas da despesa/i.test(det)){
+              } else if (alvo.fund!=="setAside" && /mês da despesa/i.test(det)){
                 var md = mesDeTexto(det.replace(/^.*?:\s*/,""));
                 if (md) alvo.due = md;
               }
@@ -7377,7 +7395,7 @@
     var m = t.match(/(\d{4})-(\d{2})/);            if (m) return m[1]+"-"+m[2];
     m = t.match(/^(\d{1,2})[\/\-](\d{4})$/);       if (m) return m[2]+"-"+("0"+m[1]).slice(-2);
     var MESES=["janeiro","fevereiro","marco","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
-    m = t.match(/^([a-z\u00e0-\u00fc]+)\s+(\d{4})$/i);
+    m = t.match(/^([a-zà-ü]+)\s+(\d{4})$/i);
     if (m){ var i=MESES.indexOf(normKey(m[1])); if(i>=0) return m[2]+"-"+("0"+(i+1)).slice(-2); }
     return null;
   }
@@ -7814,15 +7832,15 @@
   }
   window.addEventListener("scroll", escondeDica, true);
   window.addEventListener("resize", escondeDica);
-  // ---- Rodar o telem\u00f3vel, e outras mudan\u00e7as de tamanho ----
-  // Isto j\u00e1 foi um enredo: a p\u00e1gina deslizava, o Safari guardava a posi\u00e7\u00e3o em p\u00edxeis ao rodar,
-  // e ao voltar a p\u00e9 essa posi\u00e7\u00e3o tapava o cabe\u00e7alho \u2014 havia que insistir no topo v\u00e1rias vezes
-  // ao longo de meio segundo. Nada disso \u00e9 preciso agora: a p\u00e1gina n\u00e3o tem o que deslizar, e o
-  // rolo guarda a sua posi\u00e7\u00e3o sozinho. S\u00f3 falta uma coisa \u2014 medir outra vez.
-  // Durante uma rota\u00e7\u00e3o o iOS emite v\u00e1rios «resize» com tamanhos INTERM\u00c9DIOS, a meio da
-  // anima\u00e7\u00e3o. Medir com eles d\u00e1 uma altura errada, logo a seguir corrigida \u2014 via-se o rolo a
-  // mudar de tamanho duas ou tr\u00eas vezes. Por isso mede-se j\u00e1 (para o caso de ser um «resize»
-  // normal) e outra vez no fim, quando a anima\u00e7\u00e3o assentou.
+  // ---- Rodar o telemóvel, e outras mudanças de tamanho ----
+  // Isto já foi um enredo: a página deslizava, o Safari guardava a posição em píxeis ao rodar,
+  // e ao voltar a pé essa posição tapava o cabeçalho — havia que insistir no topo várias vezes
+  // ao longo de meio segundo. Nada disso é preciso agora: a página não tem o que deslizar, e o
+  // rolo guarda a sua posição sozinho. Só falta uma coisa — medir outra vez.
+  // Durante uma rotação o iOS emite vários «resize» com tamanhos INTERMÉDIOS, a meio da
+  // animação. Medir com eles dá uma altura errada, logo a seguir corrigida — via-se o rolo a
+  // mudar de tamanho duas ou três vezes. Por isso mede-se já (para o caso de ser um «resize»
+  // normal) e outra vez no fim, quando a animação assentou.
   var _medirT = null;
   function medirDepois(){
     if (_medirT) clearTimeout(_medirT);
