@@ -42,14 +42,6 @@
 </script>
 <style>
   :root {
-    /* O respiro entre a barra de cima e a faixa presa. Sem ele, o primeiro botão encosta-se à
-       barra assim que se desce e as duas coisas leem-se como uma só.
-       O valor NÃO é escolhido à vontade: é EXACTAMENTE o espaço que a zona de conteúdo já deixa
-       por cima de si (o `padding-top` do .content). Assim a faixa fica presa no sítio onde já
-       estava e nunca chega a mexer-se — com um valor menor, encolhia essa diferença ao primeiro
-       toque no ecrã, e um salto de meia dúzia de píxeis dá-se pelo olho sem se perceber porquê.
-       Quem mexer num destes valores tem de mexer no outro (há um teste que o exige). */
-    --folga: 20px;
     --bg: #f1f5f9;
     --surface: #ffffff;
     --surface-2: #f8fafc;
@@ -208,11 +200,20 @@
   .month-nav .month-label { font-weight: 700; font-size: 15px; min-width: 150px; text-align: center; }
   .month-nav .today-btn { font-size: 12px; padding: 6px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font-weight: 600; }
 
-  .rta-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0; padding: 16px 22px; border-radius: 14px; background: var(--primary); color: #fff; box-shadow: var(--shadow); flex-wrap: wrap; }
+  .rta-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0; padding: 12px 22px; border-radius: 14px; background: var(--primary); color: #fff; box-shadow: var(--shadow); flex-wrap: wrap; }
   .rta-banner.zero { background: linear-gradient(135deg, var(--primary), var(--accent2)); }
   .rta-banner.over { background: linear-gradient(135deg, #b91c1c, #dc2626); }
   .rta-amount { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
   .rta-label { font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
+  /* O valor e a frase lado a lado, e não um por cima do outro: o banner perde uma linha inteira
+     de altura, e essa altura vai toda para a lista de categorias, que é o que se veio ver.
+     Alinhados pela BASE do texto — com tamanhos tão diferentes (26px e 12,5px), centrar deixava
+     a frase a meia altura do número, a flutuar. A frase pode partir de linha se a janela
+     apertar; o número nunca. */
+  .rta-nums { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; min-width: 0; }
+  .rta-nums .rta-amount { flex: 0 0 auto; }
+  .rta-nums .rta-label { flex: 1 1 auto; min-width: 0; }
+
   .rta-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .rta-actions button { background: rgba(255,255,255,.94); color: var(--primary-dark); border: 1px solid transparent; padding: 8px 13px; border-radius: 8px; font-weight: 600; font-size: 12.5px; }
   .rta-actions button:hover { background: #fff; }
@@ -549,14 +550,13 @@
      natural, sem caixas dentro de caixas. O `clip` recorta os cantos arredondados sem criar
      essa zona de deslize (ao contrário de `hidden`, que a criaria e estragaria tudo). */
   .data-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: clip; -webkit-overflow-scrolling: touch; box-shadow: var(--shadow); }
-  /* O cabeçalho pára logo abaixo de tudo o que está preso por cima dele: a barra de cima, o
-     banner do «Pronto a atribuir» e a faixa de comandos. Todas essas alturas são medidas. */
-  table.data thead th { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga) + var(--presos, 0px)); z-index: 6; }
-  /* No orçamento prende-se o cabeçalho — Categoria, Atribuído, Atividade, Disponível — e só ele.
-     A linha do «Total do mês» vive no mesmo <thead>, mas desliza: é um número do mês inteiro, não
-     a chave de leitura das colunas, e presa roubava uma fila de altura à lista sem a mesma
-     serventia. Passa por trás do cabeçalho, que é opaco e está por cima. */
-  table.budget thead th { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga) + var(--presos, 0px)); z-index: 6; background: var(--surface-2); }
+  /* O cabeçalho cola-se ao topo do ROLO, que é quem desliza — e o topo do rolo é zero. Nada de
+     somar alturas de peças de cima: elas não se mexem, e portanto não entram na conta.
+     No orçamento prende-se o cabeçalho e só ele: a linha do «Total do mês» vive no mesmo <thead>
+     mas desliza, por ser um número do mês e não a chave de leitura das colunas. Passa por trás
+     do cabeçalho, que é opaco e está por cima. */
+  table.data thead th { position: sticky; top: 0; z-index: 6; }
+  table.budget thead th { position: sticky; top: 0; z-index: 6; background: var(--surface-2); }
   table.data { width: 100%; border-collapse: collapse; }
   table.data th { text-align: start; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; padding: 11px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2); white-space: nowrap; }
   table.data td { padding: 10px 16px; vertical-align: middle; }
@@ -689,41 +689,19 @@
   .seg { display: flex; gap: 6px; }
   .seg button { flex: 1; padding: 9px; border: 1px solid var(--border); background: var(--surface); border-radius: 9px; font-weight: 600; color: var(--text-muted); }
   .seg button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
-  /* ---- A faixa que fica presa em cima ----
-     O que é COMANDO e CONTEXTO (botões, filtros, o resumo do que se está a ver) não deve fugir
-     do ecrã ao descer uma lista: um filtro fora de vista é um filtro esquecido, e quem lê um
-     número sem ver que filtro está aceso lê-o mal. Só os DADOS correm.
-     A faixa é um bloco só, e não cada barra por si: assim não é preciso somar alturas à mão
-     para as empilhar, e uma barra que mude de altura não desalinha as outras. */
-  .presos { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga)); z-index: 15; background: var(--bg); }
-  /* A folga é espaço vazio, e por espaço vazio vê-se a lista a passar. Este remendo pinta-a
-     com o fundo da página: é filho da faixa, sobe com ela, e tapa o que passaria por trás. */
-  .presos::before { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--folga) * -1); height: var(--folga); background: var(--bg); }
-
-  /* A faixa vai ATÉ ao cabeçalho, sem nada pelo meio. Este enchimento de baixo é a chave, e
-     não é decorativo: um bloco sem enchimento em baixo deixa a margem do último filho escapar-lhe
-     por fora (o colapso de margens), e essa margem fica a descoberto — sem ninguém a pintar,
-     e sem contar na altura medida. Havendo enchimento, o colapso não acontece: a margem passa a
-     viver DENTRO da faixa, é pintada pelo fundo dela e conta na altura de uma só vez.
-     A medida é a espessura do contorno do cartão, porque o cabeçalho pára por dentro dele: assim
-     a faixa acaba exactamente onde o cabeçalho começa. Uma peça, um fundo, nenhuma junta — em
-     vez de três tiras encostadas, que é o que deixava passar o conteúdo por meio píxel de cada
-     vez. O contorno do cartão fica tapado pela faixa: uma linha de cabelo que ninguém dá por
-     ela, e é o preço de não haver junta nenhuma. */
-  .presos { padding-bottom: var(--borda, 1px); }
-  body.sem-presos .presos::before { display: none; }
-  /* O banner do «Pronto a atribuir» vive fora da zona de conteúdo, e por isso prende-se sozinho,
-     já colado à barra de cima. É a única peça com ordem própria. */
-  /* O espaço à volta do banner vive AQUI, e não no banner: um invólucro sem enchimento deixa a
-     margem do filho escapar-lhe por cima, e a altura medida ficaria menor do que o espaço
-     realmente ocupado — desalinhando tudo o que se prende por baixo. Assim o que se mede é o
-     que se vê, e o enchimento de cima faz de folga quando isto fica preso. */
-  #rtaWrap:not(:empty) { padding: 20px 26px 0; }
-  #rtaWrap { position: sticky; top: var(--topo, 64px); z-index: 16; background: var(--bg); }
-  /* Cada peça presa é altura roubada à lista. Num ecrã baixo — telemóvel deitado, ou uma janela
-     apertada — prender tudo deixaria quatro linhas à vista, que é pior do que não prender nada.
-     Aí a faixa volta a correr com a página e fica só o essencial. */
-  body.sem-presos .presos, body.sem-presos #rtaWrap { position: static; }
+  /* ---- O modelo, igual em todos os ecrãs e nos dois formatos ----
+     Cada ecrã tem duas peças: a FAIXA, com os comandos e o contexto, que não se mexe; e o ROLO,
+     a única coisa que desliza. O rolo é dimensionado para caber no que resta do ecrã, e por isso
+     a página em si nunca tem nada para deslizar — nem no telemóvel, nem no computador.
+     Isto substitui um enredo de peças coladas ao topo, cada uma parando à altura das de cima,
+     que obrigava a somar meia dúzia de medidas e deixava uma frincha por junta. Aqui não há
+     somas nem juntas: o cabeçalho cola-se ao topo do próprio rolo, que é zero.
+     Nos ecrãs de uma só lista o rolo É o cartão: o contorno arredondado fica parado e só o
+     conteúdo corre lá dentro. Nos outros é um invólucro sem forma própria. */
+  .presos { background: var(--bg); }
+  .rolo { overflow: auto; max-height: var(--lista, 60vh); -webkit-overflow-scrolling: touch; }
+  /* O cartão que desliza recorta pelo contorno: o conteúdo passa por dentro dos cantos. */
+  .data-card.rolo, .budget-card.rolo { overflow: auto; }
 
   .help-list { font-size: 13px; color: var(--text-muted); }
   /* Secções dobráveis das janelas de texto longo (o «Como funciona?» e as «Novidades»).
@@ -865,13 +843,14 @@
     .month-nav .month-label { min-width: 120px; }
 
     /* Conteúdo com espaço para a barra inferior + área segura do iPhone */
-    /* Emparelhado com o `padding-top` do .content, aqui abaixo — ver a nota em :root. */
-    :root, body { --folga: 16px; }
     .content { padding: 16px calc(13px + env(safe-area-inset-right)) calc(88px + env(safe-area-inset-bottom)) calc(13px + env(safe-area-inset-left)); }
     #rtaWrap { padding: 14px 13px 0; }
     .rta-banner { padding: 14px 16px; }
     .integrity-bar, .upcoming-bar, .overspent-bar { margin: 10px 0 0; }
     .rta-amount { font-size: 22px; }
+    /* O rótulo sai: o número e a cor já dizem em que pé se está, e a frase gastava uma linha
+       inteira da altura que faz falta à lista. No computador fica. */
+    .rta-label { display: none; }
 
     /* Safari faz zoom ao focar qualquer campo com menos de 16px.
        A regra é deliberadamente abrangente para não escapar nenhum campo novo. */
@@ -948,34 +927,9 @@
        título da secção. Esconde-se, e nas outras contas fica a forma curta: o espaço ganho é
        muito maior do que o pontinho de estado ocupa, por isso a vista continua a caber sem
        deslizar para o lado. */
-    /* NO TELEMÓVEL a tabela não cabe na largura: o cartão TEM de deslizar para o lado, e um
-       elemento que desliza não deixa nada colar-se à página. Então é o próprio cartão que passa
-       a deslizar também na vertical, e o cabeçalho cola-se ao topo DELE. A lista passa a correr
-       dentro do cartão em vez de a página inteira correr — é a diferença que se nota. */
-    /* O chão de 150px é para landscape: com o ecrã deitado sobra tão pouca altura que a conta
-       podia dar um cartão de duas linhas — ou, se a barra de cima crescesse, um valor negativo,
-       que o navegador arredonda a zero e faria a lista desaparecer. */
-    /* A altura vem MEDIDA (--lista). O cálculo com 100dvh fica como reserva, para o caso de a
-       medição não chegar a correr — mas não serve de fonte principal: com o iPhone DEITADO, o
-       Safari encolhe-se numa barra que fica POR CIMA da página, e o 100dvh continua a contar
-       essa faixa como se fosse utilizável. O cartão ficava mais alto do que o espaço real, a
-       página passava a ter de deslizar para se lhe ver o fim — e a partir do momento em que a
-       página desliza, é ela que fica com os gestos e o deslize lateral do cartão desaparece.
-       De pé o valor está certo e nada disto se notava. */
-    .data-card { overflow: auto; max-height: var(--lista, max(150px, calc(100dvh - var(--carta, 232px)))); }
-    /* Nas Contas os cartões não têm tecto: quem corre é a página (ver «cartoes-livres» no código).
-       Guardam o deslize lateral, que aí é mesmo preciso — a tabela não cabe na largura. */
-    body.cartoes-livres .data-card { max-height: none; overflow-x: auto; overflow-y: hidden; }
-    /* E a PÁGINA não pode ter nada para deslizar por baixo do cartão. Estes 88px existem para
-       as vistas onde é a página que corre (Orçamento, Relatórios) e a barra de baixo taparia o
-       fim. Onde quem corre é o cartão, essa faixa só faz mal: o iOS TRANCA O EIXO do gesto no
-       instante em que o dedo começa a arrastar, e um arrasto que apás numa faixa de página é
-       entregue ao deslize VERTICAL dela — o cartão nunca chega a ver a parte horizontal. Em
-       portrait a faixa é pequena ao lado do cartão e quase não se nota; DEITADO o ecrã tem uns
-       340px, o cartão fica com 150 e a faixa com os mesmos 88 — e aí rouba quase todos os
-       gestos. Era esta a razão de, deitado, não haver deslize para o lado nenhum. */
-    body.lista-desliza .content { padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
-    table.data thead th { top: 0; }
+    /* O conteúdo deixa de reservar espaço para a barra de baixo: o rolo já desconta a altura
+       dela, e a página em si não tem nada para deslizar. */
+    .content { padding-bottom: calc(6px + env(safe-area-inset-bottom)) !important; }
     .sem-tipo .col-tipo { display: none !important; }
     .t-longo { display: none; }
     .t-curto { display: inline; }
@@ -1246,7 +1200,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.60";
+  var APP_VERSION = "1.62";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -2616,7 +2570,7 @@
   var _desliza = null, _viewDesenhada = null;
   function guardarDeslize(){
     try {
-      var c = document.querySelector(".data-card, .budget-card");
+      var c = document.querySelector(".rolo");
       // A vista guardada é a que está NO ECRÃ (a do render anterior) e não state.ui.view — quem
       // muda de ecrã escreve o state.ui.view ANTES de mandar redesenhar, por isso ler dali daria
       // sempre a vista nova e a posição do ecrã antigo seria reposta na tabela do novo.
@@ -2627,7 +2581,7 @@
     try {
       var d = _desliza; _desliza = null;
       if (!d || d.v !== state.ui.view || (!d.x && !d.y)) return;
-      var c = document.querySelector(".data-card, .budget-card");
+      var c = document.querySelector(".rolo");
       // Só se a tabela continuar do mesmo tamanho: se encolheu ou cresceu, mudou de conteúdo
       // (filtrou, mudou de mês) e repor uma posição da lista anterior aterrava em sítio errado.
       if (!c || c.scrollWidth !== d.w || c.scrollHeight !== d.h) return;
@@ -2662,15 +2616,6 @@
     if (v === "recurring") renderRecurring();
     if (v === "reports") renderReports();
     refreshUndoButtons();
-    // Vistas cuja lista corre DENTRO do cartão (ver a regra .lista-desliza no estilo).
-    document.body.classList.toggle("lista-desliza",
-      v === "transactions" || v === "recurring");
-    // As Contas são caso único: têm DOIS cartões (orçamento, e cartões/acompanhamento). Se cada
-    // um deslizasse por dentro, ficavam dois deslizadores encaixados numa página que também
-    // desliza — e com uma lista de contas longa, chegar ao segundo cartão obrigava a deslizar a
-    // página por fora dos dois. Aqui manda a página, e só ela: os cartões crescem à vontade e
-    // cada cabeçalho de tabela prende-se por sua vez, sendo empurrado pelo seguinte.
-    document.body.classList.toggle("cartoes-livres", v === "accounts");
     medirTopo();
     reporDeslize();
     _viewDesenhada = v;
@@ -2770,7 +2715,7 @@
     }
     el("rtaWrap").innerHTML =
       '<div class="rta-banner ' + cls + '">' +
-        '<div><div class="rta-amount">' + fmt(rta) + '</div><div class="rta-label">' + msg + '</div></div>' +
+        '<div class="rta-nums"><div class="rta-amount">' + fmt(rta) + '</div><div class="rta-label">' + msg + '</div></div>' +
         '<div class="rta-actions">' +
           (rta < -0.005 ? '<button data-action="recover-preview">↩ Repor a zero…</button>'
                         : '<button data-action="fund-preview">🎯 Financiar alvos…</button>') +
@@ -3017,7 +2962,7 @@
         '</div>' +
       '</div>' +
       '</div>'+
-      '<div class="budget-card"><table class="budget"><thead><tr>' +
+      '<div class="budget-card rolo"><table class="budget"><thead><tr>' +
         '<th class="first">Categoria'+
           '<button class="btn ghost sm" data-action="expand-all" title="Abrir todos os grupos" aria-label="Abrir todos os grupos" style="padding:1px 5px;margin-inline-start:8px;">⊕</button>'+
           '<button class="btn ghost sm" data-action="collapse-all" title="Fechar todos os grupos" aria-label="Fechar todos os grupos" style="padding:1px 5px;">⊖</button>'+
@@ -3073,7 +3018,11 @@
       '<button class="btn" data-action="transfer">↔ Transferir</button>'+
       '<div class="spacer"></div>'+
       '<span class="muted" style="font-size:12.5px;">Património líquido: <b>'+fmt(netWorth())+'</b></span></div></div>'+
-      accTable(budgetAccs, "🏦 Contas de orçamento", true) + accTable(trackAccs, "💳 Cartões e outras contas");
+      // Dois cartões, um só rolo: com um rolo cada, chegar ao segundo obrigava a deslizar por
+      // fora dos dois. Assim desliza um só, e cada cabeçalho prende-se à vez ao topo dele.
+      '<div class="rolo">'+
+      accTable(budgetAccs, "🏦 Contas de orçamento", true) + accTable(trackAccs, "💳 Cartões e outras contas")+
+      '</div>';
   }
 
   function txRow(t, runBal, withAccount) {
@@ -3384,7 +3333,7 @@
       '<button class="btn" data-action="show-more-tx">Mostrar mais '+PAGINA+' (a ver '+LIM+' de '+list.length+')</button></td></tr>';
 
     el("content").innerHTML = head + resumoPayee +
-      '<div class="data-card"><table class="data"><thead><tr>'+
+      '<div class="data-card rolo"><table class="data"><thead><tr>'+
       '<th>'+thSelTodas()+'Data</th>'+(mostraConta?'<th>Conta</th>':'')+'<th>Beneficiário</th><th>Categoria</th><th class="col-nota">Nota</th>'+
       '<th class="num">Valor</th>'+(soConta?'<th class="num">Saldo</th>':'')+
       '<th style="text-align:center;">✓</th><th></th></tr></thead><tbody>'+body+'</tbody></table></div>';
@@ -3561,6 +3510,7 @@
 
     el("content").innerHTML =
       '<div class="presos">'+blocoPeriodo+'</div>' +
+      '<div class="rolo">'+
       '<div class="kpi-grid">'+
         '<div class="kpi"><div class="k-label">Rendimento</div><div class="k-value pos">'+fmt(totalIn)+'</div></div>'+
         '<div class="kpi"><div class="k-label">Despesa</div><div class="k-value neg">'+fmt(totalOut)+'</div></div>'+
@@ -3569,7 +3519,7 @@
       '</div>'+
       '<div class="report-block"><h3>Despesa por categoria</h3>'+bars+'</div>'+
       '<div class="report-block"><h3>Rendimento (verde) vs Despesa (vermelho)</h3>'+trend+'</div>'+
-      evoBlock + pnBlock;
+      evoBlock + pnBlock + '</div>';
     drawEvo(evoSeries, meses);
     drawInto("pnHost", [{ name:"Património líquido", color:REPORT_COLORS[0], values:pnVals }], meses, "Sem dados no período escolhido.");
   }
@@ -3614,7 +3564,7 @@
           '<button data-action="post-recurring-now" data-id="'+r.id+'" title="Lançar já a próxima" aria-label="Lançar já a próxima ocorrência">▶</button>'+
           '<button data-action="delete-recurring" data-id="'+r.id+'" title="Eliminar" aria-label="Eliminar esta regra recorrente">🗑</button></td></tr>';
     }).join("");
-    el("content").innerHTML=head+'<div class="data-card"><table class="data"><thead><tr>'+
+    el("content").innerHTML=head+'<div class="data-card rolo"><table class="data"><thead><tr>'+
       '<th>Próxima data</th><th>Frequência</th><th>Beneficiário</th><th>Categoria</th><th>Conta</th><th class="num">Valor</th><th style="text-align:center;">Ativa</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
   }
 
@@ -3636,7 +3586,7 @@
     // No telemóvel quem desliza é o cartão da tabela, não a página: sem isto, «voltar ao topo»
     // deixava a lista na mesma altura onde estava.
     try {
-      var cs = document.querySelectorAll(".data-card, .budget-card");
+      var cs = document.querySelectorAll(".rolo");
       for (var i=0;i<cs.length;i++) { cs[i].scrollTop = 0; cs[i].scrollLeft = 0; }
     } catch(e){}
   }
@@ -3664,60 +3614,26 @@
       var raiz = document.documentElement;
       var tb = document.querySelector(".topbar");
       if (tb) raiz.style.setProperty("--topo", tb.getBoundingClientRect().height+"px");
-      // Alturas das peças presas. Medem-se em vez de se estimarem porque mudam com a largura da
-      // janela (a barra de filtros perde e ganha linhas) e com a vista.
-      // E guardam-se SEM ARREDONDAR. Estas medidas são parcelas de uma soma que tem de bater
-      // certo ao píxel com uma posição real, e uma altura real raramente é um número inteiro:
-      // arredondar meio píxel para baixo aqui abre meio píxel de frincha ali, e vê-se passar o
-      // conteúdo por ela. Não compensa a limpeza do número.
-      var rta = document.getElementById("rtaWrap");
-      raiz.style.setProperty("--rta", (rta ? rta.getBoundingClientRect().height : 0)+"px");
-      // O contorno do cartão mede-se ANTES da faixa, e não depois: é ele que dá o enchimento de
-      // baixo dela, e portanto entra na altura que a seguir se vai medir. Pela ordem inversa,
-      // media-se a faixa com o enchimento da vista anterior.
-      var cartao = document.querySelector(".data-card, .budget-card");
-      var borda = cartao ? parseFloat((getComputedStyle(cartao)||{}).borderTopWidth) : 0;
-      raiz.style.setProperty("--borda", (borda > 0 ? borda : 0)+"px");
-      var faixa = document.querySelector(".presos");
-      // A altura da faixa TEM de incluir o espaço que a separa da tabela. A faixa não tem
-      // enchimento nem contorno em baixo, por isso a margem do último filho escapa-lhe por fora
-      // e não conta na altura medida — e o cabeçalho da tabela, que pára a essa altura, subia
-      // exactamente o tanto que essa margem media (8px nas Transações, 16px nas outras).
-      // Soma-se de volta, em vez de se uniformizar o espaçamento dos ecrãs para o cálculo dar
-      // certo: trocar um problema visual por outro não é resolver nenhum.
-      // A altura é a que a faixa mede, e mais nada: o enchimento de baixo já lá traz dentro a
-      // margem do último filho e o contorno do cartão. Uma medida, em vez de três somadas — e
-      // sem somas não há parcelas por arredondar nem juntas por onde se veja passar o conteúdo.
-      raiz.style.setProperty("--presos", (faixa ? faixa.getBoundingClientRect().height : 0)+"px");
-      // No telemóvel, a altura que a lista pode ocupar não pode ser um palpite: mede-se onde a
-      // tabela começa e quanto ocupa a barra de baixo, senão as últimas linhas ficavam
-      // escondidas por trás dela — e como quem desliza é o cartão, nunca se lá chegava.
-      // O cartão a medir é o da LISTA, e nem sempre é o primeiro: com um beneficiário aberto,
-      // as Transações põem um cartão de resumo antes dele. Medir o resumo dava uma lista alta
-      // demais, que passava por baixo da barra de baixo. Procura-se o que tem tabela dentro.
-      var card = null, todos = document.querySelectorAll(".data-card");
-      for (var j=0;j<todos.length;j++) if (todos[j].querySelector("table.data")) { card = todos[j]; break; }
-      if (!card) card = document.querySelector(".data-card");
-      if (card) {
-        var acima = card.getBoundingClientRect().top + (window.pageYOffset||0);
-        var barra = document.querySelector(".sidebar");
-        var hb = (barra && getComputedStyle(barra).position === "fixed") ? barra.getBoundingClientRect().height : 0;
-        raiz.style.setProperty("--carta", Math.round(acima + hb + 18) + "px");
-        // A altura que o ecrã tem MESMO. O visualViewport é o único que desconta as barras que
-        // o navegador põe por cima da página; o innerHeight fica para quem o não tenha.
-        var visivel = (window.visualViewport && window.visualViewport.height) || window.innerHeight || 0;
-        // Num ecrã baixo, prender tudo deixaria a lista com quatro linhas. O telemóvel deitado
-        // conhece-se pela proporção, que o zoom da página não distorce (ver a regra das
-        // disposições); uma janela genuinamente baixa conhece-se pela altura medida.
-        var larg = window.innerWidth || 0, alt2 = window.innerHeight || 1;
-        var deitadoFone = TOQUE && (larg / alt2) >= 1.9;
-        document.body.classList.toggle("sem-presos", deitadoFone || visivel < 560);
-        if (visivel > 0) {
-          var alt = Math.round(visivel - (acima + hb + 18));
-          raiz.style.setProperty("--lista", Math.max(150, alt) + "px");
-          raiz.style.setProperty("--ecra", Math.round(visivel) + "px");
-        }
-      }
+
+      // A altura do ROLO \u2014 a \u00fanica coisa que desliza em cada ecr\u00e3. Mede-se, e n\u00e3o se estima:
+      // depende de onde o rolo come\u00e7a, e isso muda com a vista, com a largura da janela (a barra
+      // de filtros ganha e perde linhas) e com as barras que o navegador p\u00f5e por cima da p\u00e1gina.
+      var rolo = document.querySelector(".rolo");
+      if (!rolo) return;
+      // O que o ecr\u00e3 tem MESMO. O visualViewport \u00e9 o \u00fanico que desconta as barras do navegador
+      // que ficam POR CIMA da p\u00e1gina \u2014 as unidades de altura do CSS contam-nas como utiliz\u00e1veis,
+      // e com o telem\u00f3vel deitado isso dava um rolo mais alto do que o espa\u00e7o que existe.
+      var visivel = (window.visualViewport && window.visualViewport.height) || window.innerHeight || 0;
+      if (!visivel) return;
+      var acima = rolo.getBoundingClientRect().top + (window.pageYOffset||0);
+      // No telem\u00f3vel a barra de navega\u00e7\u00e3o est\u00e1 POR CIMA do fim da p\u00e1gina: o que ela ocupa tem de
+      // sair da conta, sen\u00e3o as \u00faltimas linhas ficavam escondidas atr\u00e1s dela.
+      var barra = document.querySelector(".sidebar");
+      var hb = (barra && getComputedStyle(barra).position === "fixed") ? barra.getBoundingClientRect().height : 0;
+      // O ch\u00e3o \u00e9 para ecr\u00e3s muito baixos: sem ele a conta podia dar negativo, que o navegador l\u00ea
+      // como zero \u2014 e a lista desaparecia.
+      raiz.style.setProperty("--lista", Math.max(150, visivel - acima - hb - 18)+"px");
+      raiz.style.setProperty("--ecra", visivel+"px");
     } catch(e){}
   }
   function openModal(html) {
@@ -4700,8 +4616,8 @@
         '<li><b>Total do mês:</b> por cima das colunas, a soma do <b>Atribuído</b>, da <b>Atividade</b> e do <b>Disponível</b>. As categorias de <b>pagamento de cartão</b> ficam de fora das três: a atividade delas é o espelho positivo do que se gastou — 50 € de mercearia no cartão dão −50 na Mercearia e +50 no cartão — e somá-las daria zero, como se não se tivesse gasto nada. Os valores do cartão continuam na linha do grupo dele.</li>'+
         '<li><b>Vários orçamentos</b> (na barra lateral, ou no botão com o nome do orçamento no cabeçalho, no telemóvel): pode ter um <b>Pessoal</b> e um <b>Família</b>, por exemplo. Cada um é <b>completamente separado</b> — contas, categorias e transações próprias — e troca-se com um toque. Se sincroniza, vão <b>todos no mesmo gist</b>; só há uma coisa a saber: se editar orçamentos <b>diferentes</b> em aparelhos diferentes antes de sincronizar, a aplicação pergunta qual manter, como faria com qualquer conflito.</li>'+
         '<li><b>A barra de filtros do Orçamento encolhe com a janela.</b> À medida que o espaço aperta, os nomes dos botões vão desaparecendo pela ordem em que fazem menos falta — fica o símbolo, e o rato por cima diz sempre o que é. Se estreitar mesmo muito, a aplicação passa à vista de telemóvel, com o menu em baixo. É de propósito: assim a barra nunca se parte em duas linhas.</li>'+
-        '<li><b>Os comandos ficam presos em cima e não fogem do ecrã.</b> Ao descer uma lista, mantêm-se à vista os <b>botões</b>, os <b>filtros</b> e o <b>resumo</b> do que se está a ver — só os dados correm. Fica também o <b>cabeçalho</b> da lista — Data, Beneficiário, Categoria… nas Transações, e a linha <b>Categoria · Atribuído · Atividade · Disponível</b> no Orçamento, onde fica ainda o <b>Pronto a atribuir</b>. Daí para baixo é que se desliza — o <b>Total do mês</b> corre com a lista. Num ecrã baixo, como o <b>telemóvel deitado</b>, a faixa volta a correr com a página: presa, sobrariam quatro linhas de lista.</li>'+
-        '<li><b>No telemóvel, quem corre é a lista</b>, dentro da sua própria área, e não a página — nas Transações e nas Recorrentes, onde a tabela é mais larga do que o ecrã e se puxa também para o lado. Nas <b>Contas</b> é ao contrário: há <b>dois cartões</b> — contas de orçamento, e cartões e acompanhamento — e corre a página, para se poder chegar ao segundo.</li>'+
+        '<li><b>Todos os ecrãs têm o mesmo desenho: uma faixa em cima que não se mexe, e um cartão que desliza.</b> Na faixa ficam os <b>botões</b>, os <b>filtros</b>, o <b>resumo</b> do que se está a ver e o <b>cabeçalho</b> da lista — Data, Beneficiário, Categoria… nas Transações; <b>Categoria · Atribuído · Atividade · Disponível</b> no Orçamento, onde fica também o <b>Pronto a atribuir</b>. Daí para baixo é que se desliza.</li>'+
+        '<li><b>O que corre é o conteúdo do cartão, e não a página.</b> O contorno arredondado fica parado; as linhas é que passam lá dentro. No telemóvel isso quer dizer que o cartão se puxa também <b>para o lado</b>, onde a tabela é mais larga do que o ecrã — é assim que se chega ao <b>✓</b>, ao <b>⧉</b> e ao <b>🗑</b> de cada linha.</li>'+
         '<li><b>Os valores mostram-se sempre por extenso</b> — <b>8,50</b> e não <b>8,5</b>, <b>1.234,50</b> e não <b>1234,5</b> — em todos os campos, alinhados à direita. Ao escrever pode usar o formato que lhe der jeito: <b>8,5</b>, <b>8.50</b> ou <b>1234,50</b>.</li>'+
         '<li><b>Contas nos campos de dinheiro:</b> em qualquer campo de valor pode escrever a conta em vez do total — <b>23,45+11,90+7,15</b>. O resultado aparece por baixo enquanto escreve e substitui a conta assim que sai do campo. No <b>telemóvel</b> aparece um <b>teclado próprio</b> com <b>+</b> e <b>−</b>, sem letras nem risco de enganos. Num par <b>Saída/Entrada</b>, um <b>−</b> escrito no princípio do campo continua a passar o valor para o outro lado; depois de números, é uma subtração.</li>'+
         '<li><b>Datas e teclado:</b> as datas escrevem-se sempre em <b>dd/mm/aaaa</b>, mesmo que tenha o browser noutro idioma — pode escrever só os números, que as barras aparecem sozinhas, ou usar o 📅 para as escolher no calendário. Dentro de qualquer janela, o <b>Enter</b> vale por carregar no botão principal.</li>'+
@@ -4821,6 +4737,13 @@
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.62", "agosto 2026", [
+        'O <b>«Pronto a atribuir»</b> passou a gastar <b>uma linha em vez de duas</b>: no computador a frase fica ao lado do valor, e no telemóvel sai — o número e a cor já dizem em que pé se está. A altura ganha vai toda para a lista de categorias.',
+      ])+
+      ver("1.61", "agosto 2026", [
+        'Todos os ecrãs passaram a ter o <b>mesmo desenho</b>: uma <b>faixa</b> em cima, que não se mexe, e um <b>cartão</b> por baixo, que é a única coisa que desliza. O contorno arredondado fica parado e só o conteúdo corre lá dentro — como já acontecia nas Transações, agora também no <b>Orçamento</b>, nas <b>Contas</b> e nos <b>Relatórios</b>. A página em si deixou de deslizar, no telemóvel e no computador.',
+        'No <b>Orçamento</b>, as categorias passaram a correr dentro do cartão, com a linha <b>Categoria · Atribuído · Atividade · Disponível</b> sempre à vista. No telemóvel, a frase por baixo do «Pronto a atribuir» saiu — o número e a cor já dizem em que pé se está, e a frase gastava uma linha da altura que faz falta à lista.',
+      ])+
       ver("1.60", "agosto 2026", [
         'Os <b>comandos deixaram de fugir do ecrã</b> ao descer uma lista: ficam presos em cima os botões, os filtros e o resumo do que se está a ver, mais o <b>cabeçalho</b> da lista — no Orçamento, a linha <b>Categoria · Atribuído · Atividade · Disponível</b>. Daí para baixo é que se desliza. Num ecrã baixo, como o telemóvel deitado, a faixa volta a correr para não sufocar a lista.',
         'No ecr\u00e3 <b>Contas</b>, os dois cart\u00f5es \u2014 contas de or\u00e7amento e cart\u00f5es/acompanhamento \u2014 deixaram de ter deslize pr\u00f3prio. Desliza a p\u00e1gina, e cada cabe\u00e7alho prende-se \u00e0 vez.',
@@ -7891,82 +7814,25 @@
   }
   window.addEventListener("scroll", escondeDica, true);
   window.addEventListener("resize", escondeDica);
-  // Durante uma rotação o iOS emite vários «resize» com tamanhos INTERMÉDIOS, ainda a meio da
-  // animação. Medir com eles dá uma altura de lista errada, logo a seguir corrigida — e via-se
-  // o cartão a mudar de tamanho duas ou três vezes. Por isso a rotação é detetada AQUI, antes
-  // de medir seja o que for: no primeiro «resize» da rotação já se sabe que é uma rotação, e
-  // salta-se a medição. Enquanto roda mede-se uma só vez, no fim. Fora de rotações, como antes.
-  window.addEventListener("resize", function(){
-    var agora = window.innerWidth > window.innerHeight;
-    // A rotação conhece-se pela troca de lados. Sem isto reagia-se ao teclado a abrir, que muda
-    // a altura da janela mas nunca a orientação — e a página saltava sempre que se tocava num
-    // campo de valor.
-    if (agora !== _deitado) { _deitado = agora; agendaRodar(); }
-    if (!_aRodar) medirTopo();
-  });
-  window.addEventListener("resize", ajustarBarra);
-  // ---- Rodar o telemóvel ----
-  // Ao rodar, o Safari mantém o deslize da PÁGINA em píxeis. Em landscape cabe pouco de cada
-  // vez, portanto está-se quase sempre deslizado; ao voltar a portrait esse mesmo deslize passa
-  // a tapar o cabeçalho — e o «Pronto a atribuir», que é o número mais importante do ecrã,
-  // ficava escondido por cima sem nada indicar que estava lá.
-  // Repõe-se APENAS o deslize da página, nunca o do cartão da lista: no telemóvel quem desliza
-  // é o cartão, e mandá-lo ao topo faria perder o lugar numa lista de transações longa. Assim
-  // reaparece o cabeçalho e continua-se a ler onde se ia.
-  // O topo é o topo em qualquer orientação: não é preciso medir nada para lá chegar. Por isso
-  // isto corre JÁ, sem esperas — assim o salto acontece por baixo da animação de rotação do
-  // iOS e não se vê. Com uma espera, via-se o ecrã rodar, ficar um instante na posição antiga
-  // e só depois saltar: era esse o tremeluzir.
-  function reporTopo(){
-    try {
-      // Com uma janela aberta, quem desliza é o fundo escuro dela e a página fica quieta por
-      // trás. Mexer-lhe aqui não se veria agora, mas devolvia o utilizador ao topo quando
-      // fechasse a janela — um salto sem causa aparente. Fica como está.
-      var ov = el("modalOverlay");
-      if (ov && ov.classList.contains("open")) return;
-      var barra = document.querySelector(".sidebar");
-      var telemovel = barra && getComputedStyle(barra).position === "fixed";
-      if (telemovel && (window.pageYOffset||0) > 0) window.scrollTo(0,0);
-    } catch(e){}
+  // ---- Rodar o telem\u00f3vel, e outras mudan\u00e7as de tamanho ----
+  // Isto j\u00e1 foi um enredo: a p\u00e1gina deslizava, o Safari guardava a posi\u00e7\u00e3o em p\u00edxeis ao rodar,
+  // e ao voltar a p\u00e9 essa posi\u00e7\u00e3o tapava o cabe\u00e7alho \u2014 havia que insistir no topo v\u00e1rias vezes
+  // ao longo de meio segundo. Nada disso \u00e9 preciso agora: a p\u00e1gina n\u00e3o tem o que deslizar, e o
+  // rolo guarda a sua posi\u00e7\u00e3o sozinho. S\u00f3 falta uma coisa \u2014 medir outra vez.
+  // Durante uma rota\u00e7\u00e3o o iOS emite v\u00e1rios «resize» com tamanhos INTERM\u00c9DIOS, a meio da
+  // anima\u00e7\u00e3o. Medir com eles d\u00e1 uma altura errada, logo a seguir corrigida \u2014 via-se o rolo a
+  // mudar de tamanho duas ou tr\u00eas vezes. Por isso mede-se j\u00e1 (para o caso de ser um «resize»
+  // normal) e outra vez no fim, quando a anima\u00e7\u00e3o assentou.
+  var _medirT = null;
+  function medirDepois(){
+    if (_medirT) clearTimeout(_medirT);
+    _medirT = setTimeout(function(){ _medirT = null; medirTopo(); ajustarBarra(); }, 320);
   }
-  // Rodar dispara os DOIS eventos («orientationchange» e «resize»), e nem todos os Safari
-  // disparam o primeiro. Marca-se uma vez e trata-se uma vez, para não correr o mesmo trabalho
-  // duas e três vezes por cada rotação.
-  var _rodarT = [], _aRodar = false, _deitado = window.innerWidth > window.innerHeight;
-  function agendaRodar(){
-    _aRodar = true;                    // cala as medições intermédias até isto assentar
-    // Insiste-se no topo várias vezes ao longo de meio segundo, e não é exagero: o Safari
-    // restaura sozinho o deslize que a página tinha, e fá-lo DEPOIS de entregar os eventos de
-    // rotação — e nem sempre no mesmo instante. Uma tentativa isolada, por mais cedo que fosse,
-    // era desfeita por ele e ficava tudo como estava, que foi o que aconteceu à primeira versão
-    // disto. As tentativas que apanhem a página já no topo não fazem nada nem se veem.
-    reporTopo();
-    if (window.requestAnimationFrame) requestAnimationFrame(reporTopo);
-    for (var i=0;i<_rodarT.length;i++) clearTimeout(_rodarT[i]);
-    _rodarT = [ setTimeout(reporTopo, 150),
-                setTimeout(function(){ _aRodar = false; reporTopo(); medirTopo(); }, 320),
-                setTimeout(reporTopo, 600) ];
-  }
-  // Se entretanto o utilizador tocar no ecrã, manda ele: as tentativas que faltam são
-  // canceladas. Sem isto, quem rodasse e começasse logo a deslizar era atirado para trás.
-  // A medição NÃO é cancelada — só as reposições de posição: deixar a lista por medir daria
-  // uma altura errada até à rotação seguinte.
-  window.addEventListener("touchstart", function(){
-    if (!_rodarT.length) return;
-    for (var i=0;i<_rodarT.length;i++) clearTimeout(_rodarT[i]);
-    _rodarT = [];
-    _aRodar = false;
-    medirTopo();
-  }, { passive:true });
-  // Nem todos os Safari disparam «orientationchange»; quando o disparam, chega junto com o
-  // «resize» que já é tratado acima. O «agendaRodar» é idempotente, por isso ouvir os dois é
-  // seguro e cobre os dois comportamentos.
-  window.addEventListener("orientationchange", agendaRodar);
+  window.addEventListener("resize", function(){ medirTopo(); ajustarBarra(); medirDepois(); });
+  window.addEventListener("orientationchange", medirDepois);
   // As barras do Safari aparecem e desaparecem ao deslizar, e nem sempre disparam um «resize»
-  // da janela. Sem ouvir isto, a altura da lista ficava a de quando a barra estava escondida.
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener("resize", function(){ if (!_aRodar) medirTopo(); });
-  }
+  // da janela. Sem ouvir isto, a altura do rolo ficava a de quando a barra estava escondida.
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", medirTopo);
   document.addEventListener("focusout", function(e){
     if (e.target && e.target.classList && e.target.classList.contains("money")) fechaConta(e.target);
   });
