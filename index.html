@@ -551,11 +551,12 @@
   .data-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: clip; -webkit-overflow-scrolling: touch; box-shadow: var(--shadow); }
   /* O cabeçalho pára logo abaixo de tudo o que está preso por cima dele: a barra de cima, o
      banner do «Pronto a atribuir» e a faixa de comandos. Todas essas alturas são medidas. */
-  table.data thead th { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga) + var(--presos, 0px)); z-index: 6; }
-  /* No orçamento prende-se o cabeçalho E a linha de totais — vivem ambos no <thead>, e o total
-     do mês é justamente o número que se quer debaixo de olho enquanto se reparte dinheiro. */
-  table.budget thead th, table.budget thead td { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga) + var(--presos, 0px)); z-index: 6; background: var(--surface-2); }
-  table.budget thead tr.tot-row td { top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga) + var(--presos, 0px) + var(--cabec, 38px)); z-index: 5; }
+  table.data thead th { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga) + var(--presos, 0px) + var(--borda, 1px)); z-index: 6; }
+  /* No orçamento prende-se o cabeçalho — Categoria, Atribuído, Atividade, Disponível — e só ele.
+     A linha do «Total do mês» vive no mesmo <thead>, mas desliza: é um número do mês inteiro, não
+     a chave de leitura das colunas, e presa roubava uma fila de altura à lista sem a mesma
+     serventia. Passa por trás do cabeçalho, que é opaco e está por cima. */
+  table.budget thead th { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga) + var(--presos, 0px) + var(--borda, 1px)); z-index: 6; background: var(--surface-2); }
   table.data { width: 100%; border-collapse: collapse; }
   table.data th { text-align: start; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; padding: 11px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2); white-space: nowrap; }
   table.data td { padding: 10px 16px; vertical-align: middle; }
@@ -699,7 +700,12 @@
      com o fundo da página: é filho da faixa, sobe com ela, e tapa o que passaria por trás. */
   .presos::before { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--folga) * -1); height: var(--folga); background: var(--bg); }
 
-  body.sem-presos .presos::before { display: none; }
+  /* E o mesmo por BAIXO. Entre a faixa e a tabela há um espaço — a margem do último elemento da
+     faixa — que é contado na altura, para o cabeçalho parar no sítio certo, mas que ninguém
+     pinta: vêem-se as linhas a passar por essa frincha. Este remendo pinta-a, e como é filho da
+     faixa acompanha-a. A altura vem medida, porque a margem não é a mesma em todos os ecrãs. */
+  .presos::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: var(--rodape, 0px); background: var(--bg); }
+  body.sem-presos .presos::before, body.sem-presos .presos::after { display: none; }
   /* O banner do «Pronto a atribuir» vive fora da zona de conteúdo, e por isso prende-se sozinho,
      já colado à barra de cima. É a única peça com ordem própria. */
   /* O espaço à volta do banner vive AQUI, e não no banner: um invólucro sem enchimento deixa a
@@ -1234,7 +1240,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.64";
+  var APP_VERSION = "1.60";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -3663,7 +3669,7 @@
       // exactamente o tanto que essa margem media (8px nas Transações, 16px nas outras).
       // Soma-se de volta, em vez de se uniformizar o espaçamento dos ecrãs para o cálculo dar
       // certo: trocar um problema visual por outro não é resolver nenhum.
-      var alturaFaixa = 0;
+      var alturaFaixa = 0, rodape = 0;
       if (faixa) {
         alturaFaixa = faixa.getBoundingClientRect().height;
         var ultimo = faixa.lastElementChild;
@@ -3671,13 +3677,17 @@
           // Medir a margem, e não a distância entre os dois elementos: com a faixa já presa, ela
           // está parada e o resto continua a andar, e a distância entre eles mediria o deslize.
           var mb = parseFloat((getComputedStyle(ultimo)||{}).marginBottom);
-          if (mb > 0) alturaFaixa += mb;
+          if (mb > 0) { alturaFaixa += mb; rodape = mb; }
         }
       }
       raiz.style.setProperty("--presos", Math.round(alturaFaixa)+"px");
-      // A linha de totais do orçamento pára debaixo do cabeçalho da própria tabela, e não do topo.
-      var cab = document.querySelector("table.budget thead th");
-      if (cab) raiz.style.setProperty("--cabec", Math.round(cab.getBoundingClientRect().height)+"px");
+      raiz.style.setProperty("--rodape", Math.round(rodape)+"px");
+      // O cabeçalho não nasce no topo do cartão: nasce por dentro do contorno dele. São os
+      // últimos 1px do desvio — pouco, e ainda assim dá-se pelo salto. Mede-se em vez de se
+      // escrever 1px à mão, que deixaria de ser verdade no dia em que o contorno mudasse.
+      var cartao = document.querySelector(".data-card, .budget-card");
+      var borda = cartao ? parseFloat((getComputedStyle(cartao)||{}).borderTopWidth) : 0;
+      raiz.style.setProperty("--borda", ((borda > 0 ? borda : 0))+"px");
       // No telemóvel, a altura que a lista pode ocupar não pode ser um palpite: mede-se onde a
       // tabela começa e quanto ocupa a barra de baixo, senão as últimas linhas ficavam
       // escondidas por trás dela — e como quem desliza é o cartão, nunca se lá chegava.
@@ -4689,7 +4699,7 @@
         '<li><b>Total do mês:</b> por cima das colunas, a soma do <b>Atribuído</b>, da <b>Atividade</b> e do <b>Disponível</b>. As categorias de <b>pagamento de cartão</b> ficam de fora das três: a atividade delas é o espelho positivo do que se gastou — 50 € de mercearia no cartão dão −50 na Mercearia e +50 no cartão — e somá-las daria zero, como se não se tivesse gasto nada. Os valores do cartão continuam na linha do grupo dele.</li>'+
         '<li><b>Vários orçamentos</b> (na barra lateral, ou no botão com o nome do orçamento no cabeçalho, no telemóvel): pode ter um <b>Pessoal</b> e um <b>Família</b>, por exemplo. Cada um é <b>completamente separado</b> — contas, categorias e transações próprias — e troca-se com um toque. Se sincroniza, vão <b>todos no mesmo gist</b>; só há uma coisa a saber: se editar orçamentos <b>diferentes</b> em aparelhos diferentes antes de sincronizar, a aplicação pergunta qual manter, como faria com qualquer conflito.</li>'+
         '<li><b>A barra de filtros do Orçamento encolhe com a janela.</b> À medida que o espaço aperta, os nomes dos botões vão desaparecendo pela ordem em que fazem menos falta — fica o símbolo, e o rato por cima diz sempre o que é. Se estreitar mesmo muito, a aplicação passa à vista de telemóvel, com o menu em baixo. É de propósito: assim a barra nunca se parte em duas linhas.</li>'+
-        '<li><b>Os comandos ficam presos em cima e não fogem do ecrã.</b> Ao descer uma lista, mantêm-se à vista os <b>botões</b>, os <b>filtros</b> e o <b>resumo</b> do que se está a ver — só os dados correm. No <b>Orçamento</b> fica também o <b>Pronto a atribuir</b> e a linha de <b>Total do mês</b>; nas <b>Transações</b> e nas <b>Recorrentes</b>, o cabeçalho da lista — Data, Beneficiário, Categoria… Num ecrã baixo, como o <b>telemóvel deitado</b>, a faixa volta a correr com a página: presa, sobrariam quatro linhas de lista.</li>'+
+        '<li><b>Os comandos ficam presos em cima e não fogem do ecrã.</b> Ao descer uma lista, mantêm-se à vista os <b>botões</b>, os <b>filtros</b> e o <b>resumo</b> do que se está a ver — só os dados correm. Fica também o <b>cabeçalho</b> da lista — Data, Beneficiário, Categoria… nas Transações, e a linha <b>Categoria · Atribuído · Atividade · Disponível</b> no Orçamento, onde fica ainda o <b>Pronto a atribuir</b>. Daí para baixo é que se desliza — o <b>Total do mês</b> corre com a lista. Num ecrã baixo, como o <b>telemóvel deitado</b>, a faixa volta a correr com a página: presa, sobrariam quatro linhas de lista.</li>'+
         '<li><b>No telemóvel, quem corre é a lista</b>, dentro da sua própria área, e não a página — nas Transações e nas Recorrentes, onde a tabela é mais larga do que o ecrã e se puxa também para o lado. Nas <b>Contas</b> é ao contrário: há <b>dois cartões</b> — contas de orçamento, e cartões e acompanhamento — e corre a página, para se poder chegar ao segundo.</li>'+
         '<li><b>Os valores mostram-se sempre por extenso</b> — <b>8,50</b> e não <b>8,5</b>, <b>1.234,50</b> e não <b>1234,5</b> — em todos os campos, alinhados à direita. Ao escrever pode usar o formato que lhe der jeito: <b>8,5</b>, <b>8.50</b> ou <b>1234,50</b>.</li>'+
         '<li><b>Contas nos campos de dinheiro:</b> em qualquer campo de valor pode escrever a conta em vez do total — <b>23,45+11,90+7,15</b>. O resultado aparece por baixo enquanto escreve e substitui a conta assim que sai do campo. No <b>telemóvel</b> aparece um <b>teclado próprio</b> com <b>+</b> e <b>−</b>, sem letras nem risco de enganos. Num par <b>Saída/Entrada</b>, um <b>−</b> escrito no princípio do campo continua a passar o valor para o outro lado; depois de números, é uma subtração.</li>'+
@@ -4805,9 +4815,13 @@
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
       // Regra de escrita: UMA frase diz o que mudou; no m\u00e1ximo mais uma diz porqu\u00ea, e s\u00f3 quando
       // o porqu\u00ea muda a forma de usar. O relato detalhado de como se l\u00e1 chegou vive nos
-      // coment\u00e1rios do c\u00f3digo e nos requisitos \u2014 aqui rouba a vista ao que interessa.
-      ver("1.59 – 1.64", "agosto 2026", [
-        'Os <b>comandos deixaram de fugir do ecrã</b> ao descer uma lista. Ficam presos em cima os botões, os filtros e o resumo do que se está a ver — no <b>Orçamento</b> tamb\u00e9m o «Pronto a atribuir» e a <b>linha de totais</b>, e nas <b>Transa\u00e7\u00f5es</b> e <b>Recorrentes</b> o cabe\u00e7alho da lista. Num ecr\u00e3 baixo, como o telem\u00f3vel deitado, a faixa volta a correr para n\u00e3o sufocar a lista. A faixa fica à mesma distância da barra do título em que já estava, e do <b>cabeçalho da lista</b> para cima nada se mexe.',
+      // comentários do código e nos requisitos — aqui rouba a vista ao que interessa.
+      // Regra de NUMERAÇÃO: um número por alteração entregue, nunca por afinação. Acertar uma
+      // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
+      // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
+      // coisas para aprender onde há uma.
+      ver("1.60", "agosto 2026", [
+        'Os <b>comandos deixaram de fugir do ecrã</b> ao descer uma lista: ficam presos em cima os botões, os filtros e o resumo do que se está a ver, mais o <b>cabeçalho</b> da lista — no Orçamento, a linha <b>Categoria · Atribuído · Atividade · Disponível</b>. Daí para baixo é que se desliza. Num ecrã baixo, como o telemóvel deitado, a faixa volta a correr para não sufocar a lista.',
         'No ecr\u00e3 <b>Contas</b>, os dois cart\u00f5es \u2014 contas de or\u00e7amento e cart\u00f5es/acompanhamento \u2014 deixaram de ter deslize pr\u00f3prio. Desliza a p\u00e1gina, e cada cabe\u00e7alho prende-se \u00e0 vez.',
         'As <b>categorias escolhidas nos Relat\u00f3rios</b> passaram a acompanhar o or\u00e7amento e chegam aos outros aparelhos. O <b>per\u00edodo</b> e o modo <b>Gasto/Atribu\u00eddo</b> continuam a ser de cada aparelho.',
         'O <b>\u2753 Como funciona?</b> ganhou uma sec\u00e7\u00e3o sobre os <b>Relat\u00f3rios</b>, que n\u00e3o tinha, e outra sobre <b>o que viaja</b> na sincroniza\u00e7\u00e3o.',
