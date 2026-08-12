@@ -719,7 +719,21 @@
      depois de perder todos os textos, e passaria a duas linhas. Mudando de vista libertam-se
      os 250 px da barra lateral e ela volta a caber. Assim nunca há uma faixa de larguras em
      que a barra parta em duas. */
-  @media (max-width: 1040px), (max-height: 500px) {
+  /* A terceira condição existe por uma razão que não se adivinha e custou três tentativas a
+     encontrar: as duas primeiras contam píxeis de CSS, e o Safari do iPhone deixa escolher o
+     ZOOM da página, por sítio. A 75%, um iPhone deitado — que tem 956 pontos de largura —
+     anuncia 1275 × 587: passa dos 1040 de largura E dos 500 de altura, e a aplicação vestia a
+     disposição de COMPUTADOR num telemóvel. De pé nada disto se via, porque 587 de largura
+     continua abaixo dos 1040. O sintoma era a tabela deixar de deslizar para o lado — no
+     computador o cartão é selado de propósito — e nenhuma correcção feita do lado do telemóvel
+     lhe podia tocar. O apontador grosso identifica o dedo, e nenhum zoom o disfarça.
+     A quarta condição é a mais sólida das quatro, e está cá por causa dos zooms mais fundos: a
+     PROPORÇÃO do ecrã não muda com o zoom, porque as duas medidas crescem juntas. Um telemóvel
+     deitado é mais largo do que duas vezes a sua altura (956 para 440); um portátil, mesmo com
+     ecrã táctil, fica-se pelo 1,8 para 1. Distingue os dois sem depender de número nenhum que
+     o zoom possa inflacionar. */
+  @media (max-width: 1040px), (max-height: 500px), (pointer: coarse) and (max-height: 760px),
+         (pointer: coarse) and (min-aspect-ratio: 2/1) {
     .app { grid-template-columns: 1fr; }
     /* Barra lateral -> barra de navegação inferior (estilo iOS) */
     .sidebar {
@@ -1155,7 +1169,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.55";
+  var APP_VERSION = "1.56";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -4123,6 +4137,15 @@
             linha("Versão", APP_VERSION)+
             linha("Janela", (window.innerWidth||0)+" × "+(window.innerHeight||0))+
             linha("Área visível", vv ? Math.round(vv.width)+" × "+Math.round(vv.height) : "não disponível")+
+            linha("Ecrã do aparelho", (screen && screen.width ? (screen.width+" × "+screen.height) : "?"))+
+            // O zoom da página não se pergunta ao navegador: deduz-se comparando o ecrã do
+            // aparelho com o que a página julga ter. É a diferença que empurra um telemóvel
+            // deitado para lá das fronteiras da disposição — e nada mais o denuncia.
+            linha("Zoom da página", (function(){
+              var a1 = Math.min(screen.width||0, screen.height||0);
+              var a2 = Math.min(window.innerWidth||0, window.innerHeight||0);
+              return (a1 && a2) ? (Math.round(a1/a2*100)+"%") : "?";
+            })())+
             linha("Disposição", fone ? "telemóvel" : "computador")+
             linha("Altura dada à lista", (getComputedStyle(raiz).getPropertyValue("--lista")||"—").trim())+
             (card
@@ -4706,6 +4729,9 @@
       // hoje, não a cronologia de como lá chegou — por isso o recente fica ao pormenor e o
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
+      ver("1.56", "agosto 2026", [
+        '<b>Com o telemóvel deitado, a aplicação vestia a roupa do computador.</b> E era esta a causa de tudo o resto. As fronteiras entre as duas disposições contam <b>píxeis de CSS</b>, e o Safari do iPhone deixa escolher o <b>zoom da página</b>, por sítio. A <b>75%</b>, um iPhone deitado — que tem 956 pontos de largura — anuncia <b>1275 × 587</b>: passa da fronteira de largura <b>e</b> da de altura ao mesmo tempo, e a aplicação concluía que estava num computador. De pé nunca se viu, porque 587 de largura continua do lado do telemóvel. O sintoma não parecia ter que ver com isto — a tabela deixava de <b>deslizar para o lado</b>, porque no computador o cartão é selado de propósito. A fronteira passou a reconhecer o <b>dedo</b> e a <b>proporção do ecrã</b>: um telemóvel deitado é mais largo do que duas vezes a sua altura, e a proporção não muda com o zoom.',
+      ])+
       ver("1.55", "agosto 2026", [
         '<b>«Dados e cópias» passou a mostrar um diagnóstico do ecrã.</b> Um problema de disposição só existe no aparelho, e a descrição de quem lá está — por mais cuidada que seja — não chega para distinguir causas que dão o mesmo sintoma. O painel diz que <b>disposição</b> está activa (telemóvel ou computador), o tamanho da <b>área realmente visível</b>, a <b>altura</b> que a lista recebeu, se ela tem mais largura do que aquela que mostra, e se a <b>página</b> tem por onde deslizar — que não devia. Rodando o telemóvel com a janela aberta, os números acompanham.',
       ])+
