@@ -698,6 +698,7 @@
   /* A folga é espaço vazio, e por espaço vazio vê-se a lista a passar. Este remendo pinta-a
      com o fundo da página: é filho da faixa, sobe com ela, e tapa o que passaria por trás. */
   .presos::before { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--folga) * -1); height: var(--folga); background: var(--bg); }
+
   body.sem-presos .presos::before { display: none; }
   /* O banner do «Pronto a atribuir» vive fora da zona de conteúdo, e por isso prende-se sozinho,
      já colado à barra de cima. É a única peça com ordem própria. */
@@ -1233,7 +1234,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.63";
+  var APP_VERSION = "1.64";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -3656,7 +3657,24 @@
       var rta = document.getElementById("rtaWrap");
       raiz.style.setProperty("--rta", (rta ? Math.round(rta.getBoundingClientRect().height) : 0)+"px");
       var faixa = document.querySelector(".presos");
-      raiz.style.setProperty("--presos", (faixa ? Math.round(faixa.getBoundingClientRect().height) : 0)+"px");
+      // A altura da faixa TEM de incluir o espaço que a separa da tabela. A faixa não tem
+      // enchimento nem contorno em baixo, por isso a margem do último filho escapa-lhe por fora
+      // e não conta na altura medida — e o cabeçalho da tabela, que pára a essa altura, subia
+      // exactamente o tanto que essa margem media (8px nas Transações, 16px nas outras).
+      // Soma-se de volta, em vez de se uniformizar o espaçamento dos ecrãs para o cálculo dar
+      // certo: trocar um problema visual por outro não é resolver nenhum.
+      var alturaFaixa = 0;
+      if (faixa) {
+        alturaFaixa = faixa.getBoundingClientRect().height;
+        var ultimo = faixa.lastElementChild;
+        if (ultimo) {
+          // Medir a margem, e não a distância entre os dois elementos: com a faixa já presa, ela
+          // está parada e o resto continua a andar, e a distância entre eles mediria o deslize.
+          var mb = parseFloat((getComputedStyle(ultimo)||{}).marginBottom);
+          if (mb > 0) alturaFaixa += mb;
+        }
+      }
+      raiz.style.setProperty("--presos", Math.round(alturaFaixa)+"px");
       // A linha de totais do orçamento pára debaixo do cabeçalho da própria tabela, e não do topo.
       var cab = document.querySelector("table.budget thead th");
       if (cab) raiz.style.setProperty("--cabec", Math.round(cab.getBoundingClientRect().height)+"px");
@@ -4788,8 +4806,8 @@
       // Regra de escrita: UMA frase diz o que mudou; no m\u00e1ximo mais uma diz porqu\u00ea, e s\u00f3 quando
       // o porqu\u00ea muda a forma de usar. O relato detalhado de como se l\u00e1 chegou vive nos
       // coment\u00e1rios do c\u00f3digo e nos requisitos \u2014 aqui rouba a vista ao que interessa.
-      ver("1.59 – 1.63", "agosto 2026", [
-        'Os <b>comandos deixaram de fugir do ecrã</b> ao descer uma lista. Ficam presos em cima os botões, os filtros e o resumo do que se está a ver — no <b>Orçamento</b> tamb\u00e9m o «Pronto a atribuir» e a <b>linha de totais</b>, e nas <b>Transa\u00e7\u00f5es</b> e <b>Recorrentes</b> o cabe\u00e7alho da lista. Num ecr\u00e3 baixo, como o telem\u00f3vel deitado, a faixa volta a correr para n\u00e3o sufocar a lista. A faixa fica à mesma distância da barra do título em que já estava, e não se mexe.',
+      ver("1.59 – 1.64", "agosto 2026", [
+        'Os <b>comandos deixaram de fugir do ecrã</b> ao descer uma lista. Ficam presos em cima os botões, os filtros e o resumo do que se está a ver — no <b>Orçamento</b> tamb\u00e9m o «Pronto a atribuir» e a <b>linha de totais</b>, e nas <b>Transa\u00e7\u00f5es</b> e <b>Recorrentes</b> o cabe\u00e7alho da lista. Num ecr\u00e3 baixo, como o telem\u00f3vel deitado, a faixa volta a correr para n\u00e3o sufocar a lista. A faixa fica à mesma distância da barra do título em que já estava, e do <b>cabeçalho da lista</b> para cima nada se mexe.',
         'No ecr\u00e3 <b>Contas</b>, os dois cart\u00f5es \u2014 contas de or\u00e7amento e cart\u00f5es/acompanhamento \u2014 deixaram de ter deslize pr\u00f3prio. Desliza a p\u00e1gina, e cada cabe\u00e7alho prende-se \u00e0 vez.',
         'As <b>categorias escolhidas nos Relat\u00f3rios</b> passaram a acompanhar o or\u00e7amento e chegam aos outros aparelhos. O <b>per\u00edodo</b> e o modo <b>Gasto/Atribu\u00eddo</b> continuam a ser de cada aparelho.',
         'O <b>\u2753 Como funciona?</b> ganhou uma sec\u00e7\u00e3o sobre os <b>Relat\u00f3rios</b>, que n\u00e3o tinha, e outra sobre <b>o que viaja</b> na sincroniza\u00e7\u00e3o.',
