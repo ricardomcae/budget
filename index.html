@@ -671,6 +671,26 @@
   .seg button { flex: 1; padding: 9px; border: 1px solid var(--border); background: var(--surface); border-radius: 9px; font-weight: 600; color: var(--text-muted); }
   .seg button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
   .help-list { font-size: 13px; color: var(--text-muted); }
+  /* Secções dobráveis das janelas de texto longo (o «Como funciona?» e as «Novidades»).
+     São <details> do próprio navegador: abrem e fecham sem uma linha de JavaScript, o teclado
+     chega-lhes com o Tab e o leitor de ecrã anuncia se estão abertas ou fechadas — coisas que
+     um dobrável feito à mão obrigaria a reconstruir uma a uma, e mal. */
+  .ajuda-sec { border: 1px solid var(--border); border-radius: 10px; margin: 8px 0; background: var(--surface); }
+  .ajuda-sec + .ajuda-sec { margin-top: 6px; }
+  .ajuda-sec > summary { list-style: none; cursor: pointer; padding: 11px 13px; font-weight: 700;
+    font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 9px; border-radius: 10px; }
+  .ajuda-sec > summary::-webkit-details-marker { display: none; }
+  .ajuda-sec > summary::before { content: "\25b8"; display: inline-block; font-size: 12px;
+    color: var(--text-muted); transition: transform .15s; }
+  .ajuda-sec[open] > summary::before { transform: rotate(90deg); }
+  .ajuda-sec > summary:hover { background: var(--surface-2); }
+  /* O número de pontos de cada secção, encostado à direita: diz de relance onde está o peso. */
+  .ajuda-sec > summary .n { margin-inline-start: auto; font-weight: 600; font-size: 11.5px;
+    color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  /* O !important é preciso: as listas trazem margens no próprio elemento, e um estilo escrito
+     ali ganha sempre a uma folha de estilos. */
+  .ajuda-sec ul { padding-inline-start: 31px !important; padding-inline-end: 13px;
+    padding-bottom: 12px; margin: 0 !important; }
   .help-list li { margin-bottom: 9px; }
   .help-list b { color: var(--text); }
 
@@ -844,7 +864,19 @@
        elemento que desliza não deixa nada colar-se à página. Então é o próprio cartão que passa
        a deslizar também na vertical, e o cabeçalho cola-se ao topo DELE. A lista passa a correr
        dentro do cartão em vez de a página inteira correr — é a diferença que se nota. */
-    .data-card { overflow: auto; max-height: calc(100dvh - var(--carta, 232px)); }
+    /* O chão de 150px é para landscape: com o ecrã deitado sobra tão pouca altura que a conta
+       podia dar um cartão de duas linhas — ou, se a barra de cima crescesse, um valor negativo,
+       que o navegador arredonda a zero e faria a lista desaparecer. */
+    .data-card { overflow: auto; max-height: max(150px, calc(100dvh - var(--carta, 232px))); }
+    /* E a PÁGINA não pode ter nada para deslizar por baixo do cartão. Estes 88px existem para
+       as vistas onde é a página que corre (Orçamento, Relatórios) e a barra de baixo taparia o
+       fim. Onde quem corre é o cartão, essa faixa só faz mal: o iOS TRANCA O EIXO do gesto no
+       instante em que o dedo começa a arrastar, e um arrasto que apás numa faixa de página é
+       entregue ao deslize VERTICAL dela — o cartão nunca chega a ver a parte horizontal. Em
+       portrait a faixa é pequena ao lado do cartão e quase não se nota; DEITADO o ecrã tem uns
+       340px, o cartão fica com 150 e a faixa com os mesmos 88 — e aí rouba quase todos os
+       gestos. Era esta a razão de, deitado, não haver deslize para o lado nenhum. */
+    body.lista-desliza .content { padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
     table.data thead th { top: 0; }
     .sem-tipo .col-tipo { display: none !important; }
     .t-longo { display: none; }
@@ -2524,6 +2556,9 @@
     if (v === "recurring") renderRecurring();
     if (v === "reports") renderReports();
     refreshUndoButtons();
+    // Vistas cuja lista corre DENTRO do cartão (ver a regra .lista-desliza no estilo).
+    document.body.classList.toggle("lista-desliza",
+      v === "transactions" || v === "accounts" || v === "recurring");
     medirTopo();
     reporDeslize();
     _viewDesenhada = v;
@@ -3428,7 +3463,7 @@
   function renderRecurring(){
     var list=(state.recurring||[]).slice().sort(function(a,b){return a.nextDate<b.nextDate?-1:(a.nextDate>b.nextDate?1:0);});
     var head='<div class="toolbar"><button class="btn primary" data-action="add-recurring">➕ Nova recorrente</button>'+
-      '<div class="spacer"></div><span class="muted" style="font-size:12.5px;">'+list.length+' regras · lançadas automaticamente na data</span></div>';
+      '<div class="spacer"></div><span class="muted" style="font-size:12.5px;">'+list.length+(list.length===1?' regra':' regras')+' · lançada'+(list.length===1?'':'s')+' automaticamente na data</span></div>';
     if(!list.length){
       el("content").innerHTML=head+emptyState("📅","Sem transações recorrentes",
         "Crie regras para lançar automaticamente o que se repete — renda, salário, subscrições. Aparecem sozinhas na data marcada.",
@@ -3518,7 +3553,12 @@
       // No telemóvel, a altura que a lista pode ocupar não pode ser um palpite: mede-se onde a
       // tabela começa e quanto ocupa a barra de baixo, senão as últimas linhas ficavam
       // escondidas por trás dela — e como quem desliza é o cartão, nunca se lá chegava.
-      var card = document.querySelector(".data-card");
+      // O cartão a medir é o da LISTA, e nem sempre é o primeiro: com um beneficiário aberto,
+      // as Transações põem um cartão de resumo antes dele. Medir o resumo dava uma lista alta
+      // demais, que passava por baixo da barra de baixo. Procura-se o que tem tabela dentro.
+      var card = null, todos = document.querySelectorAll(".data-card");
+      for (var j=0;j<todos.length;j++) if (todos[j].querySelector("table.data")) { card = todos[j]; break; }
+      if (!card) card = document.querySelector(".data-card");
       if (card) {
         var acima = card.getBoundingClientRect().top + (window.pageYOffset||0);
         var barra = document.querySelector(".sidebar");
@@ -4455,12 +4495,19 @@
   }
 
   function helpModal() {
-    function sec(t){ return '<div style="font-weight:700;color:var(--text);margin:16px 0 6px;font-size:13px;">'+t+'</div>'; }
+    // Cada sec() fecha a secção anterior e abre a seguinte. Assim o corpo da janela continua a
+    // escrever-se em linha, tal e qual como antes, sem ter de aninhar cada lista à mão.
+    var _aberta = false;
+    function sec(t, jaAberta){
+      var fecho = _aberta ? '</details>' : '';
+      _aberta = true;
+      return fecho + '<details class="ajuda-sec"'+(jaAberta?' open':'')+'><summary>'+t+'</summary>';
+    }
     openModal(
       '<div class="modal-head"><h2>❓ Como funciona?</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body"><div class="help-list">'+
 
-      sec("O essencial")+
+      sec("O essencial", true)+
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li><b>Dê uma função a cada euro.</b> O <b>Pronto a atribuir</b> é o dinheiro por distribuir — o objetivo é chegar a 0 €.</li>'+
         '<li>Os <b>rendimentos</b> entram como transações de <b>Entrada</b> com a categoria «Rendimento».</li>'+
@@ -4516,13 +4563,17 @@
         '<li><b>🗄 Arquivar</b> esconde uma conta ou categoria sem perder o histórico. Se a categoria ainda tiver dinheiro, a aplicação pergunta se o quer devolver ao <b>Pronto a atribuir</b> — assim não fica preso numa categoria que deixou de ver.</li>'+
       '</ul>'+
 
-      sec("Contas e transações")+
+      sec("Contas e cartões")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li>Contas de <b>orçamento</b> (à ordem, poupança) entram no orçamento. De <b>acompanhamento</b> (investimentos, empréstimos) não.</li>'+
         '<li><b>Abrir uma conta</b> (na barra lateral ou no ecrã Contas) leva às <b>Transações</b> dessa conta, com o nome e os saldos por cima. Como é a lista normal, pode juntar-lhe um período, uma categoria ou uma procura. A coluna <b>Saldo</b> — o acumulado linha a linha — só aparece enquanto estiver a ver <b>só</b> aquela conta: com outro filtro ligado faltariam movimentos pelo meio e o saldo mentiria. Para sair, use o <b>‹ Contas</b> ou escolha «Todas as contas».</li>'+
         '<li><b>A categoria é obrigatória</b> em tudo o que entra ou sai de uma conta de orçamento ou de um cartão — é ela que liga o movimento ao orçamento. Não a levam: as contas de <b>acompanhamento</b> (estão fora do orçamento), o <b>saldo inicial</b> e as <b>transferências</b> entre contas suas (que só pedem categoria quando o dinheiro sai do orçamento ou entra nele). Ao <b>importar do banco</b> não se pede, por serem muitas de uma vez — a aplicação diz quantas ficaram por classificar.</li>'+
         '<li><b>Cartão de crédito:</b> ao gastar, a aplicação retira o valor à categoria da compra e guarda-o na categoria do cartão, para o ter quando pagar. O <b>💳 Pagar</b> usa esse dinheiro. Por isso a <b>categoria é obrigatória</b> nos movimentos do cartão — também nas <b>devoluções e cashbacks</b>, onde deve indicar a categoria em que tinha feito a despesa, para o dinheiro voltar para lá. (O saldo inicial e o pagamento do cartão são à parte e não levam categoria.)</li>'+
         '<li><b>↔ Transferir</b> move entre contas — está no ecrã <b>Contas</b>, dentro de uma conta aberta e na janela de nova transação. Se o dinheiro sair do orçamento para uma conta de acompanhamento, leva categoria.</li>'+
+      '</ul>'+
+
+      sec("Transações")+
+      '<ul>'+
         '<li><b>➗ Dividir</b> reparte uma compra por várias categorias.</li>'+
         '<li><b>📅 Recorrentes</b> lançam-se sozinhas na data — diária, semanal, quinzenal, mensal, semestral ou anual. Podem ser uma <b>despesa/receita</b> ou uma <b>↔ transferência</b> entre contas, útil para pôr dinheiro de lado na poupança todos os meses.</li>'+
         '<li>Clique numa transação para a editar. Transferências e divididas tratam-se <b>por inteiro</b>, nunca metade: editar muda os dois lados, apagar leva os dois, e o <b>⧉</b> duplica o conjunto todo — a cópia fica independente da original.</li>'+
@@ -4535,6 +4586,10 @@
         '<li><b>Notas nas transações:</b> têm coluna própria em qualquer ecrã — no telemóvel, estreita e cortada com «…», o suficiente para saber do que se trata. A nota completa vê-se ao passar o rato por cima ou abrindo a transação.</li>'+
         '<li><b>Procurar:</b> o campo no topo das Transações procura <b>apenas</b> no <b>beneficiário</b> e na <b>nota</b> — não procura em categorias, valores nem datas, que têm filtros próprios ao lado. Basta parte da palavra, e maiúsculas ou minúsculas é igual. Cruza-se com os filtros de conta, categoria e período («Confeitaria» + <i>este ano</i> + conta X).</li>'+
         '<li><b>🏷️ Beneficiários:</b> mudar um nome altera todas as transações; dar-lhe um nome que já existe <b>junta</b> os dois. O <b>📊 Ver</b> mostra tudo o que gastou nesse beneficiário — total, número de vezes, média e em que categorias entrou. Como é a lista de transações normal, pode juntar-lhe um <b>período</b> para ver só um ano, e editar as transações a partir dali.</li>'+
+      '</ul>'+
+
+      sec("Trazer e levar")+
+      '<ul>'+
         '<li><b>Trazer e levar</b>, em <b>Dados e cópias</b>, tem duas gavetas simétricas: <b>⬇ Importar</b> e <b>⬆ Exportar</b>, cada uma com as mesmas coisas pela mesma ordem — primeiro a <b>configuração dos alvos</b> (a «planta»), depois as <b>transações</b>. O que sai de um lado é o que entra do outro.</li>'+
         '<li><b>Importar transações</b> do banco: as linhas que já existem são detetadas e saltadas.</li>'+
         '<li><b>Importar a configuração dos alvos</b> (em <b>Dados e cópias → Trazer e levar</b>) lê o mesmo ficheiro que sai em <b>Exportar → Configuração dos alvos</b> e reconstrói grupos, categorias, alvos, prioridades e notas — de outro orçamento seu, ou do mesmo noutra altura. <b>Não apaga nada:</b> as categorias que já tem <b>mantêm as transações e o dinheiro</b> e só lhes muda o alvo; as que faltam são criadas; as suas que não venham no ficheiro ficam como estão. Uma categoria é reconhecida pelo <b>grupo mais o nome</b>, por isso «Luz» em «Casa» e «Luz» em «Escritório» são duas coisas diferentes, como sempre foram. Mostra tudo o que vai fazer <b>antes</b> de mexer, e o <b>↩ Anular</b> desfaz a importação inteira num passo.</li>'+
@@ -4558,15 +4613,32 @@
         '<li>A <b>cópia em ficheiro guarda todos os orçamentos</b> de uma vez — por isso o aviso de «alterações por guardar» também é de todos, mesmo os que não tem abertos.</li>'+
       '</ul>'+
 
-      '</div></div>'+
+      '</details></div></div>'+
       '<div class="modal-foot"><span></span><button class="btn primary" data-action="close">Entendido</button></div>');
+    numeraSeccoes();
+  }
+  // O número de pontos ao lado do título de cada secção é contado aqui, depois da janela estar
+  // escrita, e não à mão em cada uma: um número escrito à mão desactualiza-se no dia em que
+  // alguém acrescentar um ponto, e ninguém repara.
+  function numeraSeccoes(){
+    try {
+      var ds = el("modal").querySelectorAll("details.ajuda-sec");
+      for (var i=0;i<ds.length;i++){
+        var n = ds[i].querySelectorAll("li").length, sm = ds[i].querySelector("summary");
+        if (sm && n) sm.insertAdjacentHTML("beforeend", '<span class="n">'+n+'</span>');
+      }
+    } catch(e){}
   }
 
   function changelogModal() {
+    // A versão mais recente abre logo — é a que se vem ler. As anteriores ficam fechadas: estão
+    // lá para quem as procure, sem obrigarem toda a gente a passar por cima delas.
+    var _primeira = true;
     function ver(v, data, itens){
-      return '<div style="font-weight:700;color:var(--text);margin:16px 0 6px;font-size:13px;">Versão '+v+
-        ' <span class="muted" style="font-weight:400;">· '+data+'</span></div>'+
-        '<ul style="margin:0;padding-inline-start:18px;">'+itens.map(function(i){return '<li>'+i+'</li>';}).join("")+'</ul>';
+      var abre = _primeira; _primeira = false;
+      return '<details class="ajuda-sec"'+(abre?' open':'')+'><summary>Versão '+v+
+        ' <span class="muted" style="font-weight:400;">· '+data+'</span></summary>'+
+        '<ul>'+itens.map(function(i){return '<li>'+i+'</li>';}).join("")+'</ul></details>';
     }
     openModal(
       '<div class="modal-head"><h2>📋 Novidades</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
@@ -4578,6 +4650,9 @@
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
       ver("1.53", "agosto 2026", [
+        '<b>O «❓ Como funciona?» e as «📋 Novidades» deixaram de ser uma parede de texto.</b> Juntas têm perto de <b>quarenta mil caracteres</b>, e abriam de uma vez: quem procurava uma coisa concreta desistia antes de a encontrar. Passaram a <b>secções que abrem e fecham</b>, com o número de pontos ao lado do título e só a primeira aberta — ao abrir a ajuda vê-se agora <b>o essencial e uma lista de dez títulos</b>, em vez de tudo ao mesmo tempo. O texto é o mesmo, palavra por palavra: não se cortou nada. A secção que tinha crescido até aos <b>21 pontos</b> foi repartida em três — <b>Contas e cartões</b>, <b>Transações</b> e <b>Trazer e levar</b>.',
+        '<b>Com o telemóvel deitado, a lista voltou a deslizar para o lado.</b> Nas <b>Transações</b> e nas <b>Recorrentes</b> a tabela é mais larga do que o ecrã e puxa-se para o lado — mas <b>em landscape não havia maneira</b>, e a metade direita ficava inalcançável. A culpa era de uma faixa de página que sobrava por baixo do cartão: o iPhone escolhe o sentido do gesto no instante em que o dedo começa a arrastar, e um arrasto que apanhasse essa faixa passava a ser um deslize <b>vertical da página</b> — o cartão nunca chegava a ver a parte horizontal. De pé quase não se notava; deitado, com um terço da altura, roubava quase todos os gestos. A faixa desapareceu nas vistas em que quem corre é a lista, e com ela veio de brinde o <b>cabeçalho das Recorrentes a ficar fixo</b> no topo, como já acontecia nas Transações.',
+        '<b>Com um beneficiário aberto, a lista deixava de caber.</b> A altura da lista é medida, e a medida usava o primeiro cartão do ecrã — que nesse caso é o resumo do beneficiário e não a tabela. A lista ficava alta de mais e as últimas linhas escondiam-se por trás da barra de baixo.',
         '<b>Uma passagem de pente fino por todos os ecrãs.</b> Doze botões que são só um símbolo — o ✓, o ⧉, o ✖, as setas de ordenar — não diziam nada a quem usa o leitor de ecrã do telemóvel; passaram a anunciar-se pelo nome. Três mensagens escreviam <b>«1 categorias»</b>, <b>«1 linhas»</b> e <b>«1 transações»</b> quando havia uma só. E os botões principais de criar passaram todos a usar o mesmo <b>➕</b> — uns tinham-no e outros um simples <b>+</b>.',
         '<b>O símbolo da moeda ficou coerente nas três colunas do orçamento.</b> O campo <b>Atribuído</b> era o único sem ele; passou a tê-lo também, ao lado do número e fora do que se escreve — o valor do campo continua limpo. No <b>telemóvel</b> o símbolo é mais pequeno e mais apagado nas três colunas: repete-se em todas as linhas e o que interessa ler é o número. No computador fica como sempre esteve.',
         '<b>Os totais de grupo deixaram de ficar tão longe da coluna do lado.</b> Era o selo colorido do <b>Disponível</b> que fixava a largura da coluna para todas as linhas, e as que não têm selo — os totais de grupo — ficavam com o número afastado sem razão visível. O selo estreitou o espaço lateral, mantendo o mesmo formato e a mesma altura.',
@@ -4646,6 +4721,7 @@
 
       '</div></div>'+
       '<div class="modal-foot"><span></span><button class="btn primary" data-action="close">Fechar</button></div>');
+    numeraSeccoes();
   }
 
   function fundModal() {
@@ -8049,7 +8125,10 @@
     if (e.key !== "Enter" || e.isComposing || e.shiftKey) return;
     if (!el("modalOverlay").classList.contains("open")) return;
     var t = e.target, tag = t && t.tagName;
-    if (tag === "TEXTAREA" || tag === "BUTTON" || tag === "A") return;   // já têm sentido próprio
+    // O SUMMARY é o título de uma secção que abre e fecha: para quem anda de Tab em Tab, o
+    // Enter em cima dele TEM de a abrir. Sem esta linha fechava a janela inteira — e quem
+    // navega pelo teclado nunca chegaria a ver o que lá está dentro.
+    if (tag === "TEXTAREA" || tag === "BUTTON" || tag === "A" || tag === "SUMMARY") return;
     var pri = el("modal").querySelector(".modal-foot .btn.primary");
     if (!pri || pri.disabled) return;
     e.preventDefault();
