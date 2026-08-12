@@ -279,7 +279,10 @@
   /* Botões só de ícone: quadrados e com área de toque suficiente para o dedo. */
   .btn.sm.py-ico { padding: 7px 10px; font-size: 15px; line-height: 1; }
 
-  .content { padding: 20px 26px 60px; }
+  /* Os 60px de baixo eram para quando a PÁGINA deslizava, e serviam de respiro no fim do
+     conteúdo. Agora quem desliza é o cartão, e este espaço é apenas a distância entre o fim
+     dele e o fim da janela: 60 é uma faixa vazia, e é altura que faz falta às linhas. */
+  .content { padding: 20px 26px 16px; }
 
   .btn { border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 9px 15px; border-radius: 9px; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; }
   .btn:hover { background: var(--surface-2); border-color: var(--primary); }
@@ -933,9 +936,10 @@
        título da secção. Esconde-se, e nas outras contas fica a forma curta: o espaço ganho é
        muito maior do que o pontinho de estado ocupa, por isso a vista continua a caber sem
        deslizar para o lado. */
-    /* O conteúdo deixa de reservar espaço para a barra de baixo: o rolo já desconta a altura
-       dela, e a página em si não tem nada para deslizar. */
-    .content { padding-bottom: calc(6px + env(safe-area-inset-bottom)) !important; }
+    /* Só o respiro entre o cartão e a barra de baixo. SEM a área segura do iPhone: a barra é
+       que a reserva, dentro da própria altura, e essa altura já sai da conta do rolo. Somando-a
+       aqui, era descontada duas vezes — e o cartão acabava uns 40px acima de onde devia. */
+    .content { padding-bottom: 10px !important; }
     .sem-tipo .col-tipo { display: none !important; }
     .t-longo { display: none; }
     .t-curto { display: inline; }
@@ -1206,7 +1210,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.63";
+  var APP_VERSION = "1.64";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -4751,6 +4755,9 @@
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.64", "agosto 2026", [
+        'Os <b>cartões</b> passaram a chegar mais abaixo, nos dois formatos: sobrava uma faixa vazia no fim do ecrã que agora é altura de lista. No telemóvel, a margem de segurança do iPhone estava a ser contada <b>duas vezes</b> — uma pela barra de baixo e outra pelo conteúdo.',
+      ])+
       ver("1.63", "agosto 2026", [
         'No computador tinha aparecido uma <b>barra de deslize</b> ao lado do ecrã inteiro, que só servia para esconder meio banner. A altura do cartão não estava a descontar o espaço que a página reserva em baixo.',
         'No ecrã <b>Contas</b>, os dois cartões voltaram a <b>puxar-se para o lado</b>. Cada um trata do seu deslize horizontal; o vertical é do ecrã, para se chegar ao segundo quando o primeiro é comprido.',
