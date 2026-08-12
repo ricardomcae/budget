@@ -3661,11 +3661,15 @@
     try {
       var raiz = document.documentElement;
       var tb = document.querySelector(".topbar");
-      if (tb) raiz.style.setProperty("--topo", Math.round(tb.getBoundingClientRect().height)+"px");
+      if (tb) raiz.style.setProperty("--topo", tb.getBoundingClientRect().height+"px");
       // Alturas das peças presas. Medem-se em vez de se estimarem porque mudam com a largura da
       // janela (a barra de filtros perde e ganha linhas) e com a vista.
+      // E guardam-se SEM ARREDONDAR. Estas medidas são parcelas de uma soma que tem de bater
+      // certo ao píxel com uma posição real, e uma altura real raramente é um número inteiro:
+      // arredondar meio píxel para baixo aqui abre meio píxel de frincha ali, e vê-se passar o
+      // conteúdo por ela. Não compensa a limpeza do número.
       var rta = document.getElementById("rtaWrap");
-      raiz.style.setProperty("--rta", (rta ? Math.round(rta.getBoundingClientRect().height) : 0)+"px");
+      raiz.style.setProperty("--rta", (rta ? rta.getBoundingClientRect().height : 0)+"px");
       var faixa = document.querySelector(".presos");
       // A altura da faixa TEM de incluir o espaço que a separa da tabela. A faixa não tem
       // enchimento nem contorno em baixo, por isso a margem do último filho escapa-lhe por fora
@@ -3684,8 +3688,8 @@
           if (mb > 0) { alturaFaixa += mb; rodape = mb; }
         }
       }
-      raiz.style.setProperty("--presos", Math.round(alturaFaixa)+"px");
-      raiz.style.setProperty("--rodape", Math.round(rodape)+"px");
+      raiz.style.setProperty("--presos", alturaFaixa+"px");
+      raiz.style.setProperty("--rodape", rodape+"px");
       // O cabeçalho não nasce no topo do cartão: nasce por dentro do contorno dele. São os
       // últimos 1px do desvio — pouco, e ainda assim dá-se pelo salto. Mede-se em vez de se
       // escrever 1px à mão, que deixaria de ser verdade no dia em que o contorno mudasse.
