@@ -758,6 +758,15 @@
 
     /* Cabeçalho — respeita a área segura do iPhone (notch/Dynamic Island) na aplicação instalada */
     .topbar { padding: calc(11px + env(safe-area-inset-top)) calc(13px + env(safe-area-inset-right)) 11px calc(13px + env(safe-area-inset-left)); flex-wrap: wrap; }
+    /* NO TELEMÓVEL a barra de cima é FIXA, e não apenas colada ao topo. A diferença só se vê
+       nas vistas em que é a PÁGINA que desliza — Orçamento, Contas, Recorrentes, Relatórios:
+       colada, ela acompanha a página quando o dedo a puxa para além do fim e desaparece por
+       cima, levando com ela o selector de orçamento e o anular. Nas Transações nunca se viu,
+       porque aí quem desliza é a lista e a página está quieta. Fixa, fica quieta em todas.
+       Sai do fluxo, e por isso o espaço que ocupava tem de ser devolvido à zona de baixo — a
+       altura é a mesma que já se mede para o cabeçalho das listas parar debaixo dela. */
+    .topbar { position: fixed; top: 0; left: 0; right: 0; }
+    .main { padding-top: var(--topo, 64px); }
     /* O título do ecrã sai: a barra de baixo já diz onde se está, com o separador aceso —
        e era a peça mais larga da fila de cima. A cor da aplicação também: escolhe-se uma vez
        e passou para «Dados e cópias → Definições», onde vivem as outras preferências. O que
@@ -1176,7 +1185,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.57";
+  var APP_VERSION = "1.58";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -4685,7 +4694,8 @@
       // hoje, não a cronologia de como lá chegou — por isso o recente fica ao pormenor e o
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
-      ver("1.54 – 1.57", "agosto 2026", [
+      ver("1.54 – 1.58", "agosto 2026", [
+        '<b>A barra de cima deixou de fugir para cima.</b> No telemóvel, puxando a página para além do fim, o cabeçalho — com o <b>selector de orçamento</b>, o anular e o refazer — ia-se embora por cima, no <b>Orçamento</b>, nas <b>Contas</b>, nas <b>Recorrentes</b> e nos <b>Relatórios</b>. Nas Transações nunca aconteceu, porque ali quem desliza é a lista e a página está quieta; a barra estava apenas <b>colada</b> ao topo, e uma coisa colada acompanha aquilo a que está colada. Passou a ser <b>fixa</b>, e fica quieta nos cinco ecrãs.',
         '<b>Nas Recorrentes, quem desliza passou a ser a lista, e não a página.</b> Era a última diferença entre este ecrã e o das Transações: com meia dúzia de regras a lista cabia inteira, e o dedo arrastava a <b>página</b> — a barra do «➕ Nova recorrente» ia-se embora por cima. A causa era a altura mínima da aplicação estar em <b>100vh</b>, e no iPhone essa medida conta o ecrã com as barras do navegador <b>escondidas</b> — sempre um pouco mais do que aquilo que se vê. A página ficava permanentemente com um resto para deslizar, mesmo em vistas que cabem inteiras. Passou a valer a altura <b>medida</b>, que é a que existe.',
         '<b>Com o telemóvel deitado, a aplicação vestia a roupa do computador.</b> E era esta a causa de tudo o resto. As fronteiras entre as duas disposições contam <b>píxeis de CSS</b>, e o Safari do iPhone deixa escolher o <b>zoom da página</b>, por sítio. A <b>75%</b>, um iPhone deitado — que tem 956 pontos de largura — anuncia <b>1275 × 587</b>: passa da fronteira de largura <b>e</b> da de altura ao mesmo tempo, e a aplicação concluía que estava num computador. De pé nunca se viu, porque 587 de largura continua do lado do telemóvel. O sintoma não parecia ter que ver com isto — a tabela deixava de <b>deslizar para o lado</b>, porque no computador o cartão é selado de propósito. A fronteira passou a reconhecer o <b>dedo</b> e a <b>proporção do ecrã</b>: um telemóvel deitado é mais largo do que duas vezes a sua altura, e a proporção não muda com o zoom.',
         '<b>Deitado, a altura da lista deixou de ser um palpite.</b> Com o iPhone na horizontal o Safari encolhe-se numa barra que fica <b>por cima</b> da página — e as medidas de altura do CSS continuam a contar essa faixa como se fosse utilizável. A lista ficava mais alta do que o espaço que existe, a <b>página</b> tinha de deslizar para se lhe ver o fim, e a partir daí era ela que ficava com os gestos: o deslize <b>lateral</b> da tabela desaparecia por completo. A altura passou a ser medida pelo espaço <b>realmente</b> visível, e volta a ser medida sempre que essas barras aparecem ou desaparecem. De pé nunca se notou, porque de pé a conta estava certa.',
