@@ -867,7 +867,14 @@
     /* O chão de 150px é para landscape: com o ecrã deitado sobra tão pouca altura que a conta
        podia dar um cartão de duas linhas — ou, se a barra de cima crescesse, um valor negativo,
        que o navegador arredonda a zero e faria a lista desaparecer. */
-    .data-card { overflow: auto; max-height: max(150px, calc(100dvh - var(--carta, 232px))); }
+    /* A altura vem MEDIDA (--lista). O cálculo com 100dvh fica como reserva, para o caso de a
+       medição não chegar a correr — mas não serve de fonte principal: com o iPhone DEITADO, o
+       Safari encolhe-se numa barra que fica POR CIMA da página, e o 100dvh continua a contar
+       essa faixa como se fosse utilizável. O cartão ficava mais alto do que o espaço real, a
+       página passava a ter de deslizar para se lhe ver o fim — e a partir do momento em que a
+       página desliza, é ela que fica com os gestos e o deslize lateral do cartão desaparece.
+       De pé o valor está certo e nada disto se notava. */
+    .data-card { overflow: auto; max-height: var(--lista, max(150px, calc(100dvh - var(--carta, 232px)))); }
     /* E a PÁGINA não pode ter nada para deslizar por baixo do cartão. Estes 88px existem para
        as vistas onde é a página que corre (Orçamento, Relatórios) e a barra de baixo taparia o
        fim. Onde quem corre é o cartão, essa faixa só faz mal: o iOS TRANCA O EIXO do gesto no
@@ -1148,7 +1155,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.53";
+  var APP_VERSION = "1.54";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -3564,6 +3571,13 @@
         var barra = document.querySelector(".sidebar");
         var hb = (barra && getComputedStyle(barra).position === "fixed") ? barra.getBoundingClientRect().height : 0;
         raiz.style.setProperty("--carta", Math.round(acima + hb + 18) + "px");
+        // A altura que o ecrã tem MESMO. O visualViewport é o único que desconta as barras que
+        // o navegador põe por cima da página; o innerHeight fica para quem o não tenha.
+        var visivel = (window.visualViewport && window.visualViewport.height) || window.innerHeight || 0;
+        if (visivel > 0) {
+          var alt = Math.round(visivel - (acima + hb + 18));
+          raiz.style.setProperty("--lista", Math.max(150, alt) + "px");
+        }
       }
     } catch(e){}
   }
@@ -4649,9 +4663,12 @@
       // hoje, não a cronologia de como lá chegou — por isso o recente fica ao pormenor e o
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
-      ver("1.53", "agosto 2026", [
+      ver("1.54", "agosto 2026", [
+        '<b>Deitado, a altura da lista deixou de ser um palpite.</b> Com o iPhone na horizontal o Safari encolhe-se numa barra que fica <b>por cima</b> da página — e as medidas de altura do CSS continuam a contar essa faixa como se fosse utilizável. A lista ficava mais alta do que o espaço que existe, a <b>página</b> tinha de deslizar para se lhe ver o fim, e a partir daí era ela que ficava com os gestos: o deslize <b>lateral</b> da tabela desaparecia por completo. A altura passou a ser medida pelo espaço <b>realmente</b> visível, e volta a ser medida sempre que essas barras aparecem ou desaparecem. De pé nunca se notou, porque de pé a conta estava certa.',
         '<b>O «❓ Como funciona?» e as «📋 Novidades» deixaram de ser uma parede de texto.</b> Juntas têm perto de <b>quarenta mil caracteres</b>, e abriam de uma vez: quem procurava uma coisa concreta desistia antes de a encontrar. Passaram a <b>secções que abrem e fecham</b>, com o número de pontos ao lado do título e só a primeira aberta — ao abrir a ajuda vê-se agora <b>o essencial e uma lista de dez títulos</b>, em vez de tudo ao mesmo tempo. O texto é o mesmo, palavra por palavra: não se cortou nada. A secção que tinha crescido até aos <b>21 pontos</b> foi repartida em três — <b>Contas e cartões</b>, <b>Transações</b> e <b>Trazer e levar</b>.',
         '<b>Com o telemóvel deitado, a lista voltou a deslizar para o lado.</b> Nas <b>Transações</b> e nas <b>Recorrentes</b> a tabela é mais larga do que o ecrã e puxa-se para o lado — mas <b>em landscape não havia maneira</b>, e a metade direita ficava inalcançável. A culpa era de uma faixa de página que sobrava por baixo do cartão: o iPhone escolhe o sentido do gesto no instante em que o dedo começa a arrastar, e um arrasto que apanhasse essa faixa passava a ser um deslize <b>vertical da página</b> — o cartão nunca chegava a ver a parte horizontal. De pé quase não se notava; deitado, com um terço da altura, roubava quase todos os gestos. A faixa desapareceu nas vistas em que quem corre é a lista, e com ela veio de brinde o <b>cabeçalho das Recorrentes a ficar fixo</b> no topo, como já acontecia nas Transações.',
+      ])+
+      ver("1.53", "agosto 2026", [
         '<b>Com um beneficiário aberto, a lista deixava de caber.</b> A altura da lista é medida, e a medida usava o primeiro cartão do ecrã — que nesse caso é o resumo do beneficiário e não a tabela. A lista ficava alta de mais e as últimas linhas escondiam-se por trás da barra de baixo.',
         '<b>Uma passagem de pente fino por todos os ecrãs.</b> Doze botões que são só um símbolo — o ✓, o ⧉, o ✖, as setas de ordenar — não diziam nada a quem usa o leitor de ecrã do telemóvel; passaram a anunciar-se pelo nome. Três mensagens escreviam <b>«1 categorias»</b>, <b>«1 linhas»</b> e <b>«1 transações»</b> quando havia uma só. E os botões principais de criar passaram todos a usar o mesmo <b>➕</b> — uns tinham-no e outros um simples <b>+</b>.',
         '<b>O símbolo da moeda ficou coerente nas três colunas do orçamento.</b> O campo <b>Atribuído</b> era o único sem ele; passou a tê-lo também, ao lado do número e fora do que se escreve — o valor do campo continua limpo. No <b>telemóvel</b> o símbolo é mais pequeno e mais apagado nas três colunas: repete-se em todas as linhas e o que interessa ler é o número. No computador fica como sempre esteve.',
@@ -7800,6 +7817,11 @@
   // «resize» que já é tratado acima. O «agendaRodar» é idempotente, por isso ouvir os dois é
   // seguro e cobre os dois comportamentos.
   window.addEventListener("orientationchange", agendaRodar);
+  // As barras do Safari aparecem e desaparecem ao deslizar, e nem sempre disparam um «resize»
+  // da janela. Sem ouvir isto, a altura da lista ficava a de quando a barra estava escondida.
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", function(){ if (!_aRodar) medirTopo(); });
+  }
   document.addEventListener("focusout", function(e){
     if (e.target && e.target.classList && e.target.classList.contains("money")) fechaConta(e.target);
   });
