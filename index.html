@@ -734,7 +734,14 @@
      o zoom possa inflacionar. */
   @media (max-width: 1040px), (max-height: 500px), (pointer: coarse) and (max-height: 760px),
          (pointer: coarse) and (min-aspect-ratio: 2/1) {
-    .app { grid-template-columns: 1fr; }
+    /* A altura mínima da aplicação é 100vh, e no iPhone o vh conta o ecrã com as barras do
+       navegador ESCONDIDAS — mais do que aquilo que se vê enquanto elas estão à vista. A
+       página ficava sempre um pouco mais alta do que o espaço visível, e portanto sempre com
+       alguma coisa para deslizar, mesmo em vistas que cabem inteiras. Nas Transações não se
+       reparava, porque a lista é longa e o dedo cai sempre dentro dela; nas Recorrentes, com
+       meia dúzia de regras, era a página inteira que andava — e a barra do «Nova recorrente»
+       ia-se embora com ela. Passa a valer a altura MEDIDA, que é a que existe. */
+    .app { grid-template-columns: 1fr; min-height: var(--ecra, 100dvh); }
     /* Barra lateral -> barra de navegação inferior (estilo iOS) */
     .sidebar {
       position: fixed; left: 0; right: 0; bottom: 0; top: auto;
@@ -1169,7 +1176,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.56";
+  var APP_VERSION = "1.57";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -3591,6 +3598,7 @@
         if (visivel > 0) {
           var alt = Math.round(visivel - (acima + hb + 18));
           raiz.style.setProperty("--lista", Math.max(150, alt) + "px");
+          raiz.style.setProperty("--ecra", Math.round(visivel) + "px");
         }
       }
     } catch(e){}
@@ -4112,61 +4120,9 @@
             '</b> de cerca de 5 MB (orçamento '+mb(e.dados)+' · lista do histórico '+mb(e.hist)+').<br>'+
             (muitas ? '<span style="color:var(--warning);font-weight:600;">⚠️ A partir daqui a aplicação começa a ficar mais lenta a cada toque. '+
               'Quando lhe der jeito: guarde uma <b>cópia em ficheiro</b> (fica com o histórico todo), exporte a <b>configuração dos alvos</b>, crie um orçamento novo com as contas no saldo de hoje e importe lá essa configuração. Fica com tudo o que interessa e sem o peso do que já passou.</span><br>' : '')+
-            '<span id="zonaExtra" class="muted">a verificar o resto…</span>'+
-            '<div id="zonaEcra" style="margin-top:10px;"></div></div>'; })()+
+            '<span id="zonaExtra" class="muted">a verificar o resto…</span></div>'; })()+
       '</div>'+
       '<div class="modal-foot"><span class="muted" style="font-size:12px;">Orçamento base-zero · <a href="#" data-action="changelog" style="color:var(--primary);cursor:pointer;">Versão '+APP_VERSION+' — novidades</a></span><button class="btn" data-action="close">Fechar</button></div>');
-    // Diagnóstico do ecrã. Existe porque um problema de disposição só se vê no aparelho, e a
-    // descrição de quem lá está — por mais cuidada que seja — não distingue causas que dão o
-    // mesmo sintoma. Estes números distinguem-nas: dizem que disposição está activa, que altura
-    // a lista recebeu, se ela tem mesmo mais largura do que mostra, e se a página — que não
-    // devia — tem por onde deslizar. Rodar o telemóvel com a janela aberta actualiza-os.
-    (function(){
-      var alvo = el("zonaEcra"); if(!alvo) return;
-      function linha(r, v){ return '<div style="display:flex;gap:8px;"><span style="min-width:132px;">'+r+'</span><b>'+v+'</b></div>'; }
-      function pinta(){
-        try {
-          var vv = window.visualViewport;
-          var barra = document.querySelector(".sidebar");
-          var fone = barra && getComputedStyle(barra).position === "fixed";
-          var card = null, todos = document.querySelectorAll(".data-card");
-          for (var j=0;j<todos.length;j++) if (todos[j].querySelector("table.data")) { card = todos[j]; break; }
-          var raiz = document.documentElement;
-          var pag = Math.max(0, (document.body.scrollHeight||0) - (raiz.clientHeight||0));
-          var out =
-            linha("Versão", APP_VERSION)+
-            linha("Janela", (window.innerWidth||0)+" × "+(window.innerHeight||0))+
-            linha("Área visível", vv ? Math.round(vv.width)+" × "+Math.round(vv.height) : "não disponível")+
-            linha("Ecrã do aparelho", (screen && screen.width ? (screen.width+" × "+screen.height) : "?"))+
-            // O zoom da página não se pergunta ao navegador: deduz-se comparando o ecrã do
-            // aparelho com o que a página julga ter. É a diferença que empurra um telemóvel
-            // deitado para lá das fronteiras da disposição — e nada mais o denuncia.
-            linha("Zoom da página", (function(){
-              var a1 = Math.min(screen.width||0, screen.height||0);
-              var a2 = Math.min(window.innerWidth||0, window.innerHeight||0);
-              return (a1 && a2) ? (Math.round(a1/a2*100)+"%") : "?";
-            })())+
-            linha("Disposição", fone ? "telemóvel" : "computador")+
-            linha("Altura dada à lista", (getComputedStyle(raiz).getPropertyValue("--lista")||"—").trim())+
-            (card
-              ? linha("Lista", Math.round(card.clientWidth)+" à vista de "+Math.round(card.scrollWidth)+" de largura, "+
-                               Math.round(card.clientHeight)+" de "+Math.round(card.scrollHeight)+" de altura")
-              : linha("Lista", "não há nenhuma neste ecrã"))+
-            linha("Página por deslizar", pag > 1 ? (Math.round(pag)+" px — devia ser 0") : "0 px");
-          alvo.innerHTML = '<div style="border-top:1px solid var(--border);padding-top:10px;">'+
-            '<div style="font-weight:700;color:var(--text);margin-bottom:6px;">Diagnóstico do ecrã</div>'+out+
-            '<div style="margin-top:6px;">Rode o telemóvel com esta janela aberta: os números acompanham.</div></div>';
-        } catch(e){}
-      }
-      pinta();
-      // A janela fica aberta enquanto se roda o aparelho, e os números têm de acompanhar. Ouvem-se
-      // os acontecimentos que os mudam, em vez de os andar a sondar de meio em meio segundo: um
-      // temporizador continuaria a correr depois de a janela fechar, e prende quem só quer sair.
-      function refresca(){ if (el("zonaEcra")) pinta(); }
-      window.addEventListener("resize", refresca);
-      window.addEventListener("orientationchange", function(){ setTimeout(refresca, 350); });
-      if (window.visualViewport) window.visualViewport.addEventListener("resize", refresca);
-    })();
     // Estado real do armazenamento — as duas coisas que não se veem de outra forma: se os
     // dados estão protegidos contra a limpeza automática do navegador, e quanto espaço têm
     // mesmo disponível (o histórico já não vive no espaço apertado dos ~5 MB).
@@ -4729,13 +4685,9 @@
       // hoje, não a cronologia de como lá chegou — por isso o recente fica ao pormenor e o
       // resto encolhe para uma linha por assunto. Regra para quem escrever aqui: cada entrada
       // diz O QUE MUDOU PARA QUEM USA; o porquê detalhado vive nos comentários do código.
-      ver("1.56", "agosto 2026", [
+      ver("1.54 – 1.57", "agosto 2026", [
+        '<b>Nas Recorrentes, quem desliza passou a ser a lista, e não a página.</b> Era a última diferença entre este ecrã e o das Transações: com meia dúzia de regras a lista cabia inteira, e o dedo arrastava a <b>página</b> — a barra do «➕ Nova recorrente» ia-se embora por cima. A causa era a altura mínima da aplicação estar em <b>100vh</b>, e no iPhone essa medida conta o ecrã com as barras do navegador <b>escondidas</b> — sempre um pouco mais do que aquilo que se vê. A página ficava permanentemente com um resto para deslizar, mesmo em vistas que cabem inteiras. Passou a valer a altura <b>medida</b>, que é a que existe.',
         '<b>Com o telemóvel deitado, a aplicação vestia a roupa do computador.</b> E era esta a causa de tudo o resto. As fronteiras entre as duas disposições contam <b>píxeis de CSS</b>, e o Safari do iPhone deixa escolher o <b>zoom da página</b>, por sítio. A <b>75%</b>, um iPhone deitado — que tem 956 pontos de largura — anuncia <b>1275 × 587</b>: passa da fronteira de largura <b>e</b> da de altura ao mesmo tempo, e a aplicação concluía que estava num computador. De pé nunca se viu, porque 587 de largura continua do lado do telemóvel. O sintoma não parecia ter que ver com isto — a tabela deixava de <b>deslizar para o lado</b>, porque no computador o cartão é selado de propósito. A fronteira passou a reconhecer o <b>dedo</b> e a <b>proporção do ecrã</b>: um telemóvel deitado é mais largo do que duas vezes a sua altura, e a proporção não muda com o zoom.',
-      ])+
-      ver("1.55", "agosto 2026", [
-        '<b>«Dados e cópias» passou a mostrar um diagnóstico do ecrã.</b> Um problema de disposição só existe no aparelho, e a descrição de quem lá está — por mais cuidada que seja — não chega para distinguir causas que dão o mesmo sintoma. O painel diz que <b>disposição</b> está activa (telemóvel ou computador), o tamanho da <b>área realmente visível</b>, a <b>altura</b> que a lista recebeu, se ela tem mais largura do que aquela que mostra, e se a <b>página</b> tem por onde deslizar — que não devia. Rodando o telemóvel com a janela aberta, os números acompanham.',
-      ])+
-      ver("1.54", "agosto 2026", [
         '<b>Deitado, a altura da lista deixou de ser um palpite.</b> Com o iPhone na horizontal o Safari encolhe-se numa barra que fica <b>por cima</b> da página — e as medidas de altura do CSS continuam a contar essa faixa como se fosse utilizável. A lista ficava mais alta do que o espaço que existe, a <b>página</b> tinha de deslizar para se lhe ver o fim, e a partir daí era ela que ficava com os gestos: o deslize <b>lateral</b> da tabela desaparecia por completo. A altura passou a ser medida pelo espaço <b>realmente</b> visível, e volta a ser medida sempre que essas barras aparecem ou desaparecem. De pé nunca se notou, porque de pé a conta estava certa.',
         '<b>O «❓ Como funciona?» e as «📋 Novidades» deixaram de ser uma parede de texto.</b> Juntas têm perto de <b>quarenta mil caracteres</b>, e abriam de uma vez: quem procurava uma coisa concreta desistia antes de a encontrar. Passaram a <b>secções que abrem e fecham</b>, com o número de pontos ao lado do título e só a primeira aberta — ao abrir a ajuda vê-se agora <b>o essencial e uma lista de dez títulos</b>, em vez de tudo ao mesmo tempo. O texto é o mesmo, palavra por palavra: não se cortou nada. A secção que tinha crescido até aos <b>21 pontos</b> foi repartida em três — <b>Contas e cartões</b>, <b>Transações</b> e <b>Trazer e levar</b>.',
         '<b>Com o telemóvel deitado, a lista voltou a deslizar para o lado.</b> Nas <b>Transações</b> e nas <b>Recorrentes</b> a tabela é mais larga do que o ecrã e puxa-se para o lado — mas <b>em landscape não havia maneira</b>, e a metade direita ficava inalcançável. A culpa era de uma faixa de página que sobrava por baixo do cartão: o iPhone escolhe o sentido do gesto no instante em que o dedo começa a arrastar, e um arrasto que apanhasse essa faixa passava a ser um deslize <b>vertical da página</b> — o cartão nunca chegava a ver a parte horizontal. De pé quase não se notava; deitado, com um terço da altura, roubava quase todos os gestos. A faixa desapareceu nas vistas em que quem corre é a lista, e com ela veio de brinde o <b>cabeçalho das Recorrentes a ficar fixo</b> no topo, como já acontecia nas Transações.',
