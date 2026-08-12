@@ -551,12 +551,12 @@
   .data-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: clip; -webkit-overflow-scrolling: touch; box-shadow: var(--shadow); }
   /* O cabeçalho pára logo abaixo de tudo o que está preso por cima dele: a barra de cima, o
      banner do «Pronto a atribuir» e a faixa de comandos. Todas essas alturas são medidas. */
-  table.data thead th { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga) + var(--presos, 0px) + var(--borda, 1px)); z-index: 6; }
+  table.data thead th { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga) + var(--presos, 0px)); z-index: 6; }
   /* No orçamento prende-se o cabeçalho — Categoria, Atribuído, Atividade, Disponível — e só ele.
      A linha do «Total do mês» vive no mesmo <thead>, mas desliza: é um número do mês inteiro, não
      a chave de leitura das colunas, e presa roubava uma fila de altura à lista sem a mesma
      serventia. Passa por trás do cabeçalho, que é opaco e está por cima. */
-  table.budget thead th { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga) + var(--presos, 0px) + var(--borda, 1px)); z-index: 6; background: var(--surface-2); }
+  table.budget thead th { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--folga) + var(--presos, 0px)); z-index: 6; background: var(--surface-2); }
   table.data { width: 100%; border-collapse: collapse; }
   table.data th { text-align: start; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; padding: 11px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2); white-space: nowrap; }
   table.data td { padding: 10px 16px; vertical-align: middle; }
@@ -700,16 +700,18 @@
      com o fundo da página: é filho da faixa, sobe com ela, e tapa o que passaria por trás. */
   .presos::before { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--folga) * -1); height: var(--folga); background: var(--bg); }
 
-  /* E o mesmo por BAIXO. Entre a faixa e a tabela há um espaço — a margem do último elemento da
-     faixa — que é contado na altura, para o cabeçalho parar no sítio certo, mas que ninguém
-     pinta: vêem-se as linhas a passar por essa frincha. Este remendo pinta-a, e como é filho da
-     faixa acompanha-a. A altura vem medida, porque a margem não é a mesma em todos os ecrãs. */
-  /* A altura leva o contorno somado. O cabeçalho pára por DENTRO do contorno do cartão, e o
-     contorno faz parte do cartão — desliza com ele. Sem esta parcela ficava exactamente UMA
-     linha de píxeis por pintar entre o que está preso e o cabeçalho, e era por aí que se via
-     passar o conteúdo das linhas. Um píxel: pouco para se localizar, que baste para se ver. */
-  .presos::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: calc(var(--rodape, 0px) + var(--borda, 1px)); background: var(--bg); }
-  body.sem-presos .presos::before, body.sem-presos .presos::after { display: none; }
+  /* A faixa vai ATÉ ao cabeçalho, sem nada pelo meio. Este enchimento de baixo é a chave, e
+     não é decorativo: um bloco sem enchimento em baixo deixa a margem do último filho escapar-lhe
+     por fora (o colapso de margens), e essa margem fica a descoberto — sem ninguém a pintar,
+     e sem contar na altura medida. Havendo enchimento, o colapso não acontece: a margem passa a
+     viver DENTRO da faixa, é pintada pelo fundo dela e conta na altura de uma só vez.
+     A medida é a espessura do contorno do cartão, porque o cabeçalho pára por dentro dele: assim
+     a faixa acaba exactamente onde o cabeçalho começa. Uma peça, um fundo, nenhuma junta — em
+     vez de três tiras encostadas, que é o que deixava passar o conteúdo por meio píxel de cada
+     vez. O contorno do cartão fica tapado pela faixa: uma linha de cabelo que ninguém dá por
+     ela, e é o preço de não haver junta nenhuma. */
+  .presos { padding-bottom: var(--borda, 1px); }
+  body.sem-presos .presos::before { display: none; }
   /* O banner do «Pronto a atribuir» vive fora da zona de conteúdo, e por isso prende-se sozinho,
      já colado à barra de cima. É a única peça com ordem própria. */
   /* O espaço à volta do banner vive AQUI, e não no banner: um invólucro sem enchimento deixa a
@@ -3670,6 +3672,12 @@
       // conteúdo por ela. Não compensa a limpeza do número.
       var rta = document.getElementById("rtaWrap");
       raiz.style.setProperty("--rta", (rta ? rta.getBoundingClientRect().height : 0)+"px");
+      // O contorno do cartão mede-se ANTES da faixa, e não depois: é ele que dá o enchimento de
+      // baixo dela, e portanto entra na altura que a seguir se vai medir. Pela ordem inversa,
+      // media-se a faixa com o enchimento da vista anterior.
+      var cartao = document.querySelector(".data-card, .budget-card");
+      var borda = cartao ? parseFloat((getComputedStyle(cartao)||{}).borderTopWidth) : 0;
+      raiz.style.setProperty("--borda", (borda > 0 ? borda : 0)+"px");
       var faixa = document.querySelector(".presos");
       // A altura da faixa TEM de incluir o espaço que a separa da tabela. A faixa não tem
       // enchimento nem contorno em baixo, por isso a margem do último filho escapa-lhe por fora
@@ -3677,25 +3685,10 @@
       // exactamente o tanto que essa margem media (8px nas Transações, 16px nas outras).
       // Soma-se de volta, em vez de se uniformizar o espaçamento dos ecrãs para o cálculo dar
       // certo: trocar um problema visual por outro não é resolver nenhum.
-      var alturaFaixa = 0, rodape = 0;
-      if (faixa) {
-        alturaFaixa = faixa.getBoundingClientRect().height;
-        var ultimo = faixa.lastElementChild;
-        if (ultimo) {
-          // Medir a margem, e não a distância entre os dois elementos: com a faixa já presa, ela
-          // está parada e o resto continua a andar, e a distância entre eles mediria o deslize.
-          var mb = parseFloat((getComputedStyle(ultimo)||{}).marginBottom);
-          if (mb > 0) { alturaFaixa += mb; rodape = mb; }
-        }
-      }
-      raiz.style.setProperty("--presos", alturaFaixa+"px");
-      raiz.style.setProperty("--rodape", rodape+"px");
-      // O cabeçalho não nasce no topo do cartão: nasce por dentro do contorno dele. São os
-      // últimos 1px do desvio — pouco, e ainda assim dá-se pelo salto. Mede-se em vez de se
-      // escrever 1px à mão, que deixaria de ser verdade no dia em que o contorno mudasse.
-      var cartao = document.querySelector(".data-card, .budget-card");
-      var borda = cartao ? parseFloat((getComputedStyle(cartao)||{}).borderTopWidth) : 0;
-      raiz.style.setProperty("--borda", ((borda > 0 ? borda : 0))+"px");
+      // A altura é a que a faixa mede, e mais nada: o enchimento de baixo já lá traz dentro a
+      // margem do último filho e o contorno do cartão. Uma medida, em vez de três somadas — e
+      // sem somas não há parcelas por arredondar nem juntas por onde se veja passar o conteúdo.
+      raiz.style.setProperty("--presos", (faixa ? faixa.getBoundingClientRect().height : 0)+"px");
       // No telemóvel, a altura que a lista pode ocupar não pode ser um palpite: mede-se onde a
       // tabela começa e quanto ocupa a barra de baixo, senão as últimas linhas ficavam
       // escondidas por trás dela — e como quem desliza é o cartão, nunca se lá chegava.
