@@ -335,7 +335,12 @@
   select.filter, input.filter { padding: 8px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font-weight: 600; }
 
   /* Tabela do orçamento */
-  .budget-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; box-shadow: var(--shadow); }
+  /* `clip` e não `auto`: recorta os cantos arredondados SEM criar uma zona de deslize — e uma
+     zona de deslize impediria o cabeçalho e a linha de totais de se colarem ao ecrã, porque
+     passariam a colar-se ao cartão, que nunca se mexe. A tabela do orçamento é de largura 100%
+     sem mínimo, e os nomes de categoria partem de linha em vez de transbordar: não há nada
+     para deslizar na horizontal, e portanto nada a perder. */
+  .budget-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: clip; box-shadow: var(--shadow); }
   table.budget { width: 100%; border-collapse: collapse; }
   table.budget thead th { text-align: end; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; padding: 12px 18px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
   table.budget thead th.first { text-align: start; }
@@ -536,8 +541,13 @@
      natural, sem caixas dentro de caixas. O `clip` recorta os cantos arredondados sem criar
      essa zona de deslize (ao contrário de `hidden`, que a criaria e estragaria tudo). */
   .data-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: clip; -webkit-overflow-scrolling: touch; box-shadow: var(--shadow); }
-  /* O cabeçalho pára logo abaixo da barra de cima, cuja altura é medida e guardada em --topo. */
-  table.data thead th { position: sticky; top: var(--topo, 64px); z-index: 6; }
+  /* O cabeçalho pára logo abaixo de tudo o que está preso por cima dele: a barra de cima, o
+     banner do «Pronto a atribuir» e a faixa de comandos. Todas essas alturas são medidas. */
+  table.data thead th { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--presos, 0px)); z-index: 6; }
+  /* No orçamento prende-se o cabeçalho E a linha de totais — vivem ambos no <thead>, e o total
+     do mês é justamente o número que se quer debaixo de olho enquanto se reparte dinheiro. */
+  table.budget thead th, table.budget thead td { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--presos, 0px)); z-index: 6; background: var(--surface-2); }
+  table.budget thead tr.tot-row td { top: calc(var(--topo, 64px) + var(--rta, 0px) + var(--presos, 0px) + var(--cabec, 38px)); z-index: 5; }
   table.data { width: 100%; border-collapse: collapse; }
   table.data th { text-align: start; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; padding: 11px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2); white-space: nowrap; }
   table.data td { padding: 10px 16px; vertical-align: middle; }
@@ -670,6 +680,21 @@
   .seg { display: flex; gap: 6px; }
   .seg button { flex: 1; padding: 9px; border: 1px solid var(--border); background: var(--surface); border-radius: 9px; font-weight: 600; color: var(--text-muted); }
   .seg button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  /* ---- A faixa que fica presa em cima ----
+     O que é COMANDO e CONTEXTO (botões, filtros, o resumo do que se está a ver) não deve fugir
+     do ecrã ao descer uma lista: um filtro fora de vista é um filtro esquecido, e quem lê um
+     número sem ver que filtro está aceso lê-o mal. Só os DADOS correm.
+     A faixa é um bloco só, e não cada barra por si: assim não é preciso somar alturas à mão
+     para as empilhar, e uma barra que mude de altura não desalinha as outras. */
+  .presos { position: sticky; top: calc(var(--topo, 64px) + var(--rta, 0px)); z-index: 15; background: var(--bg); }
+  /* O banner do «Pronto a atribuir» vive fora da zona de conteúdo, e por isso prende-se sozinho,
+     já colado à barra de cima. É a única peça com ordem própria. */
+  #rtaWrap { position: sticky; top: var(--topo, 64px); z-index: 16; background: var(--bg); }
+  /* Cada peça presa é altura roubada à lista. Num ecrã baixo — telemóvel deitado, ou uma janela
+     apertada — prender tudo deixaria quatro linhas à vista, que é pior do que não prender nada.
+     Aí a faixa volta a correr com a página e fica só o essencial. */
+  body.sem-presos .presos, body.sem-presos #rtaWrap { position: static; }
+
   .help-list { font-size: 13px; color: var(--text-muted); }
   /* Secções dobráveis das janelas de texto longo (o «Como funciona?» e as «Novidades»).
      São <details> do próprio navegador: abrem e fecham sem uma linha de JavaScript, o teclado
@@ -905,6 +930,9 @@
        página desliza, é ela que fica com os gestos e o deslize lateral do cartão desaparece.
        De pé o valor está certo e nada disto se notava. */
     .data-card { overflow: auto; max-height: var(--lista, max(150px, calc(100dvh - var(--carta, 232px)))); }
+    /* Nas Contas os cartões não têm tecto: quem corre é a página (ver «cartoes-livres» no código).
+       Guardam o deslize lateral, que aí é mesmo preciso — a tabela não cabe na largura. */
+    body.cartoes-livres .data-card { max-height: none; overflow-x: auto; overflow-y: hidden; }
     /* E a PÁGINA não pode ter nada para deslizar por baixo do cartão. Estes 88px existem para
        as vistas onde é a página que corre (Orçamento, Relatórios) e a barra de baixo taparia o
        fim. Onde quem corre é o cartão, essa faixa só faz mal: o iOS TRANCA O EIXO do gesto no
@@ -1185,7 +1213,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.60";
+  var APP_VERSION = "1.61";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -2603,7 +2631,13 @@
     refreshUndoButtons();
     // Vistas cuja lista corre DENTRO do cartão (ver a regra .lista-desliza no estilo).
     document.body.classList.toggle("lista-desliza",
-      v === "transactions" || v === "accounts" || v === "recurring");
+      v === "transactions" || v === "recurring");
+    // As Contas são caso único: têm DOIS cartões (orçamento, e cartões/acompanhamento). Se cada
+    // um deslizasse por dentro, ficavam dois deslizadores encaixados numa página que também
+    // desliza — e com uma lista de contas longa, chegar ao segundo cartão obrigava a deslizar a
+    // página por fora dos dois. Aqui manda a página, e só ela: os cartões crescem à vontade e
+    // cada cabeçalho de tabela prende-se por sua vez, sendo empurrado pelo seguinte.
+    document.body.classList.toggle("cartoes-livres", v === "accounts");
     medirTopo();
     reporDeslize();
     _viewDesenhada = v;
@@ -2912,6 +2946,7 @@
     }
     var tot = budgetTotals(m);
     el("content").innerHTML =
+      '<div class="presos">'+
       // A barra é feita de dois BLOCOS. Cada um mantém-se inteiro; se a janela não chegar para
       // os dois, é entre eles que a linha parte — nunca a meio de um grupo de filtros.
       '<div class="toolbar">' +
@@ -2948,6 +2983,7 @@
           (nShown+(nShown===1?' categoria':' categorias')) + '</span>' +
         '</div>' +
       '</div>' +
+      '</div>'+
       '<div class="budget-card"><table class="budget"><thead><tr>' +
         '<th class="first">Categoria'+
           '<button class="btn ghost sm" data-action="expand-all" title="Abrir todos os grupos" aria-label="Abrir todos os grupos" style="padding:1px 5px;margin-inline-start:8px;">⊕</button>'+
@@ -2999,11 +3035,11 @@
       // O «Transferir» mexe em transações, e transações criam-se aqui — faltava o par dele.
       // Sem o «Nova transação», este ecrã oferecia o caso raro (mover dinheiro entre contas) e
       // escondia o caso de todos os dias.
-      '<div class="toolbar"><button class="btn primary" data-action="add-account">➕ Adicionar conta</button>'+
+      '<div class="presos"><div class="toolbar"><button class="btn primary" data-action="add-account">➕ Adicionar conta</button>'+
       '<button class="btn" data-action="add-tx">➕ Nova transação</button>'+
       '<button class="btn" data-action="transfer">↔ Transferir</button>'+
       '<div class="spacer"></div>'+
-      '<span class="muted" style="font-size:12.5px;">Património líquido: <b>'+fmt(netWorth())+'</b></span></div>'+
+      '<span class="muted" style="font-size:12.5px;">Património líquido: <b>'+fmt(netWorth())+'</b></span></div></div>'+
       accTable(budgetAccs, "🏦 Contas de orçamento", true) + accTable(trackAccs, "💳 Cartões e outras contas");
   }
 
@@ -3218,7 +3254,7 @@
         '<button class="btn hide-phone" data-action="export-view-csv" title="Guardar num .csv exatamente as transações que estão à vista, com os filtros aplicados">⬇ Exportar o que vejo</button>'+
       '</div>';
 
-    var head = andarConta + andarAcoes + '<div class="toolbar tx-filtros">'+
+    var head = '<div class="presos">' + andarConta + andarAcoes + '<div class="toolbar tx-filtros">'+
       '<span class="muted hide-phone tb-etiq" style="font-size:12.5px;">Mostrar:</span>'+
       // O que a procura varre está escrito no próprio campo E na dica: sem isso, a única forma
       // de saber que NÃO varre categorias nem valores era ir experimentar e concluir mal.
@@ -3267,7 +3303,7 @@
         // Diz sempre quantas transações ESTÃO À VISTA — como a contagem de categorias no orçamento.
         var dir = list.length+(list.length===1?' transação':' transações');
         return '<div class="tx-resumo muted"><span>'+esq+'</span><span>'+dir+'</span></div>';
-      })();
+      })() + '</div>';
 
     if (!state.transactions.length) {
       el("content").innerHTML = head + emptyState("🧾","Sem transações","Registe as suas entradas e saídas para ver a atividade no orçamento.",
@@ -3491,7 +3527,7 @@
       '<div id="pnHost" class="evo-host"></div></div>';
 
     el("content").innerHTML =
-      blocoPeriodo +
+      '<div class="presos">'+blocoPeriodo+'</div>' +
       '<div class="kpi-grid">'+
         '<div class="kpi"><div class="k-label">Rendimento</div><div class="k-value pos">'+fmt(totalIn)+'</div></div>'+
         '<div class="kpi"><div class="k-label">Despesa</div><div class="k-value neg">'+fmt(totalOut)+'</div></div>'+
@@ -3507,8 +3543,8 @@
 
   function renderRecurring(){
     var list=(state.recurring||[]).slice().sort(function(a,b){return a.nextDate<b.nextDate?-1:(a.nextDate>b.nextDate?1:0);});
-    var head='<div class="toolbar"><button class="btn primary" data-action="add-recurring">➕ Nova recorrente</button>'+
-      '<div class="spacer"></div><span class="muted" style="font-size:12.5px;">'+list.length+(list.length===1?' regra':' regras')+' · lançada'+(list.length===1?'':'s')+' automaticamente na data</span></div>';
+    var head='<div class="presos"><div class="toolbar"><button class="btn primary" data-action="add-recurring">➕ Nova recorrente</button>'+
+      '<div class="spacer"></div><span class="muted" style="font-size:12.5px;">'+list.length+(list.length===1?' regra':' regras')+' · lançada'+(list.length===1?'':'s')+' automaticamente na data</span></div></div>';
     if(!list.length){
       el("content").innerHTML=head+emptyState("📅","Sem transações recorrentes",
         "Crie regras para lançar automaticamente o que se repete — renda, salário, subscrições. Aparecem sozinhas na data marcada.",
@@ -3595,6 +3631,15 @@
       var raiz = document.documentElement;
       var tb = document.querySelector(".topbar");
       if (tb) raiz.style.setProperty("--topo", Math.round(tb.getBoundingClientRect().height)+"px");
+      // Alturas das peças presas. Medem-se em vez de se estimarem porque mudam com a largura da
+      // janela (a barra de filtros perde e ganha linhas) e com a vista.
+      var rta = document.getElementById("rtaWrap");
+      raiz.style.setProperty("--rta", (rta ? Math.round(rta.getBoundingClientRect().height) : 0)+"px");
+      var faixa = document.querySelector(".presos");
+      raiz.style.setProperty("--presos", (faixa ? Math.round(faixa.getBoundingClientRect().height) : 0)+"px");
+      // A linha de totais do orçamento pára debaixo do cabeçalho da própria tabela, e não do topo.
+      var cab = document.querySelector("table.budget thead th");
+      if (cab) raiz.style.setProperty("--cabec", Math.round(cab.getBoundingClientRect().height)+"px");
       // No telemóvel, a altura que a lista pode ocupar não pode ser um palpite: mede-se onde a
       // tabela começa e quanto ocupa a barra de baixo, senão as últimas linhas ficavam
       // escondidas por trás dela — e como quem desliza é o cartão, nunca se lá chegava.
@@ -3612,6 +3657,12 @@
         // A altura que o ecrã tem MESMO. O visualViewport é o único que desconta as barras que
         // o navegador põe por cima da página; o innerHeight fica para quem o não tenha.
         var visivel = (window.visualViewport && window.visualViewport.height) || window.innerHeight || 0;
+        // Num ecrã baixo, prender tudo deixaria a lista com quatro linhas. O telemóvel deitado
+        // conhece-se pela proporção, que o zoom da página não distorce (ver a regra das
+        // disposições); uma janela genuinamente baixa conhece-se pela altura medida.
+        var larg = window.innerWidth || 0, alt2 = window.innerHeight || 1;
+        var deitadoFone = TOQUE && (larg / alt2) >= 1.9;
+        document.body.classList.toggle("sem-presos", deitadoFone || visivel < 560);
         if (visivel > 0) {
           var alt = Math.round(visivel - (acima + hb + 18));
           raiz.style.setProperty("--lista", Math.max(150, alt) + "px");
@@ -4600,7 +4651,8 @@
         '<li><b>Total do mês:</b> por cima das colunas, a soma do <b>Atribuído</b>, da <b>Atividade</b> e do <b>Disponível</b>. As categorias de <b>pagamento de cartão</b> ficam de fora das três: a atividade delas é o espelho positivo do que se gastou — 50 € de mercearia no cartão dão −50 na Mercearia e +50 no cartão — e somá-las daria zero, como se não se tivesse gasto nada. Os valores do cartão continuam na linha do grupo dele.</li>'+
         '<li><b>Vários orçamentos</b> (na barra lateral, ou no botão com o nome do orçamento no cabeçalho, no telemóvel): pode ter um <b>Pessoal</b> e um <b>Família</b>, por exemplo. Cada um é <b>completamente separado</b> — contas, categorias e transações próprias — e troca-se com um toque. Se sincroniza, vão <b>todos no mesmo gist</b>; só há uma coisa a saber: se editar orçamentos <b>diferentes</b> em aparelhos diferentes antes de sincronizar, a aplicação pergunta qual manter, como faria com qualquer conflito.</li>'+
         '<li><b>A barra de filtros do Orçamento encolhe com a janela.</b> À medida que o espaço aperta, os nomes dos botões vão desaparecendo pela ordem em que fazem menos falta — fica o símbolo, e o rato por cima diz sempre o que é. Se estreitar mesmo muito, a aplicação passa à vista de telemóvel, com o menu em baixo. É de propósito: assim a barra nunca se parte em duas linhas.</li>'+
-        '<li><b>O cabeçalho das listas fica à vista:</b> ao descer uma lista de transações, os nomes das colunas — Data, Beneficiário, Categoria… — ficam colados ao topo, para saber sempre o que está a ler. No telemóvel, como a tabela é mais larga do que o ecrã, é a <b>lista</b> que corre dentro da sua própria área em vez da página inteira.</li>'+
+        '<li><b>Os comandos ficam presos em cima e não fogem do ecrã.</b> Ao descer uma lista, mantêm-se à vista os <b>botões</b>, os <b>filtros</b> e o <b>resumo</b> do que se está a ver — só os dados correm. No <b>Orçamento</b> fica também o <b>Pronto a atribuir</b> e a linha de <b>Total do mês</b>; nas <b>Transações</b> e nas <b>Recorrentes</b>, o cabeçalho da lista — Data, Beneficiário, Categoria… Num ecrã baixo, como o <b>telemóvel deitado</b>, a faixa volta a correr com a página: presa, sobrariam quatro linhas de lista.</li>'+
+        '<li><b>No telemóvel, quem corre é a lista</b>, dentro da sua própria área, e não a página — nas Transações e nas Recorrentes, onde a tabela é mais larga do que o ecrã e se puxa também para o lado. Nas <b>Contas</b> é ao contrário: há <b>dois cartões</b> — contas de orçamento, e cartões e acompanhamento — e corre a página, para se poder chegar ao segundo.</li>'+
         '<li><b>Os valores mostram-se sempre por extenso</b> — <b>8,50</b> e não <b>8,5</b>, <b>1.234,50</b> e não <b>1234,5</b> — em todos os campos, alinhados à direita. Ao escrever pode usar o formato que lhe der jeito: <b>8,5</b>, <b>8.50</b> ou <b>1234,50</b>.</li>'+
         '<li><b>Contas nos campos de dinheiro:</b> em qualquer campo de valor pode escrever a conta em vez do total — <b>23,45+11,90+7,15</b>. O resultado aparece por baixo enquanto escreve e substitui a conta assim que sai do campo. No <b>telemóvel</b> aparece um <b>teclado próprio</b> com <b>+</b> e <b>−</b>, sem letras nem risco de enganos. Num par <b>Saída/Entrada</b>, um <b>−</b> escrito no princípio do campo continua a passar o valor para o outro lado; depois de números, é uma subtração.</li>'+
         '<li><b>Datas e teclado:</b> as datas escrevem-se sempre em <b>dd/mm/aaaa</b>, mesmo que tenha o browser noutro idioma — pode escrever só os números, que as barras aparecem sozinhas, ou usar o 📅 para as escolher no calendário. Dentro de qualquer janela, o <b>Enter</b> vale por carregar no botão principal.</li>'+
@@ -4716,6 +4768,10 @@
       // Regra de escrita: UMA frase diz o que mudou; no m\u00e1ximo mais uma diz porqu\u00ea, e s\u00f3 quando
       // o porqu\u00ea muda a forma de usar. O relato detalhado de como se l\u00e1 chegou vive nos
       // coment\u00e1rios do c\u00f3digo e nos requisitos \u2014 aqui rouba a vista ao que interessa.
+      ver("1.61", "agosto 2026", [
+        'Os <b>comandos deixaram de fugir do ecrã</b> ao descer uma lista. Ficam presos em cima os botões, os filtros e o resumo do que se está a ver — no <b>Orçamento</b> tamb\u00e9m o «Pronto a atribuir» e a <b>linha de totais</b>, e nas <b>Transa\u00e7\u00f5es</b> e <b>Recorrentes</b> o cabe\u00e7alho da lista. Num ecr\u00e3 baixo, como o telem\u00f3vel deitado, a faixa volta a correr para n\u00e3o sufocar a lista.',
+        'No ecr\u00e3 <b>Contas</b>, os dois cart\u00f5es \u2014 contas de or\u00e7amento e cart\u00f5es/acompanhamento \u2014 deixaram de ter deslize pr\u00f3prio. Desliza a p\u00e1gina, e cada cabe\u00e7alho prende-se \u00e0 vez.',
+      ])+
       ver("1.60", "agosto 2026", [
         'As <b>Novidades</b> foram reescritas mais curtas: cada entrada diz <b>o que mudou</b>, e o porquê só quando muda a maneira de usar. Eram sete mil caracteres de justificações; o relato detalhado vive nos comentários do código.',
       ])+
