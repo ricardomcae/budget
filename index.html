@@ -631,7 +631,7 @@
   /* Barras dos relatórios */
   .report-block { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; box-shadow: var(--shadow); margin-bottom: 20px; }
   .report-block h3 { margin: 0 0 16px; font-size: 15px; }
-  .bar-row { display: grid; grid-template-columns: 150px 1fr 90px; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .bar-row { display: grid; grid-template-columns: 196px 1fr 90px; align-items: center; gap: 12px; margin-bottom: 10px; }
   .bar-row .b-name { font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .bar-track { background: var(--surface-2); border-radius: 6px; height: 22px; overflow: hidden; position: relative; }
   .bar-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--primary), var(--accent2)); min-width: 2px; }
@@ -773,6 +773,7 @@
      chip do cabeçalho é só de telemóvel — como o resto do bloco .topbar-actions. */
   .bud-chip #budNameM, .bud-chip .caret { display: inline; }
   .so-fone { display: none; }
+  .rep-per .rot { display: block; line-height: 1.15; }
   .so-fone-btn { display: none; }
   button { -webkit-tap-highlight-color: transparent; }
 
@@ -998,7 +999,7 @@
     .modal { max-width: 100%; }
     .toolbar { gap: 8px; }
     .toolbar .search { min-width: 140px; flex: 1; }
-    .bar-row { grid-template-columns: 88px 1fr 80px; }
+    .bar-row { grid-template-columns: 116px 1fr 80px; }
     .bar-val { white-space: nowrap; }
     .kpi-grid { grid-template-columns: 1fr 1fr; }
     .kpi { padding: 14px 12px; }
@@ -1236,7 +1237,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.70";
+  var APP_VERSION = "1.72";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -3518,7 +3519,10 @@
     var net = round2(totalIn - totalOut);
 
     var repPer = [1,3,6,12,24].map(function(nn){
-      return '<button data-action="report-months" data-id="'+nn+'" class="'+((!customPer&&nMonths===nn)?'active':'')+'">'+nn+'<span class="rot"> '+(nn===1?'mês':'meses')+'</span><span class="so-fone">m</span></button>';
+      // O rótulo em linha própria: o «1 mês» cabia todo numa linha e os restantes partiam em
+      // duas, e cinco botões lado a lado com alturas de texto diferentes lê-se mal. No telemóvel
+      // não se aplica — ali o rótulo dá lugar ao «m», que cabe folgado.
+      return '<button data-action="report-months" data-id="'+nn+'" class="rep-per '+((!customPer&&nMonths===nn)?'active':'')+'">'+nn+'<span class="rot">'+(nn===1?'mês':'meses')+'</span><span class="so-fone">m</span></button>';
     }).join("");
     var blocoPeriodo = '<div class="report-block" style="padding:14px 18px;margin-bottom:18px;">'+
       '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">'+
@@ -3537,9 +3541,26 @@
 
     // ---------- Despesa por categoria ----------
     var arr = Object.keys(spend).map(function(k){return {name:k,val:spend[k]};}).sort(function(a,b){return b.val-a.val;});
-    var maxV = arr.length ? arr[0].val : 1;
+    // Num orçamento com trinta ou quarenta categorias, a lista inteira não se lê: o que interessa
+    // são as que pesam, e a cauda só rouba altura. Ficam as REP_TOP maiores e as restantes juntam-se
+    // numa linha, sempre a última — mesmo quando a soma delas dá uma barra maior do que algumas
+    // acima, porque é um somatório e não uma categoria, e trocá-la de sítio faria parecer que era.
+    // Só se agrupa a partir de DUAS: uma «Outras» com uma categoria dentro esconde-lhe o nome sem
+    // poupar linha nenhuma.
+    var REP_TOP = 15;
+    if (arr.length > REP_TOP + 1) {
+      var resto = arr.slice(REP_TOP), soma = 0;
+      for (var ri=0; ri<resto.length; ri++) soma = round2(soma + resto[ri].val);
+      arr = arr.slice(0, REP_TOP);
+      arr.push({ name:"Outras "+resto.length+" categorias", val:soma,
+                 detalhe: resto.map(function(r){ return r.name+" "+fmt(r.val); }).join(" · ") });
+    }
+    // O máximo tem de contar com a linha das restantes: sendo uma soma, pode ser a maior de todas,
+    // e as barras acima passariam dos 100% da régua.
+    var maxV = 1;
+    for (var mi=0; mi<arr.length; mi++) maxV = Math.max(maxV, arr[mi].val);
     var bars = arr.length ? arr.map(function(x){
-      return '<div class="bar-row"><div class="b-name" title="'+esc(x.name)+'">'+esc(x.name)+'</div>'+
+      return '<div class="bar-row"><div class="b-name" title="'+esc(x.detalhe||x.name)+'">'+esc(x.name)+'</div>'+
         '<div class="bar-track"><div class="bar-fill" style="width:'+Math.max(2,(x.val/maxV)*100)+'%"></div></div>'+
         '<div class="bar-val">'+fmt(x.val)+'</div></div>';
     }).join("") : '<div class="muted" style="padding:8px 0;">Sem despesas registadas neste período.</div>';
@@ -4040,7 +4061,7 @@
           '<option value="refill" id="catFundRefill"'+(curFund==="refill"?" selected":"")+'>Repor até este valor — acrescenta só o que falta</option>'+
           '<option value="setAside" id="catFundSetAside"'+(curFund==="setAside"?" selected":"")+'>Reservar este valor todos os meses — mesmo que já o tenha</option>'+
         '</select><div class="hint" id="catFundHint" style="margin-top:6px;"></div></div>'+
-        '<div class="hint" id="catTargetHint" style="margin-top:-6px;"></div>'+
+        '<div class="field"><div class="hint" id="catTargetHint" style="margin-top:-6px;"></div></div>'+
         (editing?'<div class="field" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;">'+
           '<label>Deixar de usar esta categoria</label>'+
           '<div style="display:flex;gap:8px;">'+
@@ -4115,8 +4136,11 @@
         '<div style="font-weight:700;font-size:13px;">'+titulo+'</div>'+corpo+'</div>';
     }
     function acao(html){ return '<div class="field">'+html+'</div>'; }
+    // O .field não é aqui decoração: é dele que a nota apanha o tamanho pequeno (ver .field .hint).
+    // Sem ele a frase de apoio sai do tamanho do corpo do texto e passa a pesar mais do que o
+    // próprio título da secção, que é o contrário do que se quer.
     function seccao(t, sub){
-      return '<div style="margin:22px 0 10px;"><div style="font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);">'+t+'</div>'+
+      return '<div class="field" style="margin:22px 0 10px;"><div style="font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);">'+t+'</div>'+
         (sub?'<div class="hint" style="margin-top:3px;">'+sub+'</div>':'')+'</div>';
     }
     openModal(
@@ -4247,13 +4271,17 @@
           // se sentir do que depois.
           var nTx = state.transactions.length;
           var muitas = nTx >= 6000;
-          return '<div class="hint" id="zonaEspaco" style="border-top:1px solid var(--border);padding-top:10px;margin-top:18px;">'+
+          // A nota do espaço é do mesmo tipo das outras deste ecrã — apoio, não título — e tem
+          // de ser do mesmo tamanho. Ficava grande por a regra do .hint pedir um .field à volta,
+          // que este bloco não tinha: sozinha no meio do ecrã, a nota parecia mais importante do
+          // que os botões a que se refere.
+          return '<div class="field"><div class="hint" id="zonaEspaco" style="border-top:1px solid var(--border);padding-top:10px;margin-top:18px;">'+
             'Este orçamento tem <b>'+nTx.toLocaleString("pt-PT")+'</b> transaç'+(nTx===1?'ão':'ões')+'.<br>'+
             'Espaço usado: <b>'+mb(e.total)+
             '</b> de cerca de 5 MB (orçamento '+mb(e.dados)+' · lista do histórico '+mb(e.hist)+').<br>'+
             (muitas ? '<span style="color:var(--warning);font-weight:600;">⚠️ A partir daqui a aplicação começa a ficar mais lenta a cada toque. '+
               'Quando lhe der jeito: guarde uma <b>cópia em ficheiro</b> (fica com o histórico todo), exporte a <b>configuração dos alvos</b>, crie um orçamento novo com as contas no saldo de hoje e importe lá essa configuração. Fica com tudo o que interessa e sem o peso do que já passou.</span><br>' : '')+
-            '<span id="zonaExtra" class="muted">a verificar o resto…</span></div>'; })()+
+            '<span id="zonaExtra" class="muted">a verificar o resto…</span></div></div>'; })()+
       '</div>'+
       '<div class="modal-foot"><span class="muted" style="font-size:12px;">Orçamento base-zero · <a href="#" data-action="changelog" style="color:var(--primary);cursor:pointer;">Versão '+APP_VERSION+' — novidades</a></span><button class="btn" data-action="close">Fechar</button></div>');
     // Estado real do armazenamento — as duas coisas que não se veem de outra forma: se os
@@ -4430,16 +4458,23 @@
       '<div class="modal-foot"><span></span><button class="btn" data-action="close">Continuar sem guardar</button></div>');
   }
 
-  function payeesModal(){
+  // Ordem à escolha, guardada entre visitas. Em qualquer delas o nome desempata, para a lista
+  // não dançar entre beneficiários com a mesma contagem ou a mesma data.
+  // Função própria porque a exportação tem de sair pela MESMA ordem que se está a ver: uma
+  // segunda cópia da ordenação divergia desta à primeira alteração que só uma delas recebesse.
+  function ordemPayees(){
     var idx = payeeIndex(), arr = [];
     for (var k in idx) if (idx.hasOwnProperty(k)) arr.push({ k:k, e:idx[k] });
-    // Ordem à escolha, guardada entre visitas. Em qualquer delas o nome desempata, para a lista
-    // não dançar entre beneficiários com a mesma contagem ou a mesma data.
     var ordem = state.ui.payeeSort || "usados";
     var porNome = function(a,b){ return a.e.name.localeCompare(b.e.name, "pt", {sensitivity:"base"}); };
     arr.sort(ordem==="recentes" ? function(a,b){ return (a.e.lastDate<b.e.lastDate?1:(a.e.lastDate>b.e.lastDate?-1:0)) || porNome(a,b); }
            : ordem==="nome"     ? porNome
            :                      function(a,b){ return b.e.count-a.e.count || porNome(a,b); });
+    return arr;
+  }
+  function payeesModal(){
+    var arr = ordemPayees();
+    var ordem = state.ui.payeeSort || "usados";
 
     var corpo;
     if (!arr.length) {
@@ -4481,7 +4516,12 @@
         'Mudar um nome altera <b>todas</b> as transações e regras onde aparece. Se lhe der um nome que já existe, os dois <b>juntam-se</b> num só — é assim que se corrige um «Continemte» ou se unificam variantes.</p>'+
         corpo+
       '</div>'+
-      '<div class="modal-foot"><span class="muted" style="font-size:12px;">'+arr.length+' beneficiário'+(arr.length===1?'':'s')+'</span><button class="btn" data-action="close">Fechar</button></div>');
+      // O botão fica junto à contagem, que é onde se está a olhar para a lista. Escondido no
+      // telemóvel pela mesma razão que o «Exportar o que vejo» das Transações: guardar ficheiros
+      // é trabalho de computador, e a barra do telemóvel não tem largura a perder.
+      '<div class="modal-foot"><span class="muted" style="font-size:12px;">'+arr.length+' beneficiário'+(arr.length===1?'':'s')+
+        (arr.length?' <button class="btn sm hide-phone" data-action="export-payees-csv" title="Guardar num .csv os beneficiários que estão à vista, com a ordem e o filtro do ecrã">⬇ Exportar</button>':'')+
+        '</span><button class="btn" data-action="close">Fechar</button></div>');
   }
 
   function renamePayeeModal(k){
@@ -4773,7 +4813,7 @@
         '<li><b>Trazer e levar</b>, em <b>Dados e cópias</b>, tem duas gavetas simétricas: <b>⬇ Importar</b> e <b>⬆ Exportar</b>, cada uma com as mesmas coisas pela mesma ordem — primeiro a <b>configuração dos alvos</b> (a «planta»), depois as <b>transações</b>. O que sai de um lado é o que entra do outro.</li>'+
         '<li><b>Importar transações</b> do banco: as linhas que já existem são detetadas e saltadas.</li>'+
         '<li><b>Importar a configuração dos alvos</b> (em <b>Dados e cópias → Trazer e levar</b>) lê o mesmo ficheiro que sai em <b>Exportar → Configuração dos alvos</b> e reconstrói grupos, categorias, alvos, prioridades e notas — de outro orçamento seu, ou do mesmo noutra altura. <b>Não apaga nada:</b> as categorias que já tem <b>mantêm as transações e o dinheiro</b> e só lhes muda o alvo; as que faltam são criadas; as suas que não venham no ficheiro ficam como estão. Uma categoria é reconhecida pelo <b>grupo mais o nome</b>, por isso «Luz» em «Casa» e «Luz» em «Escritório» são duas coisas diferentes, como sempre foram. Mostra tudo o que vai fazer <b>antes</b> de mexer, e o <b>↩ Anular</b> desfaz a importação inteira num passo.</li>'+
-        '<li><b>Exportar para folha de cálculo</b> (no computador): o <b>⬇ Exportar o que vejo</b>, nas Transações, guarda exatamente as linhas que estão à vista — com os filtros e a conta que tiver ligados. Para o orçamento inteiro, sem filtros, é em <b>Dados e cópias</b>. Nenhum deles sai do orçamento aberto, e um <b>.csv não é cópia de segurança</b> — não repõe nada.</li>'+
+        '<li><b>Exportar para folha de cálculo</b> (no computador): o <b>⬇ Exportar o que vejo</b>, nas Transações, guarda exatamente as linhas que estão à vista — com os filtros e a conta que tiver ligados. O <b>⬇ Exportar</b> dos <b>🏷 Beneficiários</b> faz o mesmo com a lista de nomes: um por linha, com as transações, o total, a média, a primeira e a última vez e as categorias em que entrou — pela ordem que escolheu e só os que o filtro deixa ver. Para o orçamento inteiro, sem filtros, é em <b>Dados e cópias</b>. Nenhum deles sai do orçamento aberto, e um <b>.csv não é cópia de segurança</b> — não repõe nada.</li>'+
       '</ul>'+
 
       sec("Se algo não bater certo")+
@@ -4837,6 +4877,16 @@
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.72", "agosto 2026", [
+        'Os <b>🏷 Beneficiários</b> ganharam um <b>⬇ Exportar</b>, ao lado da contagem: um por linha, com as transações, o total, a média, a primeira e a última vez e as categorias em que entrou. Sai pela ordem que escolheu e só os que o filtro deixa ver. No computador, como as outras exportações.',
+        'Nos <b>Relatórios</b>, trocar o período — de 6 para 12 meses, por exemplo — deixou de atirar a página para cima. Quem está a olhar para o gráfico de baixo é justamente quem quer comparar os dois.',
+      ])+
+      ver("1.71", "agosto 2026", [
+        'No gráfico <b>Despesa por categoria</b>, ficam as <b>15 maiores</b> e as restantes juntam-se numa linha «Outras», sempre a última — mesmo quando a soma delas dá uma barra maior. Passar por cima dela mostra o que lá está dentro.',
+        'Nesse gráfico, os <b>nomes das categorias</b> ganharam espaço e truncam mais tarde.',
+        'No ecrã <b>Dados e cópias</b>, a nota do espaço ocupado e os textos por baixo dos títulos das secções ficaram do tamanho das outras notas — estavam do tamanho do corpo do texto e pareciam mais importantes do que os botões a que se referem.',
+        'No computador, os botões de período dos <b>Relatórios</b> partem todos da mesma maneira: o número em cima e «mês»/«meses» por baixo.',
+      ])+
       ver("1.70", "agosto 2026", [
         'No <b>Orçamento</b>, mudar de mês deixou de atirar a lista para cima: fica-se nas mesmas categorias, que é o que se quer comparar de um mês para o outro. Com filtros ligados continua a começar do princípio — aí a lista muda mesmo de um mês para o outro.',
       ])+
@@ -5857,8 +5907,11 @@
     },
     "show-more-tx": function(){ state.ui.txLimit=(state.ui.txLimit||PAGINA)+PAGINA; save(); render(); },
     "report-toggle-cat": function(id){ var arr=(state.reportCats||[]).slice(); var i=arr.indexOf(id); if(i>=0) arr.splice(i,1); else arr.push(id); state.reportCats=arr; _manterPos=true; save(); render(); },
-    "report-months": function(id){ state.ui.reportMonths=parseInt(id,10)||6; state.ui.reportFrom=null; state.ui.reportTo=null; save(); render(); },
-    "report-clear-range": function(){ state.ui.reportFrom=null; state.ui.reportTo=null; save(); render(); },
+    // Mudar o período muda os NÚMEROS, não o ecrã: os mesmos blocos, pela mesma ordem. Quem
+    // está a olhar para o gráfico lá de baixo está a comparar seis meses com doze, e ir ao topo
+    // a cada toque obriga a descer outra vez para ver o efeito do que acabou de carregar.
+    "report-months": function(id){ _manterPos=true; state.ui.reportMonths=parseInt(id,10)||6; state.ui.reportFrom=null; state.ui.reportTo=null; save(); render(); },
+    "report-clear-range": function(){ _manterPos=true; state.ui.reportFrom=null; state.ui.reportTo=null; save(); render(); },
     "report-mode": function(id){ state.ui.reportMode=(id==="atribuido"?"atribuido":"gasto"); _manterPos=true; save(); render(); },
 
     "add-group": function(){ groupModal(); },
@@ -6297,6 +6350,7 @@
     "export-view-csv": exportViewCSV,
     "export-budget-csv": exportBudgetCSV,
     "export-config-csv": exportBudgetConfigCSV,
+    "export-payees-csv": exportPayeesCSV,
     "copia-ok": function(){ closeModal(); concluirCopia(false); },
     "copia-falhou": function(){ closeModal(); toast("A cópia não foi marcada como feita — tente outra vez."); },
     "backup-now": function(){ exportJSON(); },
@@ -7161,6 +7215,45 @@
     if (de || ate) partes.push((de||"inicio") + "_a_" + (ate||todayISO()));
     guardarFicheiro(partes.filter(Boolean).join("-") + ".csv", "﻿"+linhasTx(lista), "text/csv;charset=utf-8",
       function(){ toast(lista.length + (lista.length===1 ? " transação exportada" : " transações exportadas") + " — só o que estava à vista."); });
+  }
+  // Beneficiários para folha de cálculo. Vive aqui e não em «Trazer e levar» pela mesma razão
+  // que o «Exportar o que vejo» das Transações vive no ecrã das transações: exporta a lista TAL
+  // COMO ESTÁ — com o filtro escrito e a ordem escolhida. Fora do ecrã não havia filtro nem
+  // ordem para respeitar, e o ficheiro seria outro.
+  // As contas não vêm do índice de beneficiários (que só guarda a contagem e a última data):
+  // uma passagem pelas transações dá o que o 📊 de cada um mostra, e é esse o ficheiro que se
+  // espera — a mesma informação, para todos de uma vez.
+  function exportPayeesCSV(){
+    var idx = payeeIndex(), tot = {};
+    for (var i=0;i<state.transactions.length;i++){
+      var t = state.transactions[i];
+      if (t.transfer || isOpening(t)) continue;
+      var k = payeeKey((t.payee||"").trim()); if(!k) continue;
+      var e = tot[k] || (tot[k] = { gasto:0, recebido:0, cats:{}, primeira:"" });
+      e.gasto = round2(e.gasto + (t.outflow||0));
+      e.recebido = round2(e.recebido + (t.inflow||0));
+      if (!e.primeira || t.date < e.primeira) e.primeira = t.date;
+      var cn = t.categoryId===INCOME ? "Rendimento" : (t.categoryId ? ((categoryById(t.categoryId)||{name:""}).name) : "");
+      if (cn) e.cats[cn] = (e.cats[cn]||0) + 1;
+    }
+    // A ordem do ficheiro é a do ecrã, e o filtro escrito também conta: o que está à vista é o
+    // que sai. Sem linhas à vista não se exporta um ficheiro vazio — diz-se porquê.
+    var lista = ordemPayees();
+    var f = el("pyFilter"), qk = f ? payeeKey(f.value) : "";
+    if (qk) lista = lista.filter(function(x){ return x.k.indexOf(qk) >= 0; });
+    if (!lista.length) { toast("Não há beneficiários à vista para exportar."); return; }
+    function n(x){ return round2(x||0).toFixed(2).replace(".", ","); }
+    var rows = [["Beneficiário","Transações","Total gasto","Total recebido","Média por transação","Primeira vez","Última vez","Categorias"]];
+    for (var j=0;j<lista.length;j++){
+      var x = lista[j], e2 = tot[x.k] || { gasto:0, recebido:0, cats:{}, primeira:"" };
+      var cats = Object.keys(e2.cats).sort(function(a,b){ return e2.cats[b]-e2.cats[a] || a.localeCompare(b,"pt"); });
+      rows.push([x.e.name, x.e.count, n(e2.gasto), n(e2.recebido),
+                 n(x.e.count ? e2.gasto/x.e.count : 0), e2.primeira||"", x.e.lastDate||"", cats.join(" · ")]);
+    }
+    var csv = rows.map(function(r){ return r.map(function(c){ var v=String(c); return /[",;\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }).join(";"); }).join("\n");
+    guardarFicheiro("beneficiarios-" + limpaNome(budgetName(_bindex.active)) + "-" + todayISO() + ".csv",
+      "\ufeff"+csv, "text/csv;charset=utf-8",
+      function(){ toast(lista.length + (lista.length===1 ? " beneficiário exportado" : " beneficiários exportados") + (qk ? " — só os que estavam à vista." : ".")); });
   }
   function exportCSV() {
     var csv = linhasTx(state.transactions);
@@ -8337,8 +8430,8 @@
     if (e.target.id==="txFilterFrom"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.from=ptParaIso(e.target.value)||null; render(); }
     if (e.target.id==="txFilterTo"){ state.ui.txFilter=state.ui.txFilter||{}; state.ui.txFilter.to=ptParaIso(e.target.value)||null; render(); }
     if (e.target.id==="txFilterPer"){ state.ui.txFilter=state.ui.txFilter||{}; var pv=e.target.value; state.ui.txFilter.per=pv||null; if(pv!=="custom"){ state.ui.txFilter.from=null; state.ui.txFilter.to=null; } render(); }
-    if (e.target.id==="repFrom"){ state.ui.reportFrom=e.target.value||null; if(state.ui.reportFrom&&!state.ui.reportTo) state.ui.reportTo=state.ui.month; render(); }
-    if (e.target.id==="repTo"){ state.ui.reportTo=e.target.value||null; if(state.ui.reportTo&&!state.ui.reportFrom) state.ui.reportFrom=shiftMonth(state.ui.reportTo,-5); render(); }
+    if (e.target.id==="repFrom"){ _manterPos=true; state.ui.reportFrom=e.target.value||null; if(state.ui.reportFrom&&!state.ui.reportTo) state.ui.reportTo=state.ui.month; render(); }
+    if (e.target.id==="repTo"){ _manterPos=true; state.ui.reportTo=e.target.value||null; if(state.ui.reportTo&&!state.ui.reportFrom) state.ui.reportFrom=shiftMonth(state.ui.reportTo,-5); render(); }
   });
   document.addEventListener("keydown", function(e){
     if (e.key==="Enter" && e.target.closest("[data-assign]")) { e.target.blur(); }
