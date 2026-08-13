@@ -1242,7 +1242,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.73";
+  var APP_VERSION = "1.74";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -3229,6 +3229,19 @@
       for (var gcj=0; gcj<gcs.length; gcj++) catOpts += '<option value="'+gcs[gcj].id+'"'+(f.category===gcs[gcj].id?" selected":"")+'>'+esc(gcs[gcj].name)+'</option>';
       catOpts += '</optgroup>';
     }
+    // Rede de segurança, a mesma que o gráfico dos Relatórios tem: uma categoria cujo grupo
+    // tenha desaparecido não pode sumir-se da caixa. Se estiver a filtrar por ela, a caixa
+    // passava a mostrar «Todas as categorias» com o filtro ligado — a dizer o contrário do
+    // que estava a fazer.
+    var jaLa = {};
+    for (var jg=0; jg<state.groups.length; jg++)
+      categoriesOfGroup(state.groups[jg].id).forEach(function(c){ jaLa[c.id]=true; });
+    var catSemGrupo = state.categories.filter(function(c){ return !c.cardId && !c.hidden && !jaLa[c.id]; });
+    if (catSemGrupo.length){
+      catOpts += '<optgroup label="Sem grupo">';
+      for (var sgi=0; sgi<catSemGrupo.length; sgi++) catOpts += '<option value="'+catSemGrupo[sgi].id+'"'+(f.category===catSemGrupo[sgi].id?" selected":"")+'>'+esc(catSemGrupo[sgi].name)+'</option>';
+      catOpts += '</optgroup>';
+    }
     var catArq = state.categories.filter(function(c){ return c.hidden && !c.cardId; });
     if (catArq.length){
       catOpts += '<optgroup label="Arquivadas">';
@@ -4775,7 +4788,8 @@
         '<li><b>O período escolhe-se em cima</b> e vale para o ecrã todo: <b>1, 3, 6, 12 ou 24 meses</b> a contar do mês em vista, ou um intervalo à medida (<b>de</b> / <b>até</b>, só no computador).</li>'+
         '<li><b>Os quatro números de topo</b> — Rendimento, Despesa, Resultado e Património no fim — são do período escolhido. O <b>património</b> é tudo o que tem menos tudo o que deve, e conta também as contas de <b>acompanhamento</b>, que ficam de fora do orçamento.</li>'+
         '<li><b>Um reembolso abate à despesa</b>, em vez de contar como rendimento. Devolveu metade de uma compra? A categoria mostra só o que ficou por gastar. Rendimento é apenas o que entra pela categoria «Rendimento»; transferências entre contas suas não são nem uma coisa nem outra.</li>'+
-        '<li><b>A evolução por categoria</b>, no fim, põe lado a lado as categorias que escolher, ao longo dos meses: escolhem-se nas <b>bolinhas</b> por baixo do gráfico, que aparecem pela mesma ordem do ecrã <b>Orçamento</b>, e a cor de cada uma acompanha-a. Se nunca escolheu nenhuma, a aplicação propõe as de maior despesa.</li>'+
+        '<li><b>A despesa por categoria</b> mostra as <b>15 maiores</b> do período; as restantes somam-se numa linha <b>«Outras N categorias»</b>, sempre no fim — mesmo quando a soma delas dá uma barra maior do que alguma acima, porque é um total e não uma categoria. No computador, o rato por cima dela diz quais são e quanto vale cada uma.</li>'+
+      '<li><b>A evolução por categoria</b>, no fim, põe lado a lado as categorias que escolher, ao longo dos meses: escolhem-se nas <b>bolinhas</b> por baixo do gráfico, que aparecem pela mesma ordem do ecrã <b>Orçamento</b>, e a cor de cada uma acompanha-a. Se nunca escolheu nenhuma, a aplicação propõe as de maior despesa.</li>'+
         '<li><b>Gasto ou Atribuído:</b> o mesmo gráfico lê-se de duas maneiras — o que <b>saiu de facto</b> em cada mês, ou o que <b>pôs lá</b> em cada mês. Ver os dois é a maneira mais rápida de perceber se um alvo está bem calibrado.</li>'+
         '<li><b>As categorias escolhidas acompanham o orçamento</b> e chegam aos outros aparelhos. O <b>período</b> e o modo <b>Gasto/Atribuído</b> ficam em cada aparelho, como o mês em que está.</li>'+
       '</ul>'+
@@ -4810,7 +4824,7 @@
         '<li><b>Campos de valor:</b> algarismos e um separador decimal. Em <b>Saída/Entrada</b>, o «-» troca de lado.</li>'+
         '<li><b>Notas nas transações:</b> têm coluna própria em qualquer ecrã — no telemóvel, estreita e cortada com «…», o suficiente para saber do que se trata. A nota completa vê-se ao passar o rato por cima ou abrindo a transação.</li>'+
         '<li><b>Procurar:</b> o campo no topo das Transações procura <b>apenas</b> no <b>beneficiário</b> e na <b>nota</b> — não procura em categorias, valores nem datas, que têm filtros próprios ao lado. Basta parte da palavra, e maiúsculas ou minúsculas é igual. Cruza-se com os filtros de conta, categoria e período («Confeitaria» + <i>este ano</i> + conta X).</li>'+
-        '<li><b>🏷️ Beneficiários:</b> mudar um nome altera todas as transações; dar-lhe um nome que já existe <b>junta</b> os dois. O <b>📊 Ver</b> mostra tudo o que gastou nesse beneficiário — total, número de vezes, média e em que categorias entrou. Como é a lista de transações normal, pode juntar-lhe um <b>período</b> para ver só um ano, e editar as transações a partir dali.</li>'+
+        '<li><b>🏷️ Beneficiários:</b> mudar um nome altera todas as transações; dar-lhe um nome que já existe <b>junta</b> os dois. O <b>📊 Ver</b> mostra tudo o que gastou nesse beneficiário — total, número de vezes, média e em que categorias entrou. Como é a lista de transações normal, pode juntar-lhe um <b>período</b> para ver só um ano, e editar as transações a partir dali. No computador, o <b>⬇ Exportar</b> ao lado da contagem guarda a lista toda num <b>.csv</b>, com a ordem e o filtro que tiver.</li>'+
       '</ul>'+
 
       sec("Trazer e levar")+
@@ -4882,6 +4896,10 @@
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.74", "agosto 2026", [
+        'Uma categoria cujo <b>grupo tenha desaparecido</b> deixou de se sumir da caixa «Todas as categorias» das Transações. Se estivesse a filtrar por ela, a caixa passava a dizer «Todas as categorias» com o filtro ligado.',
+        'O <b>❓ Como funciona?</b> passou a explicar as <b>15 maiores</b> da despesa por categoria e o <b>⬇ Exportar</b> dos beneficiários.',
+      ])+
       ver("1.73", "agosto 2026", [
         'No telemóvel, os botões de período dos <b>Relatórios</b> diziam <b>«1 mês m»</b> em vez de <b>«1m»</b> — a forma longa e a curta ao mesmo tempo. Ficou só a curta, como era.',
       ])+
