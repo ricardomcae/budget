@@ -1261,7 +1261,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.75";
+  var APP_VERSION = "1.76";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -3556,6 +3556,16 @@
       if (!noPeriodo[mm]) continue;
       if (t.transfer && !t.categoryId) continue;          // transferência interna não é despesa nem receita
       if (isOpening(t)) continue;                          // saldo inicial não é receita/despesa real
+      // Contas de ACOMPANHAMENTO estão fora do orçamento — é essa a definição delas. Uma comissão
+      // cobrada pela corretora, ou um cashback creditado numa conta de investimento, não são
+      // despesa nem rendimento SEUS: são variação de património, e é no gráfico do património
+      // que já aparecem. Contá-los aqui inflacionava a Despesa com dinheiro que nunca passou
+      // pelas contas do orçamento, e — por estas contas nunca guardarem categoria — juntava-os
+      // todos debaixo de «Sem categoria», onde se misturavam com o caso oposto: uma transação
+      // numa conta de ORÇAMENTO à qual falta categoria, que é um erro e a aplicação avisa disso.
+      // Duas coisas de significado contrário na mesma rubrica.
+      var accT = lkAcc(t.accountId);
+      if (accT && accT.type === "tracking") continue;
       if (t.categoryId === INCOME) { totalIn += (t.inflow||0); porMes[mm].inc += (t.inflow||0); continue; }
       // Uma entrada numa categoria de DESPESA é uma devolução ou um reembolso: abate ao que se
       // gastou nessa categoria, não é rendimento novo. Sem isto, quem devolvesse metade de uma
@@ -4833,7 +4843,7 @@
       sec("Relatórios")+
       '<ul>'+
         '<li><b>O período escolhe-se em cima</b> e vale para o ecrã todo: <b>1, 3, 6, 12 ou 24 meses</b> a contar do mês em vista, ou um intervalo à medida (<b>de</b> / <b>até</b>, só no computador).</li>'+
-        '<li><b>Os quatro números de topo</b> — Rendimento, Despesa, Resultado e Património no fim — são do período escolhido. O <b>património</b> é tudo o que tem menos tudo o que deve, e conta também as contas de <b>acompanhamento</b>, que ficam de fora do orçamento.</li>'+
+        '<li><b>Os quatro números de topo</b> — Rendimento, Despesa, Resultado e Património no fim — são do período escolhido, mas não têm todos o mesmo alcance. O <b>Rendimento</b>, a <b>Despesa</b> e o <b>Resultado</b> são do <b>orçamento</b>: o que se passa nas contas de <b>acompanhamento</b> não entra, porque essas contas estão fora dele — uma comissão da corretora não é uma despesa sua, é o seu património a mudar. O <b>Património no fim</b> é o contrário: tudo o que tem menos tudo o que deve, contas de acompanhamento incluídas.</li>'+
         '<li><b>Saída e Entrada são dois lados</b>, não dois números soltos: se uma conta der negativo, o valor muda de campo e fica positivo. Escrever <b>«4−6»</b> na Entrada guarda uma <b>Saída de 2</b> — é o mesmo dinheiro, dito do lado certo.</li>'+
         '<li><b>Um reembolso abate à despesa</b>, em vez de contar como rendimento. Devolveu metade de uma compra? A categoria mostra só o que ficou por gastar. Rendimento é apenas o que entra pela categoria «Rendimento»; transferências entre contas suas não são nem uma coisa nem outra.</li>'+
         '<li><b>A despesa por categoria</b> conta só o que <b>saiu a mais do que entrou</b>: uma categoria onde devolveu mais do que gastou, ou uma entrada sem categoria, não aparecem — não são despesa. Mostra as <b>15 maiores</b> do período; as restantes somam-se numa linha <b>«Outras N categorias»</b>, sempre no fim — mesmo quando a soma delas dá uma barra maior do que alguma acima, porque é um total e não uma categoria. No computador, o rato por cima dela diz quais são e quanto vale cada uma.</li>'+
@@ -4945,6 +4955,10 @@
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.76", "setembro 2026", [
+        'Nos <b>Relatórios</b>, o que se passa nas <b>contas de acompanhamento</b> deixou de contar como despesa ou rendimento seus. Uma comissão da corretora ou um cashback creditado numa conta de investimento inflacionavam a <b>Despesa</b> com dinheiro que nunca passou pelo orçamento — e, por estas contas não levarem categoria, iam todos parar a «Sem categoria». Continuam a contar no <b>Património</b>, que é onde pertencem.',
+        'Assim, o <b>«Sem categoria»</b> volta a querer dizer uma coisa só: uma transação numa conta de orçamento a que falta a categoria — que é um engano, e continua bem à vista.',
+      ])+
       ver("1.75", "setembro 2026", [
         'Uma conta que dê <b>negativo</b> passa para o outro lado, em positivo: escrever «4−6» na <b>Entrada</b> grava uma <b>Saída de 2</b>. Antes ficava lá uma entrada de −2 e a lista mostrava «+−2,00 €» a verde, como se tivesse entrado dinheiro. O saldo estava certo — o sentido é que não estava.',
         'O <b>diário de movimentos</b> passou a contar para a sincronização. <b>Limpar o diário</b> não mexia em mais nada, e por isso não era detectado como alteração: ficava só neste aparelho. Agora chega aos outros — se o limpar num, fica limpo em todos.',
