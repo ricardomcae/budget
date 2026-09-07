@@ -471,6 +471,11 @@
     text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted);
     padding: 7px 16px; border-top: 1px solid var(--border); }
   table.data tr.mes-sep:first-child td { border-top: 0; }
+  /* Data por chegar: a data esbate-se e ganha um relógio. Não se esbate a LINHA inteira — o
+     valor e o beneficiário continuam a ser o que se vem ler, e apagá-los tornaria a transação
+     difícil de encontrar em vez de a distinguir. */
+  table.data tr.tx-futura > td:first-child { opacity: .55; font-style: italic; }
+  .fut-dot { margin-inline-end: 4px; font-style: normal; opacity: .85; }
   .toolbar .sep { width: 1px; align-self: stretch; background: var(--border); margin: 2px 4px; }
   .target-note { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
   /* Os montantes nunca partem de linha — era o que atirava o «€» para baixo. */
@@ -671,6 +676,20 @@
   .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
   /* Autocomplete de beneficiários — dropdown próprio (o <datalist> não funciona no Safari iOS). */
   .ac-wrap { position: relative; }
+  /* Botão de limpar dos campos de texto livre. Só aparece quando o campo TEM texto: a pista
+     de que se pode apagar não faz falta num campo vazio, e um X em cada campo de um formulário
+     seria ruído. Quem decide é o :placeholder-shown — com o campo vazio o marcador de exemplo
+     está à vista, e a regra apaga o botão. Sem JS nenhum, por isso não há estado para sair do
+     sítio quando a janela se redesenha.
+     (Por isto, todo o campo com X TEM de ter placeholder — ver teste_campo_x.js.) */
+  .campo-x { position: relative; display: block; }
+  .campo-x > input { width: 100%; padding-inline-end: 34px; }
+  .campo-x > .limpa-x { position: absolute; inset-inline-end: 6px; top: 50%; transform: translateY(-50%);
+    border: 0; background: transparent; cursor: pointer; color: var(--text-muted);
+    width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center;
+    font-size: 13px; line-height: 1; padding: 0; }
+  .campo-x > .limpa-x:hover { background: var(--surface-2); color: var(--text); }
+  .campo-x > input:placeholder-shown + .limpa-x { display: none; }
   .ac-list { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-lg); max-height: 244px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
   .ac-item { padding: 10px 12px; font-size: 13.5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
   .ac-item:last-child { border-bottom: 0; }
@@ -1242,7 +1261,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.74";
+  var APP_VERSION = "1.75";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -3105,8 +3124,14 @@
     var balCell = (runBal===undefined) ? '' : '<td class="num" style="font-variant-numeric:tabular-nums;font-weight:600;'+(runBal<-0.005?"color:var(--negative)":"")+'">'+fmt(runBal)+'</td>';
     var accCell = "";
     if (withAccount) { var a=lkAcc(t.accountId); accCell = '<td class="tag" style="white-space:nowrap;">'+esc(a?a.name:"—")+'</td>'; }
-    return '<tr class="hoverable" data-action="edit-tx" data-id="'+t.id+'" style="cursor:pointer;">'+
-      '<td class="muted" style="white-space:nowrap;"><label class="tx-selcell" title="Selecionar (só para somar)"><input type="checkbox" class="tx-sel" data-id="'+t.id+'"'+(_txSel[t.id]?" checked":"")+'></label>'+fmtDate(t.date)+'</td>'+
+    // Uma transação com data que ainda não chegou já conta no Saldo (é dinheiro que a pessoa
+    // sabe que vai sair), mas não aconteceu. Marca-se na própria linha, e não com um separador:
+    // um separador só funciona se as futuras estiverem todas juntas no topo, o que deixa de ser
+    // verdade assim que se ordena ou filtra de outra maneira. A marca viaja com a linha.
+    var futura = t.date > todayISO();
+    return '<tr class="hoverable'+(futura?" tx-futura":"")+'" data-action="edit-tx" data-id="'+t.id+'" style="cursor:pointer;">'+
+      '<td class="muted" style="white-space:nowrap;"><label class="tx-selcell" title="Selecionar (só para somar)"><input type="checkbox" class="tx-sel" data-id="'+t.id+'"'+(_txSel[t.id]?" checked":"")+'></label>'+
+        (futura?'<span class="fut-dot" title="Data ainda por chegar" aria-label="Data ainda por chegar">◷</span>':'')+fmtDate(t.date)+'</td>'+
       accCell +
       '<td style="font-weight:600;">'+esc(t.payee||"")+(t.split?' <span class="tag" title="Transação dividida">🔗</span>':'')+'</td>'+
       '<td>'+catName+'</td>'+
@@ -3116,8 +3141,8 @@
       '<td class="tag col-nota"'+(t.memo?' title="'+esc(t.memo)+'"':'')+'>'+esc(t.memo||"")+'</td>'+
       // Sai a vermelho com −, entra a verde com +. O sinal faz o trabalho principal; a cor
       // é reforço, não é a única pista.
-      '<td class="num">'+(t.outflow ? '<span class="tx-amt out">−'+fmt(t.outflow)+'</span>'
-                        : (t.inflow ? '<span class="tx-amt in">+'+fmt(t.inflow)+'</span>' : ''))+'</td>'+
+      '<td class="num">'+(t.outflow ? '<span class="tx-amt out">'+comSinal(-Math.abs(t.outflow))+'</span>'
+                        : (t.inflow ? '<span class="tx-amt '+(t.inflow<0?"out":"in")+'">'+comSinal(t.inflow)+'</span>' : ''))+'</td>'+
       balCell +
       '<td style="text-align:center;"><span class="cleared-dot '+(t.cleared?"on":"")+'" data-action="toggle-clear" data-id="'+t.id+'" role="button" tabindex="0"'+
         ' title="'+(t.cleared?"Confirmada no banco":"Por confirmar no banco")+'" aria-label="'+(t.cleared?"Confirmada":"Por confirmar")+' — '+esc(t.payee||"sem beneficiário")+'">✓</span></td>'+
@@ -3378,8 +3403,16 @@
         if (Math.abs(pend) > 0.005) {
           // O «nesta conta»/«em todas as contas» só no computador: no telemóvel já se lê no
           // filtro de conta, ali ao lado, e era a peça mais comprida da linha.
-          partes.push('<b class="pend" title="Registado mas ainda não confirmado no banco">Por confirmar: '+fmt(pend)+'</b>'+
-            '<span class="hide-phone"> '+(f.account ? "nesta conta" : "em todas as contas")+'</span>');
+          // O «Por confirmar» é de RECONCILIAÇÃO: responde a «a aplicação bate certo com o extrato?»,
+          // e essa pergunta é por CONTA. Se seguisse também o filtro de categoria deixava de a
+          // responder — e a promessa de que «quando chega a zero, bate certo com o extrato» ficava
+          // falsa. Por isso não segue o filtro; o que tem de fazer é DIZÊ-LO, senão ao lado de uma
+          // lista filtrada parece que se refere a ela. A contagem de transações ali à direita segue
+          // o filtro, e ter dois números com âmbitos diferentes sem os distinguir é que engana.
+          var ambito = f.account ? "nesta conta" : "em todas as contas";
+          if (f.category || f.per || f.from || f.to || f.payee || (f.q||"").trim()) ambito += ", sem os filtros";
+          partes.push('<b class="pend" title="Registado mas ainda não confirmado no banco. Conta-se por conta inteira — não segue os filtros da lista, para poder continuar a comparar-se com o extrato.">Por confirmar: '+fmt(pend)+'</b>'+
+            '<span class="hide-phone"> '+ambito+'</span>');
         }
         var esq = (accA ? pontoConta(f.account) : "") + partes.join('&nbsp; · &nbsp;');
         // Diz sempre quantas transações ESTÃO À VISTA — como a contagem de categorias no orçamento.
@@ -3558,7 +3591,15 @@
     '</div>';
 
     // ---------- Despesa por categoria ----------
-    var arr = Object.keys(spend).map(function(k){return {name:k,val:spend[k]};}).sort(function(a,b){return b.val-a.val;});
+    // Só entra quem GASTOU. Uma categoria cujo saldo do período seja nulo ou a favor — porque
+    // as devoluções superaram as compras, ou porque foi só uma entrada sem categoria (um
+    // cashback pago a uma conta de acompanhamento, por exemplo) — não é despesa nenhuma, e
+    // aparecia com valor negativo e uma barra de 2%, num gráfico que se chama «Despesa».
+    // O abate das devoluções mantém-se: é ele que faz «100 gastos, 30 devolvidos» valer 70.
+    // O que sai é o resultado que deixou de ser despesa, não a regra que o calcula.
+    var arr = Object.keys(spend).map(function(k){return {name:k,val:spend[k]};})
+                    .filter(function(x){ return x.val > 0.005; })
+                    .sort(function(a,b){return b.val-a.val;});
     // Num orçamento com trinta ou quarenta categorias, a lista inteira não se lê: o que interessa
     // são as que pesam, e a cauda só rouba altura. Ficam as REP_TOP maiores e as restantes juntam-se
     // numa linha, sempre a última — mesmo quando a soma delas dá uma barra maior do que algumas
@@ -3682,7 +3723,7 @@
         : (r.categoryId===INCOME?'<span class="pill budget">Rendimento</span>':(r.categoryId?esc((categoryById(r.categoryId)||{name:"(apagada)"}).name):'<span class="muted">—</span>'));
       // Mesmo sinal e mesma cor da lista de transações: duas listas de dinheiro que se leem
       // de maneiras diferentes obrigam a reaprender a segunda.
-      var amt=r.outflow?'<span class="tx-amt out">−'+fmt(r.outflow)+'</span>':(r.inflow?'<span class="tx-amt in">+'+fmt(r.inflow)+'</span>':'');
+      var amt=r.outflow?'<span class="tx-amt out">'+comSinal(-Math.abs(r.outflow))+'</span>':(r.inflow?'<span class="tx-amt '+(r.inflow<0?"out":"in")+'">'+comSinal(r.inflow)+'</span>':'');
       return sep + '<tr class="hoverable" data-action="edit-recurring" data-id="'+r.id+'" style="cursor:pointer;'+(r.active?'':'opacity:.5;')+'">'+
         '<td style="white-space:nowrap;font-weight:600;">'+fmtDate(r.nextDate)+'</td>'+
         '<td><span class="pill tracking">'+(FREQ_LABEL[r.freq]||r.freq)+'</span></td>'+
@@ -3885,7 +3926,7 @@
           '<div class="field"><label>Data</label>'+dateField("txDate", tx.date)+'</div>'+
           '<div class="field"><label>Conta</label><select id="txAcc">'+accOpts+'</select></div>'+
         '</div>'+
-        '<div class="field"><label>Beneficiário</label><div class="ac-wrap"><input id="txPayee" maxlength="100" autocomplete="off" value="'+esc(tx.payee||"")+'" placeholder="Ex.: Continente, Salário, EDP…"></div></div>'+
+        '<div class="field"><label>Beneficiário</label><div class="ac-wrap">'+comX('txPayee', '<input id="txPayee" maxlength="100" autocomplete="off" value="'+esc(tx.payee||"")+'" placeholder="Ex.: Continente, Salário, EDP…">', 'o beneficiário')+'</div></div>'+
         '<div class="field" id="txCatField"><label>Categoria</label><select id="txCat">'+catOpts+'</select>'+
           '<div class="hint hidden" id="txCatSug">💡 Categoria preenchida a partir da última vez que usou este beneficiário.</div>'+
           '<div class="hint hidden" id="txCatWarn">⚠️ Sem categoria, este movimento muda o saldo da conta mas fica de fora do orçamento — as contas deixam de bater certo.</div>'+
@@ -3894,7 +3935,7 @@
           '<div class="field"><label>Saída (despesa)</label><input id="txOut" class="money" data-par="txIn" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(tx.outflow)+'" placeholder="0,00"></div>'+
           '<div class="field"><label>Entrada (receita)</label><input id="txIn" class="money" data-par="txOut" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(tx.inflow)+'" placeholder="0,00"></div>'+
         '</div>'+
-        '<div class="field"><label>Nota (opcional)</label><input id="txMemo" maxlength="300" value="'+esc(tx.memo||"")+'"></div>'+
+        '<div class="field"><label>Nota (opcional)</label>'+comX('txMemo', '<input id="txMemo" maxlength="300" value="'+esc(tx.memo||"")+'" placeholder="Ex.: jantar de aniversário">', 'a nota')+'</div>'+
         '<label class="opcao" style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="txClear" '+(tx.cleared?"checked":"")+' style="width:auto;"> Confirmada (reconciliada com o banco)</label>'+
       '</div>'+
       '<div class="modal-foot"><span>'+(editing
@@ -4046,7 +4087,7 @@
     openModal(
       '<div class="modal-head"><h2>'+(editing?"Editar categoria":"Nova categoria")+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
       '<div class="modal-body">'+
-        '<div class="field"><label>Nome</label><input id="catName" maxlength="60" value="'+esc(cat.name)+'" placeholder="Ex.: Supermercado"></div>'+
+        '<div class="field"><label>Nome</label>'+comX('catName', '<input id="catName" maxlength="60" value="'+esc(cat.name)+'" placeholder="Ex.: Supermercado">', 'o nome')+'</div>'+
         '<div class="field"><label>Grupo</label><select id="catGroup">'+grpOpts+'</select></div>'+
         (editing ? '<div class="field"><label>Ordem no orçamento</label>'+
           '<div style="display:flex;gap:8px;">'+
@@ -4054,7 +4095,7 @@
             '<button class="btn" data-action="move-cat-down" data-id="'+cat.id+'" style="flex:1;justify-content:center;">▼ Descer</button>'+
           '</div>'+
           '<div class="hint">A lista por trás vai mudando a cada toque. No computador também pode arrastar a linha da categoria.</div></div>' : '')+
-        '<div class="field"><label>Nota (opcional)</label><input id="catNote" maxlength="300" value="'+esc(cat.note||"")+'" placeholder="Ex.: rever no fim do mês"></div>'+
+        '<div class="field"><label>Nota (opcional)</label>'+comX('catNote', '<input id="catNote" maxlength="300" value="'+esc(cat.note||"")+'" placeholder="Ex.: rever no fim do mês">', 'a nota')+'</div>'+
         '<div class="field"><label>Prioridade</label><select id="catPrio">'+
           ['alta','normal','baixa'].map(function(p){ return '<option value="'+p+'"'+((cat.priority||"normal")===p?" selected":"")+'>'+PRIO_LABEL[p]+'</option>'; }).join("")+
         '</select><div class="hint">Usada ao financiar alvos com «Repartir o que está por atribuir» e a estratégia por prioridade. No orçamento também pode carregar no ▲ ● ▼ à frente do nome para mudar sem abrir esta janela.</div></div>'+
@@ -4102,20 +4143,26 @@
       el("catFundField").classList.toggle("hidden", !(v==="monthly" || perio || v==="byDate"));
       var fundV = el("catFund").value;
       if (v==="monthly") {
-        el("catFundRefill").textContent = "Repor até este valor — acrescenta só o que falta";
-        el("catFundSetAside").textContent = "Reservar este valor todos os meses — mesmo que já o tenha";
-        el("catFundHint").textContent = "";
+        // O texto longo vai para a nota por baixo, não para dentro da opção: uma <option> de um
+        // selector nativo NÃO quebra linha em computador (quem a desenha é o sistema, não a
+        // página), e o que não cabe fica cortado sem se poder ler. No telemóvel o iOS mostra uma
+        // roda que quebra sozinha — daí só se notar de um lado.
+        el("catFundRefill").textContent = "Repor até este valor";
+        el("catFundSetAside").textContent = "Reservar todos os meses";
+        el("catFundHint").textContent = fundV==="setAside"
+          ? "Guarda este valor todos os meses, mesmo que já lá esteja o suficiente. O que sobra vai-se acumulando."
+          : "Acrescenta só o que falta para chegar a este valor. Se já lá estiver, não pede nada.";
       } else if (perio) {
         var cad = v==="quarterly"?"trimestre":(v==="semiannual"?"semestre":"ano");
         var div = v==="quarterly"?"3":(v==="semiannual"?"6":"12");
-        el("catFundRefill").textContent = "Repor — chegar ao total até à data; se gastar a meio, pede mais para compensar";
-        el("catFundSetAside").textContent = "Reservar — o mesmo todos os meses (total ÷ "+div+"); gaste à vontade";
+        el("catFundRefill").textContent = "Repor — chegar ao total";
+        el("catFundSetAside").textContent = "Reservar — total ÷ "+div+" por mês";
         el("catFundHint").textContent = fundV==="setAside"
           ? "Reserva sempre "+(div==="3"?"1/3":div==="6"?"1/6":"1/12")+" do total por mês, aconteça o que acontecer. Ideal para gastos que faz ao longo do "+cad+"."
           : "Junta até ter o total. Se gastar a meio, pede mais nos meses seguintes para na mesma chegar lá.";
       } else if (v==="byDate") {
-        el("catFundRefill").textContent = "Repor — chegar ao total na data; se gastar a meio, pede mais para compensar";
-        el("catFundSetAside").textContent = "Reservar — mensalidade fixa até à data; gaste à vontade";
+        el("catFundRefill").textContent = "Repor — chegar ao total na data";
+        el("catFundSetAside").textContent = "Reservar — mensalidade fixa";
         el("catFundHint").textContent = fundV==="setAside"
           ? "Congela agora a mensalidade (o que falta ÷ meses até à data) e pede-a fixa até lá, aconteça o que acontecer. Se um dia ficar para trás, reabra e guarde para recalcular. Não garante o total pousado na data — para isso, escolha Repor."
           : "Reparte o que falta pelos meses até à data. Se gastar a meio, sobe a mensalidade para na mesma chegar ao total na data.";
@@ -4787,8 +4834,9 @@
       '<ul>'+
         '<li><b>O período escolhe-se em cima</b> e vale para o ecrã todo: <b>1, 3, 6, 12 ou 24 meses</b> a contar do mês em vista, ou um intervalo à medida (<b>de</b> / <b>até</b>, só no computador).</li>'+
         '<li><b>Os quatro números de topo</b> — Rendimento, Despesa, Resultado e Património no fim — são do período escolhido. O <b>património</b> é tudo o que tem menos tudo o que deve, e conta também as contas de <b>acompanhamento</b>, que ficam de fora do orçamento.</li>'+
+        '<li><b>Saída e Entrada são dois lados</b>, não dois números soltos: se uma conta der negativo, o valor muda de campo e fica positivo. Escrever <b>«4−6»</b> na Entrada guarda uma <b>Saída de 2</b> — é o mesmo dinheiro, dito do lado certo.</li>'+
         '<li><b>Um reembolso abate à despesa</b>, em vez de contar como rendimento. Devolveu metade de uma compra? A categoria mostra só o que ficou por gastar. Rendimento é apenas o que entra pela categoria «Rendimento»; transferências entre contas suas não são nem uma coisa nem outra.</li>'+
-        '<li><b>A despesa por categoria</b> mostra as <b>15 maiores</b> do período; as restantes somam-se numa linha <b>«Outras N categorias»</b>, sempre no fim — mesmo quando a soma delas dá uma barra maior do que alguma acima, porque é um total e não uma categoria. No computador, o rato por cima dela diz quais são e quanto vale cada uma.</li>'+
+        '<li><b>A despesa por categoria</b> conta só o que <b>saiu a mais do que entrou</b>: uma categoria onde devolveu mais do que gastou, ou uma entrada sem categoria, não aparecem — não são despesa. Mostra as <b>15 maiores</b> do período; as restantes somam-se numa linha <b>«Outras N categorias»</b>, sempre no fim — mesmo quando a soma delas dá uma barra maior do que alguma acima, porque é um total e não uma categoria. No computador, o rato por cima dela diz quais são e quanto vale cada uma.</li>'+
       '<li><b>A evolução por categoria</b>, no fim, põe lado a lado as categorias que escolher, ao longo dos meses: escolhem-se nas <b>bolinhas</b> por baixo do gráfico, que aparecem pela mesma ordem do ecrã <b>Orçamento</b>, e a cor de cada uma acompanha-a. Se nunca escolheu nenhuma, a aplicação propõe as de maior despesa.</li>'+
         '<li><b>Gasto ou Atribuído:</b> o mesmo gráfico lê-se de duas maneiras — o que <b>saiu de facto</b> em cada mês, ou o que <b>pôs lá</b> em cada mês. Ver os dois é a maneira mais rápida de perceber se um alvo está bem calibrado.</li>'+
         '<li><b>As categorias escolhidas acompanham o orçamento</b> e chegam aos outros aparelhos. O <b>período</b> e o modo <b>Gasto/Atribuído</b> ficam em cada aparelho, como o mês em que está.</li>'+
@@ -4817,7 +4865,8 @@
         '<li><b>📅 Recorrentes</b> lançam-se sozinhas na data — diária, semanal, quinzenal, mensal, semestral ou anual. Podem ser uma <b>despesa/receita</b> ou uma <b>↔ transferência</b> entre contas, útil para pôr dinheiro de lado na poupança todos os meses.</li>'+
         '<li>Clique numa transação para a editar. Transferências e divididas tratam-se <b>por inteiro</b>, nunca metade: editar muda os dois lados, apagar leva os dois, e o <b>⧉</b> duplica o conjunto todo — a cópia fica independente da original.</li>'+
         '<li><b>No telemóvel, o cabeçalho</b> tem, por esta ordem: o <b>nome do orçamento</b> (toque para trocar ou gerir), <b>➕</b> nova transação, <b>🏷️</b> beneficiários, <b>💾</b> dados e cópias, <b>↩ ↪</b> anular e refazer, <b>🕑</b> movimentos recentes e <b>❓</b> esta ajuda. O título do ecrã não aparece — é a barra de baixo, com o separador aceso, que diz onde está.</li>'+
-        '<li><b>🕑 Movimentos recentes</b> (ao lado do ↩ ↪, no topo) — o registo de como tem repartido o dinheiro <b>pelas categorias</b>: mover entre categorias, 🩹 cobrir, 🎯 financiar, 🧹 libertar excedente, atribuir à mão, adiar, e também o que anulou. Cada linha diz <b>o que fez</b> e, por baixo, <b>de onde veio o dinheiro</b> — «Cobriu «Roupa»» e, em pequeno, «de Férias 50,00 €». Quando as origens são muitas, mostra as duas maiores e conta as restantes. Guarda os <b>últimos 30</b> e acompanha o orçamento (sobrevive a fechar a aplicação e vai na sincronização). As <b>transações não entram</b> — essas têm a sua própria lista. É só para ler: para andar para trás use o <b>↩</b>.</li>'+
+        '<li><b>Datas por chegar:</b> uma transação com data futura já conta no <b>Saldo</b> — é dinheiro que sabe que vai sair — mas ainda não aconteceu. Na lista a data fica <b>esbatida com um ◷</b>, com filtros ou sem eles.</li>'+
+        '<li><b>🕑 Movimentos recentes</b> (ao lado do ↩ ↪, no topo) — o registo de como tem repartido o dinheiro <b>pelas categorias</b>: mover entre categorias, 🩹 cobrir, 🎯 financiar, 🧹 libertar excedente, atribuir à mão, adiar, e também o que anulou. Cada linha diz <b>o que fez</b> e, por baixo, <b>de onde veio o dinheiro</b> — «Cobriu «Roupa»» e, em pequeno, «de Férias 50,00 €». Quando as origens são muitas, mostra as duas maiores e conta as restantes. Guarda os <b>últimos 30</b> e acompanha o orçamento: sobrevive a fechar a aplicação e <b>vai na sincronização</b> — incluindo quando o <b>limpa</b>, que o deixa vazio em todos os aparelhos. As <b>transações não entram</b> — essas têm a sua própria lista. É só para ler: para andar para trás use o <b>↩</b>.</li>'+
         '<li><b>Somar à pressa:</b> as caixas à esquerda da data selecionam transações e mostram o total em baixo. A caixa no <b>cabeçalho</b> marca todas as que estão à vista. É só uma conta rápida — não altera nada, e a seleção desaparece ao mudar de página.</li>'+
         '<li><b>Separadores de mês</b> nas listas de transações e de recorrentes: «Agosto 2026», «Julho 2026»… Só aparecem quando a lista atravessa mais do que um mês — num filtro de «este mês» não separariam nada.</li>'+
         '<li><b>Uma coluna «Valor»</b> nas listas de transações e de recorrentes: as saídas aparecem a <b>vermelho com −</b> e as entradas a <b>verde com +</b>. Ao registar ou editar continua a haver dois campos, <b>Saída</b> e <b>Entrada</b>, que é o que evita enganos ao escrever.</li>'+
@@ -4832,7 +4881,7 @@
         '<li><b>Trazer e levar</b>, em <b>Dados e cópias</b>, tem duas gavetas simétricas: <b>⬇ Importar</b> e <b>⬆ Exportar</b>, cada uma com as mesmas coisas pela mesma ordem — primeiro a <b>configuração dos alvos</b> (a «planta»), depois as <b>transações</b>. O que sai de um lado é o que entra do outro.</li>'+
         '<li><b>Importar transações</b> do banco: as linhas que já existem são detetadas e saltadas.</li>'+
         '<li><b>Importar a configuração dos alvos</b> (em <b>Dados e cópias → Trazer e levar</b>) lê o mesmo ficheiro que sai em <b>Exportar → Configuração dos alvos</b> e reconstrói grupos, categorias, alvos, prioridades e notas — de outro orçamento seu, ou do mesmo noutra altura. <b>Não apaga nada:</b> as categorias que já tem <b>mantêm as transações e o dinheiro</b> e só lhes muda o alvo; as que faltam são criadas; as suas que não venham no ficheiro ficam como estão. Uma categoria é reconhecida pelo <b>grupo mais o nome</b>, por isso «Luz» em «Casa» e «Luz» em «Escritório» são duas coisas diferentes, como sempre foram. Mostra tudo o que vai fazer <b>antes</b> de mexer, e o <b>↩ Anular</b> desfaz a importação inteira num passo.</li>'+
-        '<li><b>Exportar para folha de cálculo</b> (no computador): o <b>⬇ Exportar o que vejo</b>, nas Transações, guarda exatamente as linhas que estão à vista — com os filtros e a conta que tiver ligados. O <b>⬇ Exportar</b> dos <b>🏷 Beneficiários</b> faz o mesmo com a lista de nomes: um por linha, com as transações, o total, a média, a primeira e a última vez e as categorias em que entrou — pela ordem que escolheu e só os que o filtro deixa ver. Para o orçamento inteiro, sem filtros, é em <b>Dados e cópias</b>. Nenhum deles sai do orçamento aberto, e um <b>.csv não é cópia de segurança</b> — não repõe nada.</li>'+
+        '<li><b>Exportar para folha de cálculo</b> (no computador): o <b>⬇ Exportar o que vejo</b>, nas Transações, guarda exatamente as linhas que estão à vista — com os filtros e a conta que tiver ligados. O <b>⬇ Exportar</b> dos <b>🏷 Beneficiários</b> faz o mesmo com a lista de nomes: um por linha, com as transações, o total, a média, a primeira e a última vez e as categorias em que entrou — pela ordem que escolheu e só os que o filtro deixa ver. Para o orçamento inteiro, sem filtros, é em <b>Dados e cópias</b>. Nenhum deles sai do orçamento aberto, e um <b>.csv não é cópia de segurança</b> — não repõe nada. Os ficheiros saem no formato normal (<b>RFC 4180</b>): aguentam nomes com aspas, ponto-e-vírgula ou mudanças de linha, e o que sai volta a entrar igual.</li>'+
       '</ul>'+
 
       sec("Se algo não bater certo")+
@@ -4896,6 +4945,15 @@
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.75", "setembro 2026", [
+        'Uma conta que dê <b>negativo</b> passa para o outro lado, em positivo: escrever «4−6» na <b>Entrada</b> grava uma <b>Saída de 2</b>. Antes ficava lá uma entrada de −2 e a lista mostrava «+−2,00 €» a verde, como se tivesse entrado dinheiro. O saldo estava certo — o sentido é que não estava.',
+        'O <b>diário de movimentos</b> passou a contar para a sincronização. <b>Limpar o diário</b> não mexia em mais nada, e por isso não era detectado como alteração: ficava só neste aparelho. Agora chega aos outros — se o limpar num, fica limpo em todos.',
+        'No gráfico <b>Despesa por categoria</b> deixaram de aparecer categorias que não gastaram nada. Uma entrada sem categoria — um cashback pago a uma conta de acompanhamento, por exemplo — desenhava uma barra com valor <b>negativo</b>. As devoluções continuam a abater à despesa, como sempre.',
+        'As transações com <b>data que ainda não chegou</b> distinguem-se na lista: a data fica esbatida e ganha um <b>◷</b>. Funciona com filtros ligados ou sem eles.',
+        'Os campos de <b>texto livre</b> — beneficiário, nota, nome — ganharam um <b>✕</b> para apagar de uma vez, que só aparece quando há texto.',
+        'Os ficheiros <b>.csv</b> exportados deixaram de poder executar fórmulas ao abrir no Excel, e passaram a aguentar nomes com aspas, ponto-e-vírgula ou mudanças de linha lá dentro — sai e volta a entrar igual.',
+        'No <b>Método</b> do alvo (Repor / Reservar), os textos passaram a caber numa linha no computador; a explicação ficou na nota por baixo, onde se lê inteira.',
+      ])+
       ver("1.74", "agosto 2026", [
         'Uma categoria cujo <b>grupo tenha desaparecido</b> deixou de se sumir da caixa «Todas as categorias» das Transações. Se estivesse a filtrar por ela, a caixa passava a dizer «Todas as categorias» com o filtro ligado.',
         'O <b>❓ Como funciona?</b> passou a explicar as <b>15 maiores</b> da despesa por categoria e o <b>⬇ Exportar</b> dos beneficiários.',
@@ -5270,7 +5328,7 @@
               '<div class="field"><label>Saída (despesa)</label><input id="rcOut" class="money" data-par="rcIn" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(s.outflow)+'" placeholder="0,00"></div>'+
               '<div class="field"><label>Entrada (receita)</label><input id="rcIn" class="money" data-par="rcOut" maxlength="13" type="text" inputmode="decimal" value="'+amtStr2(s.inflow)+'" placeholder="0,00"></div>'+
             '</div>')+
-        '<div class="field"><label>Nota (opcional)</label><input id="rcMemo" maxlength="300" value="'+esc(s.memo||"")+'"></div>'+
+        '<div class="field"><label>Nota (opcional)</label>'+comX('rcMemo', '<input id="rcMemo" maxlength="300" value="'+esc(s.memo||"")+'" placeholder="Ex.: mensalidade do ginásio">', 'a nota')+'</div>'+
         '<label class="opcao" style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="rcActive" '+(s.active?"checked":"")+' style="width:auto;"> Ativa (lança automaticamente na data)</label>'+
         (ehTransf?'<div class="hint" style="margin-top:8px;">Lança as duas metades de uma vez, tal como uma transferência feita à mão. Ideal para pôr dinheiro de lado na poupança todos os meses.</div>':'')+
       '</div>'+
@@ -5526,7 +5584,36 @@
     if (!isFinite(v) || v > MAX_VALOR) return NaN;
     return neg ? -v : v;
   }
+  // Envolve um campo de texto e põe-lhe um ✕ para limpar. Um sítio só a decidir como é —
+  // antes havia dois X escritos à mão, cada um à sua maneira, e nenhum nos campos do formulário.
+  // O id do campo vai no data-id: é assim que as acções recebem o alvo (não recebem o evento).
+  function comX(id, inputHTML, rotulo){
+    return '<span class="campo-x">' + inputHTML +
+      '<button type="button" class="limpa-x" data-action="limpar-campo" data-id="'+id+'" tabindex="-1" title="Apagar '+esc(rotulo)+'" aria-label="Apagar '+esc(rotulo)+'">✕</button></span>';
+  }
   function amtStr(n){ if (n===""||n===null||n===undefined||n===0) return ""; return String(n).replace(".", ","); }
+  // Saída e Entrada são DOIS LADOS do mesmo eixo, não dois números independentes. Uma entrada de
+  // −2 € é, literalmente, uma saída de 2 €: o mesmo dinheiro, dito ao contrário. Guardá-la com o
+  // sinal negativo dá contas certas (o saldo bate) mas semântica errada — a lista mostrava
+  // «+−2,00 €» a verde, como se tivesse entrado dinheiro.
+  // Isto é a REDE DE SEGURANÇA, ao nível dos dados: passa aqui tudo o que se grava, venha do
+  // formulário, do teclado de contas, de um ficheiro importado ou de um defeito futuro.
+  function normalizaLados(o){
+    if (!o) return o;
+    var out = round2(o.outflow||0), inn = round2(o.inflow||0);
+    if (out < 0) { inn = round2(inn - out); out = 0; }     // saída negativa É entrada
+    if (inn < 0) { out = round2(out - inn); inn = 0; }     // entrada negativa É saída
+    // Se sobrarem os dois, fica o líquido do lado certo: nunca as duas colunas preenchidas.
+    if (out > 0 && inn > 0) { var liq = round2(inn - out); inn = liq > 0 ? liq : 0; out = liq < 0 ? -liq : 0; }
+    o.outflow = out; o.inflow = inn;
+    return o;
+  }
+  // O sinal e o valor numa peça só. Sem isto, «+» colado a um fmt() que já traz o seu próprio
+  // «−» produzia «+−2,00 €» — e nenhum sítio que mostre dinheiro deve poder escrever dois sinais.
+  function comSinal(n){
+    n = round2(n||0);
+    return (n < 0 ? "−" : "+") + fmt(Math.abs(n));
+  }
   // Formato de TODOS os campos de dinheiro em repouso: sempre os cêntimos e os milhares, como
   // o resto da aplicação. Um "8,5" onde se esperava "8,50", ou um "1234,5" sem o ponto dos
   // milhares, obriga a reler o número para o perceber — e num campo de edição isso é pior do
@@ -5825,6 +5912,9 @@
       var data = { date: dateVal("txDate")||todayISO(), accountId: accId, payee: valLim("txPayee", LIM_PAYEE),
         categoryId: catId, memo: valLim("txMemo", LIM_NOTA),
         outflow: num("txOut"), inflow: num("txIn"), cleared: el("txClear").checked };
+      // Rede de segurança: um valor negativo é o outro lado do eixo, não um lado com sinal.
+      // Os campos já o trocam ao escrever, mas isto é o último ponto por onde tudo passa.
+      normalizaLados(data);
       if (data.outflow===0 && data.inflow===0) { toast("Indique um valor de saída ou entrada."); return; }
       if (data.outflow>0 && data.inflow>0) { toast("Preencha só a Saída OU a Entrada, não as duas."); return; }
       // Categoria obrigatória nas contas de orçamento e de cartão (ver precisaCategoria).
@@ -5909,8 +5999,8 @@
         state.transactions=state.transactions.filter(function(x){ return x.split!==editando; });
       }
       var pair = lines.length>1 ? (editando||uid()) : null;
-      lines.forEach(function(l){ state.transactions.push({ id:uid(), date:s.date||todayISO(), accountId:s.accountId, payee:s.payee, categoryId:l.categoryId, memo:s.memo,
-        outflow: s.dir==="out"?round2(l.amount):0, inflow: s.dir==="in"?round2(l.amount):0, cleared:s.cleared, split:pair }); });
+      lines.forEach(function(l){ state.transactions.push(normalizaLados({ id:uid(), date:s.date||todayISO(), accountId:s.accountId, payee:s.payee, categoryId:l.categoryId, memo:s.memo,
+        outflow: s.dir==="out"?round2(l.amount):0, inflow: s.dir==="in"?round2(l.amount):0, cleared:s.cleared, split:pair })); });
       _split=null; closeModal(); save(); render();
       if(editando){
         toast(pair ? ("Transação dividida alterada — "+lines.length+" categorias.") : "Ficou com uma categoria só — já não é uma transação dividida.");
@@ -5927,6 +6017,15 @@
       state.ui.txLimit=PAGINA; save(); render(); aoTopo();
     },
     // Só o texto. Devolve o cursor à caixa, para se poder escrever outra coisa de imediato.
+    // Limpa o campo imediatamente antes do botão. Sem re-desenhar: a janela é um formulário por
+    // preencher, e redesenhá-la deitava fora o que já lá estava escrito nos outros campos.
+    "limpar-campo": function(id){
+      var inp = el(id);
+      if (!inp) return;
+      inp.value = "";
+      try { inp.dispatchEvent(new Event("input", {bubbles:true})); inp.dispatchEvent(new Event("change", {bubbles:true})); } catch(e){}
+      try { inp.focus(); } catch(e){}
+    },
     "tx-search-clear": function(){
       var f = state.ui.txFilter||{}; f.q=""; state.ui.txFilter=f; state.ui.txLimit=PAGINA;
       save(); renderTransactions(); var c=el("txSearch"); if(c) c.focus();
@@ -6293,6 +6392,8 @@
         dados = { nextDate:d.nextDate||todayISO(), freq:d.freq, accountId:d.accountId, toAccountId:null,
                   payee:d.payee||"", categoryId:(accR && accR.type==="tracking") ? null : (d.categoryId||null), memo:d.memo||"",
                   outflow:d.outflow||0, inflow:d.inflow||0, active:!!d.active };
+        normalizaLados(dados);
+        if (!dados.outflow && !dados.inflow) { toast("Indique um valor de saída ou entrada."); return; }
       }
       // Dia pretendido da regra: fixa-se aqui, a partir da data escolhida. É o que permite a uma
       // regra do dia 31 voltar ao 31 depois de passar por fevereiro (ver advanceDate).
@@ -6494,9 +6595,14 @@
   // tem de o acrescentar aqui — há um teste que percorre o estado e exige exactamente isso.
   function sigOf(st){
     try {
+      // O diário (moves) CONTA. Não porque o seu conteúdo seja dinheiro, mas porque é a única
+      // coisa que algumas acções alteram: limpar o diário não toca em mais nada, e sem ele aqui
+      // essa acção não era detectada como alteração — o aparelho concluía que nada mudara e
+      // nunca enviava. Acrescentar movimentos já sincronizava, mas por acidente: era a atribuição
+      // que os acompanha que fazia a assinatura mexer.
       var s = JSON.stringify([st.settings, st.accounts, st.groups, st.categories,
                               st.assignments, st.snooze||{}, st.transactions, st.recurring||[],
-                              st.reportCats||[]]);
+                              st.reportCats||[], st.moves||[]]);
       return hash32(s) + "/" + s.length;                  // o comprimento afasta colisões
     } catch(e){
       return "x/" + ((st && st.transactions) ? st.transactions.length : 0);
@@ -7223,7 +7329,7 @@
       var cat = t.categoryId===INCOME?"Rendimento":(t.categoryId?((categoryById(t.categoryId)||{name:""}).name):"");
       rows.push([t.date, acc?acc.name:"", t.payee||"", cat, t.memo||"", (t.outflow||0).toFixed(2).replace(".",","), (t.inflow||0).toFixed(2).replace(".",","), t.cleared?"Sim":"Não"]);
     }
-    return rows.map(function(r){ return r.map(function(c){ var s=String(c); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";"); }).join("\n");
+    return csvTexto(rows);
   }
   // Exporta SÓ o que os filtros do ecrã Transações deixam à vista, pela mesma regra que desenha
   // a lista (txFiltradas). O nome do ficheiro leva a conta, a categoria e o período quando os há:
@@ -7276,7 +7382,7 @@
       rows.push([x.e.name, x.e.count, n(e2.gasto), n(e2.recebido),
                  n(x.e.count ? e2.gasto/x.e.count : 0), e2.primeira||"", x.e.lastDate||"", cats.join(" · ")]);
     }
-    var csv = rows.map(function(r){ return r.map(function(c){ var v=String(c); return /[",;\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }).join(";"); }).join("\n");
+    var csv = csvTexto(rows);
     guardarFicheiro("beneficiarios-" + limpaNome(budgetName(_bindex.active)) + "-" + todayISO() + ".csv",
       "\ufeff"+csv, "text/csv;charset=utf-8",
       function(){ toast(lista.length + (lista.length===1 ? " beneficiário exportado" : " beneficiários exportados") + (qk ? " — só os que estavam à vista." : ".")); });
@@ -7301,7 +7407,7 @@
     }
     var tot=budgetTotals(m);
     rows.push([], ["Total do mês (sem cartões de crédito)","", n(tot.assigned), n(tot.activity), n(tot.avail)]);
-    var csv = rows.map(function(r){ return r.map(function(c){ var s=String(c==null?"":c); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";"); }).join("\n");
+    var csv = csvTexto(rows);
     guardarFicheiro("orcamento-" + limpaNome(budgetName(_bindex.active)) + "-" + m + ".csv", "﻿"+csv, "text/csv;charset=utf-8", function(){ toast("Orçamento do mês exportado (CSV)."); });
   }
   // Exporta a "planta" da configuração: cada categoria com o seu tipo de alvo, método (Repor/
@@ -7336,16 +7442,73 @@
         rows.push([grp.name, cat.name, prio, tipo, metodo, n(tg.amount), detalhe, cat.note||""]);
       }
     }
-    var csv = rows.map(function(r){ return r.map(function(c){ var s=String(c==null?"":c); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";"); }).join("\n");
+    var csv = csvTexto(rows);
     guardarFicheiro("alvos-" + limpaNome(budgetName(_bindex.active)) + ".csv", "﻿"+csv, "text/csv;charset=utf-8", function(){ toast("Configuração do orçamento exportada (CSV)."); });
   }
   // ---------- Importação de CSV ----------
+  // ---------- Escrever CSV (RFC 4180) ----------
+  // Um campo vai entre aspas se contiver aspas, o separador, ou fim de linha (CR e LF contam,
+  // mesmo sozinhos); as aspas de dentro duplicam-se. As linhas terminam em CRLF, como a norma
+  // manda — o leitor aceita os dois, por isso quem já tenha ficheiros antigos não perde nada.
+  //
+  // E há uma segunda coisa, que não é de formato mas de segurança: uma folha de cálculo trata
+  // um campo começado por = + - @ como FÓRMULA. Um beneficiário chamado «=SOMA(...)» — escrito
+  // por engano, ou por quem partilhe o orçamento — passaria a executar ao abrir o ficheiro no
+  // Excel. É a falha conhecida por «injeção de fórmulas em CSV», e como a própria aplicação diz
+  // que o .csv é «para abrir no Excel», isto é uso real e não hipótese. Um apóstrofo à frente
+  // obriga a folha a ler o campo como texto.
+  // NÚMEROS ficam de fora: «-45,90» começa por «-», e pôr-lhe um apóstrofo transformava a coluna
+  // de dinheiro em texto — que é justamente o que se vai lá fazer contas.
+  function csvCampo(v){
+    var t = String(v==null?"":v);
+    // O «'?» no princípio não é distração: um nome que JÁ comece por apóstrofo seguido de um
+    // destes símbolos («'=isto é texto») levaria o apóstrofo embora na leitura, que retira um.
+    // Pondo-lhe outro, a leitura retira o que nós pusemos e devolve o original.
+    if (/^'?[=+\-@\t\r]/.test(t) && !/^[-+]?[0-9][0-9.,]*$/.test(t)) t = "'" + t;
+    return /[";\r\n]/.test(t) ? '"' + t.replace(/"/g,'""') + '"' : t;
+  }
+  function csvTexto(rows){
+    return rows.map(function(r){ return r.map(csvCampo).join(";"); }).join("\r\n");
+  }
+  // ---------- Ler CSV ----------
+  // Partir por linhas com um split() simples é errado: um campo entre aspas pode conter uma
+  // quebra de linha, e o split parte o registo a meio — o resto do ficheiro entra desalinhado,
+  // em silêncio. Extractos de banco com descrições em duas linhas existem mesmo. Este percorre
+  // o texto a contar aspas, e só quebra fora delas.
+  function csvLinhas(text){
+    var out=[], cur="", q=false;
+    for (var i=0;i<text.length;i++){
+      var ch=text[i];
+      if (q){
+        if (ch!=='"') { cur+=ch; continue; }
+        if (text[i+1]==='"'){ cur+='""'; i++; continue; }   // aspas duplicadas: ainda lá dentro
+        q=false; cur+=ch; continue;
+      }
+      if (ch==='"'){ q=true; cur+=ch; continue; }
+      if (ch==="\n" || ch==="\r"){
+        if (ch==="\r" && text[i+1]==="\n") i++;
+        out.push(cur); cur=""; continue;
+      }
+      cur+=ch;
+    }
+    out.push(cur);
+    return out.filter(function(l){ return l.trim()!==""; });
+  }
+  // O inverso exacto do apóstrofo que a escrita põe: só se sai quando o que vem a seguir é um
+  // dos símbolos que o motivaram. Assim um nome que comece mesmo por apóstrofo fica intacto, e
+  // exportar→importar→exportar devolve o mesmo ficheiro.
+  function csvDesescapa(v){
+    var t = String(v==null?"":v);
+    // Simétrico do «'?» da escrita: retira UM apóstrofo quando o que vem a seguir é um símbolo
+    // perigoso — ou outro apóstrofo antes dele, que é como um «'=» original chegou aqui.
+    return /^''?[=+\-@\t\r]/.test(t) ? t.slice(1) : t;
+  }
   function splitCSVLine(line, d){
     var out=[],cur="",q=false;
     for(var i=0;i<line.length;i++){ var ch=line[i];
       if(q){ if(ch==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
-      else { if(ch==='"') q=true; else if(ch===d){ out.push(cur); cur=""; } else cur+=ch; } }
-    out.push(cur); return out;
+      else { if(ch==='"') q=true; else if(ch===d){ out.push(csvDesescapa(cur)); cur=""; } else cur+=ch; } }
+    out.push(csvDesescapa(cur)); return out;
   }
   // Para PALAVRAS-CHAVE: nomes de colunas, tipos de alvo, «sim/não». Deita fora tudo o que não
   // seja letra, e é isso que faz «Tipo de alvo» e «tipodealvo» darem no mesmo.
@@ -7363,7 +7526,7 @@
   }
   function parseCSV(text, defaultAccountId){
     text=String(text).replace(/^﻿/,"");
-    var lines=text.split(/\r?\n/).filter(function(l){ return l.trim()!==""; });
+    var lines=csvLinhas(text);
     if(!lines.length) return { rows:[], skipped:0, error:"O ficheiro está vazio." };
     var head=lines[0];
     var cand=[";",",","\t"], d=";", best=-1;
@@ -7416,8 +7579,8 @@
       var kr=accId+"|"+date+"|"+round2(out).toFixed(2)+"|"+round2(inf).toFixed(2);
       var repetida=false;
       if(jaExiste[kr]>0){ repetida=true; jaExiste[kr]--; dups++; }
-      rows.push({ date:date, accountId:accId, payee:corta(f[idx.payee]||"", LIM_PAYEE), categoryId:catId,
-        memo:("nota" in idx ? corta(f[idx.nota]||"", LIM_NOTA) : ""), outflow:round2(out), inflow:round2(inf), cleared:cl, dup:repetida });
+      rows.push(normalizaLados({ date:date, accountId:accId, payee:corta(f[idx.payee]||"", LIM_PAYEE), categoryId:catId,
+        memo:("nota" in idx ? corta(f[idx.nota]||"", LIM_NOTA) : ""), outflow:round2(out), inflow:round2(inf), cleared:cl, dup:repetida }));
       if(rows.length>=MAX_LINHAS_CSV){ cortado=(lines.length-1)-i; break; }
     }
     return { rows:rows, skipped:skipped, semCat:semCat, dups:dups, cortado:cortado, error:null };
@@ -7529,7 +7692,11 @@
       var WDAYS = ["domingo","segundafeira","tercafeira","quartafeira","quintafeira","sextafeira","sabado"];
 
       // O que já existe, pela mesma chave que vamos usar a seguir.
-      function chave(g,c){ return normNome(g)+" "+normNome(c); }
+      // Separador que nunca pode aparecer dentro de um nome. Escrito como \u0000 e NÃO como o
+      // byte em bruto: um byte não imprimível no código faz as ferramentas tratarem o ficheiro
+      // como binário (o grep recusa-se a procurar nele) e qualquer passo que o copie pode
+      // comê-lo em silêncio — e aí «Casa»+«Luz» passaria a colidir com «Casa Luz».
+      function chave(g,c){ return normNome(g)+"\u0000"+normNome(c); }
       var jaTenho = {}, gruposTenho = {};
       for (var gi=0; gi<state.groups.length; gi++){
         var grp = state.groups[gi];
@@ -8048,9 +8215,25 @@
   function fechaConta(inp){
     if (!inp || !inp.classList || !inp.classList.contains("money")) return;
     var v = avaliaExpr(inp.value);
-    if (v !== null) inp.value = amtStr2(v);
+    if (v !== null) escreveNoLado(inp, v);
+    else if (inp.value) {                    // valor escrito à mão, sem conta: «-2» vale o mesmo
+      var d = parseAmount(inp.value);
+      if (!isNaN(d) && d < 0) escreveNoLado(inp, d);
+    }
     escondeDica();
     if (inp.getAttribute("data-par") && inp.value) { var op = el(inp.getAttribute("data-par")); if (op) op.value = ""; }
+  }
+  // Onde é que o resultado aterra. Num par Saída/Entrada, um valor negativo pertence ao OUTRO
+  // campo, em positivo: «4−6» escrito na Entrada é uma saída de 2, e é isso que se escreve.
+  // Num campo sem par (o Atribuído do orçamento, o valor de uma divisão) o sinal fica como está —
+  // ali um negativo é um negativo legítimo, não um lado trocado.
+  function escreveNoLado(inp, v){
+    var parId = inp.getAttribute("data-par");
+    var op = parId ? el(parId) : null;
+    if (op && v < 0) { op.value = amtStr2(-v); inp.value = ""; try { op.dispatchEvent(new Event("change",{bubbles:true})); } catch(e){} return op; }
+    inp.value = v ? amtStr2(v) : "";
+    if (op && inp.value) op.value = "";
+    return inp;
   }
   window.addEventListener("scroll", escondeDica, true);
   window.addEventListener("resize", escondeDica);
@@ -8130,9 +8313,8 @@
     if(!_kpEl || !_kp) return;
     var v = calcValue(_kp);
     if (_kpEl.hasAttribute("data-assign")) { applyAssign(_kpEl.getAttribute("data-assign"), v); return; }
-    _kpEl.value = v ? amtStr2(v) : "";
-    var par = _kpEl.getAttribute("data-par");                 // Saída/Entrada: só um dos dois lados
-    if (par && _kpEl.value) { var op = el(par); if (op) op.value = ""; }
+    escreveNoLado(_kpEl, v);
+    var par = _kpEl.getAttribute("data-par");
     try { _kpEl.dispatchEvent(new Event("change", {bubbles:true})); } catch(e){}
     var tot = document.getElementById("splitTotal");          // total da divisão de transação
     if (tot && _kpEl.id && _kpEl.id.indexOf("spAmt")===0){
