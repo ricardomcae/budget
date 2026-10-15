@@ -1278,7 +1278,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.82";
+  var APP_VERSION = "1.83";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -1315,6 +1315,18 @@
     ui: { view: "budget", month: nowMonthKey() }
   };
 
+  // Tudo o que o load() usa tem de estar declarado ANTES desta linha. Um «var» mais abaixo no
+  // ficheiro existe, mas ainda vale undefined quando o load() corre aqui, no arranque. Foi assim
+  // que a 1.81–1.82 apagou orçamentos: a lista VISTA_UI estava declarada mais abaixo, a leitura
+  // do orçamento aberto rebentava ao arrancar, caía no orçamento vazio — e o vazio era gravado
+  // por cima. Fora do arranque (trocar de orçamento) já tudo existia, e por isso só o orçamento
+  // que estava aberto ao fechar a aplicação é que aparecia vazio. O teste teste_183 arranca a
+  // aplicação a sério, com dados, para apanhar qualquer recaída.
+  var ID_OK = /^[A-Za-z0-9_-]*$/;
+  var ID_CHAVES = /^(id|transfer|cardId|payFrom|openAccount|catId)$|Id$/;
+  var VISTA_UI = ["reportMonths","reportFrom","reportTo","reportMode","payeeSort","coverMode","fundStrategy","recoverStrategy","surplusSemAlvo"];
+  var _podeEsvaziar = false;     // ligado só por «Apagar todos os dados»
+  var _falhaLeitura = {};        // id -> razão, para o aviso e para a sincronização não enviar vazio
   var state = load();
 
   // Delega no loadBudgetRaw para haver UMA só normalização/migração. Antes tinha uma cópia
@@ -1343,12 +1355,16 @@
     // uma vez por save (barato), mas só se escreve quando o conteúdo MUDOU de facto.
     var json;
     try { json = JSON.stringify(state); } catch(e0){ json = null; }
+    if (typeof json !== "string") json = null;   // JSON.stringify(undefined) dá undefined, não null
     // Sem serialização não se grava nada: escrever "null" apagaria o orçamento na leitura
     // seguinte, e em silêncio — porque não houve exceção nenhuma para avisar.
     if (json === null) { if(!_semEspaco){ _semEspaco=true; toast("Não foi possível guardar — os dados não puderam ser preparados."); } return false; }
     if (json === _ultimoJSON) { scheduleAutoSync(); return true; }
-    try { localStorage.setItem(budKey(_bindex.active), json); _ultimoJSON = json; _sigCache = null; }
-    catch (e) { guardou = false; }
+    try { gravaOrcamento(_bindex.active, json, _podeEsvaziar); _ultimoJSON = json; _sigCache = null; }
+    catch (e) {
+      if (e && e.protegido) { avisoProtegido(budgetName(_bindex.active)); return false; }
+      guardou = false;
+    }
     if (guardou) _semEspaco = false;
     else if (!_semEspaco) { _semEspaco = true; try { storageFullModal(); } catch(e2){ toast("Não foi possível guardar — armazenamento cheio."); } }
     scheduleAutoSync();
@@ -2301,8 +2317,6 @@
   // ENTRADA que estes campos têm a forma que a aplicação lhes dá. Os dados legítimos não mudam
   // (já têm essa forma) — só um valor fora do formato é corrigido. A mesma limpeza aplicada aos
   // ids e às referências a eles dá o mesmo resultado, por isso as ligações não se perdem.
-  var ID_OK = /^[A-Za-z0-9_-]*$/;
-  var ID_CHAVES = /^(id|transfer|cardId|payFrom|openAccount|catId)$|Id$/;
   function limpaId(v){ return String(v).replace(/[^A-Za-z0-9_-]/g, "_"); }
   function sanearEstado(o){
     if (!o || typeof o !== "object") return o;
@@ -2378,7 +2392,6 @@
   // NÃO entram: ecrã, mês e filtros. Esses voltam ao início sempre que se abre a aplicação ou se
   // muda de orçamento (reporVistaInicial), em qualquer aparelho — e um filtro posto no
   // computador a aparecer de repente no telemóvel, a meio do uso, esconderia linhas sem razão.
-  var VISTA_UI = ["reportMonths","reportFrom","reportTo","reportMode","payeeSort","coverMode","fundStrategy","recoverStrategy","surplusSemAlvo"];
   function recolheVista(st){
     st = st || state;
     var v = { collapsed:{} }, c = st.collapsed || {};
@@ -2400,10 +2413,36 @@
     var nova = recolheVista();
     if (JSON.stringify(nova) !== JSON.stringify(state.settings.vista || null)) state.settings.vista = nova;
   }
+  // ---------- Protecção contra orçamentos esvaziados ----------
+  // Um orçamento lido com falha voltava VAZIO, sem aviso — e esse vazio era depois gravado por
+  // cima do verdadeiro (save, cópia guardada) e enviado para a nuvem (o pacote lê os orçamentos
+  // não abertos daqui). O outro aparelho adotava-o em silêncio ao abrir. Recuperar não resolvia:
+  // ao reabrir, o vazio voltava. Três barreiras: (1) a leitura distingue «não existe» de
+  // «existe mas falhou» e, no segundo caso, tenta devolver os dados tal como estão e avisa com
+  // a razão; (2) nunca se grava um orçamento sem dados por cima de um que tem, excepto quando
+  // se pediu para o esvaziar; (3) a nuvem não esvazia um orçamento deste aparelho sem perguntar.
+  function semDados(st){ return !st || (!(st.transactions||[]).length && !(st.accounts||[]).length && !(st.categories||[]).length); }
+  function textoSemDados(txt){
+    if (txt == null) return true;
+    if (String(txt).length > 4000) return false;          // um orçamento com dados nunca é tão curto
+    try { return semDados(JSON.parse(txt)); } catch(e){ return false; }   // ilegível ≠ vazio: não se toca
+  }
+  function gravaOrcamento(id, json, permitirVazio){
+    if (typeof json !== "string") throw new Error("orçamento sem conteúdo");   // nunca «undefined»
+    if (!permitirVazio && textoSemDados(json)) {
+      var atual = null; try { atual = localStorage.getItem(budKey(id)); } catch(e){}
+      if (atual && !textoSemDados(atual)) { var er = new Error("protegido"); er.protegido = true; throw er; }
+    }
+    localStorage.setItem(budKey(id), json);
+  }
+  function avisoProtegido(nome){
+    toast("Não gravei «"+nome+"» vazio por cima dos dados que lá estão. Feche e volte a abrir a aplicação.");
+  }
   function loadBudgetRaw(id){
     try {
       var raw = localStorage.getItem(budKey(id));
       if (!raw) return JSON.parse(JSON.stringify(DEFAULT_STATE));
+      delete _falhaLeitura[id];
       var o = JSON.parse(raw);
       o.settings = o.settings || { locale:"pt-PT", currency:"EUR" };
       o.collapsed = o.collapsed || {}; o.assignments = o.assignments || {}; o.snooze = o.snooze || {};
@@ -2431,7 +2470,28 @@
                             malva:"violeta", ocre:"grafite", telha:"ameixa" };
       if (CORES_ANTIGAS[o.settings.theme]) o.settings.theme = CORES_ANTIGAS[o.settings.theme];
       return aplicaVista(sanearEstado(o));   // também cobre o pacote da nuvem, que passa por aqui
-    } catch(e){ return JSON.parse(JSON.stringify(DEFAULT_STATE)); }
+    } catch(e){
+      // Existe mas não se conseguiu preparar. Guarda-se a razão (vai no aviso) e tenta-se devolver
+      // os dados como estão, com o mínimo para a aplicação funcionar — um orçamento com um campo
+      // estranho é muito melhor do que um vazio que depois é gravado por cima.
+      _falhaLeitura[id] = String((e && e.message) || e);
+      var nm = (typeof budgetName === "function" && _bindex) ? budgetName(id) : id;
+      setTimeout(function(){ toast("Houve um problema a ler «"+nm+"» ("+_falhaLeitura[id]+"). Os dados não foram alterados."); }, 400);
+      try {
+        var o2 = JSON.parse(localStorage.getItem(budKey(id)));
+        if (o2 && typeof o2 === "object" && Array.isArray(o2.transactions) && Array.isArray(o2.accounts)) {
+          o2.settings = (o2.settings && typeof o2.settings === "object") ? o2.settings : { locale:"pt-PT", currency:"EUR" };
+          o2.groups = o2.groups || []; o2.categories = o2.categories || [];
+          o2.assignments = o2.assignments || {}; o2.snooze = o2.snooze || {}; o2.collapsed = o2.collapsed || {};
+          o2.recurring = o2.recurring || []; o2.moves = Array.isArray(o2.moves) ? o2.moves : [];
+          o2.backup = o2.backup || { at:null, sig:null, autoDay:null, pend:0 };
+          o2.ui = { view:"budget", month:nowMonthKey() };
+          try { sanearEstado(o2); } catch(e3){}
+          return o2;
+        }
+      } catch(e2){}
+      return JSON.parse(JSON.stringify(DEFAULT_STATE));   // protegido pelo gravaOrcamento
+    }
   }
   // Estado de VISTA reposto sempre que se "abre" um orçamento (entrar na aplicação ou trocar de
   // orçamento). Só toca no state.ui — nunca em dados. Sem isto, a aplicação reabria onde se tinha
@@ -5237,6 +5297,9 @@
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.83", "outubro 2026", [
+        '<b>Protecção contra orçamentos esvaziados.</b> Se a aplicação não conseguir ler um orçamento, já não o substitui por um vazio: mostra o que lá está e diz porquê. Nunca grava um orçamento vazio por cima de um com dados (só «Apagar todos os dados» o faz), não envia um vazio para a nuvem, e se a nuvem trouxer um orçamento vazio que neste aparelho tem dados, <b>pergunta</b> antes — com a opção de manter os daqui e os enviar.',
+      ])+
       ver("1.82", "outubro 2026", [
         'Os <b>🕑 Movimentos recentes</b> guardam agora os <b>últimos 40</b> (eram 30).',
       ])+
@@ -7003,7 +7066,9 @@
           '<b>Não se pode anular</b> com o ↩ — guarda-se um ponto 🛟 antes, em «Dados e cópias».',
         entao:function(){ pontoDeSeguranca("antes de apagar todos os dados");
           state=JSON.parse(JSON.stringify(DEFAULT_STATE)); state.ui.month=nowMonthKey();
-          limparHistorico(); hideUndo(); closeModal(); save(); render(); toast("Dados apagados."); } });
+          _podeEsvaziar = true;   // aqui esvaziar é mesmo o pedido
+          try { limparHistorico(); hideUndo(); closeModal(); save(); } finally { _podeEsvaziar = false; }
+          render(); toast("Dados apagados."); } });
     }
   };
 
@@ -7068,7 +7133,11 @@
   // O pacote que vai para o gist: os orçamentos todos, o ativo do primeiro-a-ser-visto no fim.
   function syncContainer(){
     return { v:2, active:_bindex.active, budgets: _bindex.list.map(function(b){
-      return { id:b.id, name:b.name, data: (b.id===_bindex.active) ? state : loadBudgetRaw(b.id) };
+      var d = (b.id===_bindex.active) ? state : loadBudgetRaw(b.id);
+      // Nunca enviar para a nuvem um orçamento que veio vazio por não se ter conseguido ler — o
+      // outro aparelho adotá-lo-ia. Pára a sincronização e diz porquê.
+      if (_falhaLeitura[b.id] && semDados(d)) throw new Error("leitura: «"+b.name+"»");
+      return { id:b.id, name:b.name, data:d };
     }) };
   }
   function backupPending(){
@@ -7143,10 +7212,11 @@
         state.backup.dev = _deviceId; state.backup.devNome = nomeDesteAparelho();
       } else {
         var st = loadBudgetRaw(id);
+        if (_falhaLeitura[id]) continue;   // lido com falha: não se reescreve
         st.backup = st.backup || {};
         st.backup.at = agora; st.backup.sig = sigOf(st); st.backup.pend = 0;
         st.backup.dev = _deviceId; st.backup.devNome = nomeDesteAparelho();
-        try { localStorage.setItem(budKey(id), JSON.stringify(st)); } catch(e){}
+        try { gravaOrcamento(id, JSON.stringify(st)); } catch(e){}
       }
     }
   }
@@ -7576,6 +7646,7 @@
   function msgSync(e){
     var m = (e && e.message) || "";
     if (/corrida/.test(m))      return "Outro aparelho estava a guardar ao mesmo tempo. Nada se perdeu — tente daqui a pouco.";
+    if (/^leitura: /.test(m))   return "Não enviei nada: não consegui ler o orçamento "+m.slice(9)+" neste aparelho, e enviá-lo vazio apagava-o no outro.";
     if (/\(404\)/.test(m))      return "A cópia na nuvem não foi encontrada. Verifique a configuração da sincronização.";
     if (/\(401\)|\(403\)/.test(m)) return "O GitHub recusou o token — pode ter expirado ou sido revogado.";
     if (/decrypt|Unexpected token|palavra-passe/i.test(m)) return "Não foi possível abrir a cópia da nuvem — a palavra-passe pode ser diferente.";
@@ -7630,7 +7701,7 @@
     }
     return { soNuvem:soNuvem, soAqui:soAqui, orcSoNuvem:orcSoNuvem, orcSoAqui:orcSoAqui };
   }
-  function adoptRemote(remoto, rev){
+  function adoptRemote(remoto, rev, opts){
     // Compatibilidade: a nuvem pode ainda ter o formato antigo (um só orçamento).
     if (remoto && remoto.accounts && !remoto.budgets) {
       remoto = { v:2, active:_bindex.active, budgets:[{ id:_bindex.active, name:budgetName(_bindex.active), data:remoto }] };
@@ -7643,13 +7714,42 @@
       toast("A cópia na nuvem está vazia ou corrompida — nada foi alterado neste aparelho.");
       return;
     }
+    // A nuvem traz VAZIO um orçamento que aqui tem dados? Isso não se aceita em silêncio — foi
+    // exactamente assim que um orçamento esvaziado num aparelho apagava o do outro, ao abrir.
+    if (!(opts && (opts.aceitarVazios || opts.manter))) {   // já decidido: não volta a perguntar
+      var esvazia = [];
+      for (var q=0;q<remoto.budgets.length;q++){
+        var rb = remoto.budgets[q];
+        if (!semDados(rb.data)) continue;
+        var loc = (rb.id===_bindex.active) ? state : (budgetName(rb.id) ? loadBudgetRaw(rb.id) : null);
+        if (loc && !semDados(loc)) esvazia.push({ id:rb.id, nome:rb.name||budgetName(rb.id), n:(loc.transactions||[]).length });
+      }
+      if (esvazia.length) {
+        setSyncStatus("Por decidir ⚠️");
+        var nomes = esvazia.map(function(x){ return "<b>"+esc(x.nome)+"</b> ("+x.n+" transaç"+(x.n===1?"ão":"ões")+" aqui)"; }).join(", ");
+        var perg = function(){ perguntar({ titulo:"⚠️ A nuvem traz um orçamento vazio", perigo:true,
+          // O × da janela vale como «não» — por isso o «não» é o seguro: manter os dados.
+          sim:"Aceitar vazio", nao:"Manter os deste aparelho",
+          texto:'A cópia na nuvem tem '+nomes+' <b>sem dados</b>, mas neste aparelho '+(esvazia.length===1?'ele tem':'eles têm')+' dados.<br><br>'+
+            'O mais provável é ter sido esvaziado por engano noutro aparelho. <b>Manter os deste aparelho</b> fica com os dados daqui e envia-os para a nuvem. '+
+            'Escolha <b>Aceitar vazio</b> só se apagou os dados de propósito.',
+          entao:function(){ adoptRemote(remoto, rev, { aceitarVazios:true }); },
+          senao:function(){ adoptRemote(remoto, rev, { manter: esvazia.map(function(x){ return x.id; }) }); } }); };
+        if (el("modalOverlay").classList.contains("open")) _avisoSyncPendente = perg; else perg();
+        return;
+      }
+    }
+    var manter = (opts && opts.manter) || [];
     var ui = state.ui;                    // preserva a vista/mês/tema deste dispositivo
     pontoDeSeguranca("antes de adotar a versão da nuvem");
     var antigos = _bindex.list.map(function(b){ return b.id; });
     var lista = [];
     for (var i=0;i<remoto.budgets.length;i++){
       var b=remoto.budgets[i];
-      try { localStorage.setItem(budKey(b.id), JSON.stringify(b.data)); } catch(e){}
+      if (manter.indexOf(b.id) >= 0) {
+        // Fica o deste aparelho (o que está aberto vai de memória para o disco).
+        if (b.id===_bindex.active) { try { gravaOrcamento(b.id, JSON.stringify(state)); } catch(e){} }
+      } else { try { gravaOrcamento(b.id, JSON.stringify(b.data), true); } catch(e){} }
       lista.push({ id:b.id, name:b.name });
     }
     // limpa os orçamentos que a nuvem já não tem
@@ -7664,8 +7764,12 @@
     // e a sincronização seguinte enviava-o para lá — desfazendo a adoção sem ninguém querer.
     limparHistorico(); hideUndo();
     _idx = null; _payees = null; _ultimoJSON = null; _sigCache = null;
-    _sync.baseRev = rev; save(); _sync.syncedSig = allSig(); saveSyncCfg();
+    _sync.baseRev = rev; save();
+    // Mantendo orçamentos deste aparelho, aqui há o que a nuvem não tem: fica marcado como por
+    // enviar (sem isto a assinatura dizia «igual à nuvem» e os dados bons nunca subiam).
+    _sync.syncedSig = manter.length ? "por-enviar" : allSig(); saveSyncCfg();
     render();
+    if (manter.length) { toast("Mantive os dados deste aparelho — a enviar para a nuvem…"); setTimeout(function(){ syncNow({silent:true}); }, 300); }
   }
   async function syncNow(opts){
     opts = opts || {};
