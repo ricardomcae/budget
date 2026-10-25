@@ -1278,7 +1278,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.83";
+  var APP_VERSION = "1.84";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -4740,6 +4740,12 @@
           '<input type="checkbox" data-action="sync-toggle-auto" '+(_sync.auto?"checked":"")+' style="width:auto;"> Sincronizar automaticamente ao guardar</label>'+
           '<div class="hint" style="margin-top:4px;">Também sincroniza sempre que abre a aplicação.</div></div>'+
         '<div class="field"><button class="btn primary" data-action="sync-now" style="width:100%;justify-content:center;">🔄 Sincronizar agora</button></div>'+
+        // O último erro, com as palavras do próprio GitHub: um aviso de 2 segundos não chega para
+        // decidir se é preciso trocar o token ou só esperar.
+        (_sync.ultimoErro ? '<div class="field"><div class="hint" style="border:1px solid var(--warning);border-radius:9px;padding:8px 10px;">'+
+          '<b>Último problema</b> ('+esc(fmtDateTime(_sync.ultimoErro.at))+'): '+esc(_sync.ultimoErro.texto)+
+          (_sync.ultimoErro.gh ? '<br><span class="muted">GitHub ('+esc(String(_sync.ultimoErro.status||""))+'): «'+esc(_sync.ultimoErro.gh)+'»</span>' : '')+
+          '</div></div>' : '')+
         '<div class="field"><label>Token novo <span class="muted">(se expirou ou foi revogado)</span></label>'+
           '<input id="syncNewToken" maxlength="255" type="password" placeholder="cole aqui o token novo do GitHub">'+
           '<button class="btn" data-action="sync-update-token" style="width:100%;justify-content:center;margin-top:8px;">🔑 Atualizar token</button>'+
@@ -5297,6 +5303,9 @@
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.84", "outubro 2026", [
+        'A sincronização passou a distinguir um <b>token que já não vale</b> de uma <b>pausa pedida pelo GitHub</b> (demasiados pedidos seguidos) — antes, os dois davam «o GitHub recusou o token». Numa pausa, a aplicação espera sozinha até à hora indicada e retoma; em «Sincronização» fica escrito o último problema, com a mensagem do próprio GitHub.',
+      ])+
       ver("1.83", "outubro 2026", [
         '<b>Protecção contra orçamentos esvaziados.</b> Se a aplicação não conseguir ler um orçamento, já não o substitui por um vazio: mostra o que lá está e diz porquê. Nunca grava um orçamento vazio por cima de um com dados (só «Apagar todos os dados» o faz), não envia um vazio para a nuvem, e se a nuvem trouxer um orçamento vazio que neste aparelho tem dados, <b>pergunta</b> antes — com a opção de manter os daqui e os enviar.',
       ])+
@@ -7611,9 +7620,28 @@
 
   // ---- Ligação ao GitHub (gists) ----
   function ghHeaders(){ return { "Authorization":"Bearer "+_sync.token, "Accept":"application/vnd.github+json", "Content-Type":"application/json" }; }
+  // Erro do GitHub com o que é preciso para o EXPLICAR. O código sozinho não chega: o GitHub
+  // responde 403 tanto a um token sem acesso como a «demasiados pedidos» (limites de abuso), e
+  // a aplicação dizia sempre «token recusado — pode ter expirado» — mandando trocar um token
+  // que estava bom. Lê-se a mensagem do GitHub e os cabeçalhos dos limites para separar os casos.
+  async function erroGH(res, etapa){
+    var msg = "", h = res.headers, hd = function(n){ try { return h && h.get ? h.get(n) : null; } catch(e){ return null; } };
+    try { var t = await res.text(); try { msg = (JSON.parse(t)||{}).message || t; } catch(e){ msg = t; } } catch(e){}
+    msg = String(msg||"").slice(0, 200);
+    var e = new Error(etapa+" ("+res.status+")");
+    e.status = res.status; e.ghMsg = msg;
+    var resta = hd("x-ratelimit-remaining"), reset = +hd("x-ratelimit-reset") || 0, depois = +hd("retry-after") || 0;
+    if (res.status === 429 || (res.status === 403 && (resta === "0" || /rate limit|abuse|secondary/i.test(msg)))) {
+      e.limite = true;
+      e.esperaAte = depois ? Date.now() + depois*1000
+                  : (resta === "0" && reset ? reset*1000 + 5000
+                  : Date.now() + Math.min(60, Math.pow(2, Math.min(6, (_sync.pausas||0))))*60000);   // 1, 2, 4… até 60 min
+    }
+    return e;
+  }
   async function gistRead(){
     var res = await fetch("https://api.github.com/gists/"+_sync.gistId, { headers: ghHeaders() });
-    if (!res.ok) throw new Error("leitura ("+res.status+")");
+    if (!res.ok) throw await erroGH(res, "leitura");
     var g = await res.json(), f = g.files && g.files["orcamento.enc.json"];
     if (!f) throw new Error("ficheiro não encontrado no gist");
     var content = f.content;
@@ -7623,12 +7651,12 @@
   async function gistWrite(outer){
     var res = await fetch("https://api.github.com/gists/"+_sync.gistId, { method:"PATCH", headers: ghHeaders(),
       body: JSON.stringify({ files:{ "orcamento.enc.json":{ content: JSON.stringify(outer) } } }) });
-    if (!res.ok) throw new Error("escrita ("+res.status+")");
+    if (!res.ok) throw await erroGH(res, "escrita");
   }
   async function gistCreate(outer){
     var res = await fetch("https://api.github.com/gists", { method:"POST", headers: ghHeaders(),
       body: JSON.stringify({ description:"O Meu Orçamento (cifrado)", public:false, files:{ "orcamento.enc.json":{ content: JSON.stringify(outer) } } }) });
-    if (!res.ok) throw new Error("criação ("+res.status+")");
+    if (!res.ok) throw await erroGH(res, "criação");
     return (await res.json()).id;
   }
 
@@ -7648,11 +7676,14 @@
     if (/corrida/.test(m))      return "Outro aparelho estava a guardar ao mesmo tempo. Nada se perdeu — tente daqui a pouco.";
     if (/^leitura: /.test(m))   return "Não enviei nada: não consegui ler o orçamento "+m.slice(9)+" neste aparelho, e enviá-lo vazio apagava-o no outro.";
     if (/\(404\)/.test(m))      return "A cópia na nuvem não foi encontrada. Verifique a configuração da sincronização.";
-    if (/\(401\)|\(403\)/.test(m)) return "O GitHub recusou o token — pode ter expirado ou sido revogado.";
+    if (e && e.limite)         return "O GitHub pediu uma pausa (demasiados pedidos seguidos). Volto a tentar sozinho às "+horaDe(e.esperaAte)+" — os dados ficam guardados neste aparelho.";
+    if (/\(401\)/.test(m))      return "O GitHub não reconhece o token: expirou ou foi revogado. Crie um novo e use «🔑 Atualizar token».";
+    if (/\(403\)/.test(m))      return "O GitHub recusou o pedido" + (e && e.ghMsg ? ": «"+e.ghMsg+"»" : ".") + " Veja se o token tem a permissão «gist».";
     if (/decrypt|Unexpected token|palavra-passe/i.test(m)) return "Não foi possível abrir a cópia da nuvem — a palavra-passe pode ser diferente.";
     if (/Failed to fetch|NetworkError|network/i.test(m)) return "Não foi possível chegar ao GitHub. Verifique a ligação à Internet.";
     return "Não foi possível concluir a sincronização. Tente novamente daqui a pouco.";
   }
+  function horaDe(ms){ var d = new Date(ms||Date.now()); return pad(d.getHours())+":"+pad(d.getMinutes()); }
   async function pushLocal(rev){
     // Assinatura do que VAI ser enviado, capturada AGORA (antes das idas à rede). Se a gravássemos
     // no fim, a partir do estado atual, uma edição feita durante a sincronização ficaria marcada
@@ -7771,9 +7802,16 @@
     render();
     if (manter.length) { toast("Mantive os dados deste aparelho — a enviar para a nuvem…"); setTimeout(function(){ syncNow({silent:true}); }, 300); }
   }
+  var _retomaTimer = null;
   async function syncNow(opts){
     opts = opts || {};
     if (_syncing || !syncReady()) return;
+    if (_sync.pausaAte && Date.now() < _sync.pausaAte) {
+      setSyncStatus("Pausa pedida pelo GitHub — até às "+horaDe(_sync.pausaAte)+" ⏸");
+      if (!opts.silent) toast("O GitHub pediu uma pausa. Volto a tentar sozinho às "+horaDe(_sync.pausaAte)+" — insistir antes pode piorar.");
+      clearTimeout(_retomaTimer); _retomaTimer = setTimeout(function(){ syncNow({silent:true}); }, _sync.pausaAte - Date.now() + 2000);
+      return;
+    }
     _syncing = true; setSyncStatus("A sincronizar…");
     try {
       var outer = null;
@@ -7813,7 +7851,8 @@
         setSyncStatus("Já sincronizado ✓");
         if (!opts.silent) toast("Já está sincronizado.");
       }
-      _sync.lastSyncAt = new Date().toISOString(); saveSyncCfg();   // carimbo da última sincronização bem-sucedida
+      _sync.lastSyncAt = new Date().toISOString();   // carimbo da última sincronização bem-sucedida
+      _sync.pausaAte = null; _sync.pausas = 0; _sync.ultimoErro = null; saveSyncCfg();
     } catch(e){
       // Gist não encontrado (apagado no GitHub, ID errado, ou o token deixou de lhe aceder).
       // NUNCA criar outro em silêncio: com dois aparelhos ligados, cada um criaria o seu
@@ -7823,9 +7862,23 @@
         setSyncStatus("Gist não encontrado ⚠️");
         _syncing = false; abrirAvisoSync(gistLostModal, opts); return;
       }
+      // Limite de pedidos: pausa até à hora que o GitHub indicar (ou 1, 2, 4… minutos). Insistir
+      // durante uma pausa pode levar o GitHub a bloquear de vez — por isso nem a sincronização
+      // automática nem a manual vão à rede antes dessa hora.
+      if (e && e.limite) {
+        _sync.pausaAte = e.esperaAte; _sync.pausas = (_sync.pausas||0) + 1;
+        _sync.ultimoErro = { at:new Date().toISOString(), texto: msgSync(e), gh: e.ghMsg||"", status: e.status };
+        saveSyncCfg();
+        setSyncStatus("Pausa pedida pelo GitHub — até às "+horaDe(e.esperaAte)+" ⏸");
+        if (!opts.silent) toast(msgSync(e));
+        clearTimeout(_retomaTimer); _retomaTimer = setTimeout(function(){ syncNow({silent:true}); }, Math.max(5000, e.esperaAte - Date.now() + 2000));
+        _syncing = false; return;
+      }
       if (/\(401\)|\(403\)/.test(e.message)) {
-        setSyncStatus("Token recusado ⚠️");
-        toast("O GitHub recusou o token — pode ter expirado ou sido revogado.");
+        _sync.ultimoErro = { at:new Date().toISOString(), texto: msgSync(e), gh: (e && e.ghMsg)||"", status: e && e.status };
+        saveSyncCfg();
+        setSyncStatus(/\(401\)/.test(e.message) ? "Token não aceite ⚠️" : "GitHub recusou ⚠️");
+        toast(msgSync(e));
         _syncing = false; return;
       }
       // Outro aparelho publicou entre a nossa leitura e a nossa escrita. Nada se perdeu:
