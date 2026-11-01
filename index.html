@@ -1278,7 +1278,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.84";
+  var APP_VERSION = "1.86";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -2099,6 +2099,30 @@
   // por mês, por isso expira sozinho — no mês seguinte volta a pedir sem ser preciso fazer nada.
   function isSnoozed(catId, m){ return !!(state.snooze && state.snooze[catId+"|"+m]); }
 
+  // MÊS DO PAGAMENTO de um alvo «Repor» com prazo (até uma data; trimestral/semestral/anual com
+  // mês da despesa). O dinheiro juntou-se para ESTA despesa: pagá-la neste mês não pode voltar a
+  // pedir o total. Antes, o gasto baixava o saldo, o «falta» subia, e — sendo o último mês —
+  // pedia tudo de uma vez: IMI de 271,24 €, com 232,36 € juntos e pago a 1 de novembro por
+  // 271,27 €, pedia 310,15 € (os 38,91 € em falta MAIS outra vez os 271,24 €).
+  // Agora conta o que estava juntado ANTES do gasto deste mês (como o alvo mensal já fazia:
+  // «gastar não reabre o alvo») e pede o maior de dois valores: o que falta para o total, e o
+  // que falta para a categoria não ficar negativa (a conta pode vir uns cêntimos acima do
+  // previsto). Sem gasto este mês, dá exactamente o mesmo que antes. Só se aplica no mês do
+  // pagamento: nos meses anteriores, um gasto continua a ter de ser reposto até à data.
+  function alvoNoMesDoPagamento(cat, m, amt, avail, dataTxt){
+    var act = activityFor(cat.id, m);
+    if (!(act < -0.005)) return null;                 // nada gasto este mês: regra normal
+    var juntado = round2(avail - act);                // o que havia antes de pagar (inclui o atribuído este mês)
+    var paraTotal = round2(amt - juntado), paraZero = round2(-avail);
+    var need = Math.max(0, paraTotal, paraZero);
+    need = round2(need);
+    var gasto = round2(-act);
+    return { need:need, met: need <= 0.005, doMes: need <= 0.005,
+      progress: Math.max(0, Math.min(1, amt>0 ? juntado/amt : 0)),
+      label: need > 0.005
+        ? ("Mês do pagamento ("+dataTxt+") — pagou "+fmt(gasto)+" e tinha "+fmt(Math.max(0,juntado))+" juntos: falta "+fmt(need)+(paraZero >= paraTotal ? " para a categoria ficar a zero" : " para o total de "+fmt(amt)))
+        : ("🎯 Pago — "+fmt(gasto)+" em "+dataTxt+", com o dinheiro juntado") };
+  }
   function targetInfo(cat, m) {
     if (!cat.target || !(cat.target.amount>0)) return null;
     var tg = cat.target, type = tg.type || "monthly", amt = tg.amount;
@@ -2160,6 +2184,10 @@
       var dueEff = tg.due || null, gd = 0;
       while (dueEff && monthsBetween(m, dueEff) < 0 && gd++ < 4000) dueEff = shiftMonth(dueEff, per);
 
+      if (dueEff && monthsBetween(m, dueEff) === 0) {
+        var pg = alvoNoMesDoPagamento(cat, m, amt, avail, monthLabel(dueEff));
+        if (pg) return pg;
+      }
       var falta = round2(amt - avail);
       if (falta <= 0.005) {
         return { need:0, met:true, progress:1,
@@ -2208,6 +2236,10 @@
                           : ("✅ Reservado o deste mês — "+fmt(slFix)+"/mês até "+monthLabel(target)) };
       }
       var diff = monthsBetween(m, target), left = diff>=0 ? diff+1 : 1;
+      if (diff === 0) {
+        var pg3 = alvoNoMesDoPagamento(cat, m, amt, avail, monthLabel(target));
+        if (pg3) return pg3;
+      }
       var remain = round2(amt - avail);
       // PRAZO TERMINADO. O "até uma data" é uma meta ÚNICA, não uma cadência: passada a data não
       // há mais nada a pedir. Sem esta saída, gastar o dinheiro DEPOIS do prazo punha o saldo a
@@ -2277,6 +2309,11 @@
     var entries = [];
     if (mode !== "cap") {
       entries = needs.map(function(n){ return {catId:n.catId, name:n.name, add:n.need, prio:n.prio}; });
+    } else if (strategy === "manual") {
+      // Escolher à mão: cada categoria marcada recebe o que o seu alvo pede, por inteiro. Não se
+      // corta ao que há por atribuir — quem escolhe vê o total e o que fica, a vermelho se passar.
+      entries = needs.filter(function(n){ return !!_fundSel[n.catId]; })
+                     .map(function(n){ return {catId:n.catId, name:n.name, add:n.need, prio:n.prio}; });
     } else if (rta > 0.005) {
       if (strategy === "prop") {
         var totalNeed = 0; needs.forEach(function(n){ totalNeed += n.need; });
@@ -5181,7 +5218,7 @@
         '<li><b>Todos os ecrãs têm o mesmo desenho: uma faixa em cima que não se mexe, e um cartão que desliza.</b> Na faixa ficam os <b>botões</b>, os <b>filtros</b>, o <b>resumo</b> do que se está a ver e o <b>cabeçalho</b> da lista — Data, Beneficiário, Categoria… nas Transações; <b>Categoria · Atribuído · Atividade · Disponível</b> no Orçamento, onde fica também o <b>Pronto a atribuir</b>. Daí para baixo é que se desliza.</li>'+
         '<li><b>O que corre é o conteúdo do cartão, e não a página.</b> O contorno arredondado fica parado; as linhas é que passam lá dentro. No telemóvel isso quer dizer que o cartão se puxa também <b>para o lado</b>, onde a tabela é mais larga do que o ecrã — é assim que se chega ao <b>✓</b>, ao <b>⧉</b> e ao <b>🗑</b> de cada linha.</li>'+
         '<li><b>Os valores mostram-se sempre por extenso</b> — <b>8,50</b> e não <b>8,5</b>, <b>1.234,50</b> e não <b>1234,5</b> — em todos os campos, alinhados à direita. Ao escrever pode usar o formato que lhe der jeito: <b>8,5</b>, <b>8.50</b> ou <b>1234,50</b>.</li>'+
-        '<li><b>Contas nos campos de dinheiro:</b> em qualquer campo de valor pode escrever a conta em vez do total — <b>23,45+11,90+7,15</b>. O resultado aparece por baixo enquanto escreve e substitui a conta assim que sai do campo. No <b>telemóvel</b> aparece um <b>teclado próprio</b> com <b>+</b> e <b>−</b>, sem letras nem risco de enganos. Num par <b>Saída/Entrada</b>, um <b>−</b> escrito no princípio do campo continua a passar o valor para o outro lado; depois de números, é uma subtração.</li>'+
+        '<li><b>Contas nos campos de dinheiro:</b> em qualquer campo de valor pode escrever a conta em vez do total — <b>23,45+11,90+7,15</b>. O resultado aparece por baixo enquanto escreve e substitui a conta assim que sai do campo. No <b>telemóvel</b> aparece um <b>teclado próprio</b> com <b>+</b> e <b>−</b>, sem letras nem risco de enganos. No <b>computador</b> escreve-se no próprio campo, também no <b>Atribuído</b> do orçamento: <b>Enter</b> aplica, <b>Esc</b> desiste e <b>Tab</b> aplica e passa à categoria seguinte. Num par <b>Saída/Entrada</b>, um <b>−</b> escrito no princípio do campo continua a passar o valor para o outro lado; depois de números, é uma subtração.</li>'+
         '<li><b>Datas e teclado:</b> as datas escrevem-se sempre em <b>dd/mm/aaaa</b>, mesmo que tenha o browser noutro idioma — pode escrever só os números, que as barras aparecem sozinhas, ou usar o 📅 para as escolher no calendário. Dentro de qualquer janela, o <b>Enter</b> vale por carregar no botão principal.</li>'+
         '<li><b>Cor da aplicação:</b> oito à escolha, em <b>Dados e cópias → Definições</b> — basta tocar numa bolinha. Vão do petróleo ao rosa pelo lado do roxo, mais um cinzento e um castanho, e nenhuma é verde nem laranja de propósito: uma cor de marca nessas zonas confunde-se, a um relance, com as barras que dizem se há dinheiro. No computador, o círculo no canto superior direito percorre-as uma a uma. A cor <b>é de cada orçamento</b>, e não do aparelho: fica guardada com ele e vai na sincronização, como as outras definições. Dê uma cor a cada um — verde-azulado ao <b>Pessoal</b>, framboesa ao <b>Família</b>, por exemplo — e passa a saber num relance qual está aberto, no telemóvel e no computador, sem ler o nome. Os verdes e vermelhos dos valores nunca mudam — são eles que dizem se há ou não dinheiro.</li>'+
         '<li><b>Esc</b> dentro de um campo desfaz o que estava a escrever e larga o campo, sem gravar. Dentro de uma janela, é preciso carregar duas vezes: a primeira sai do campo, a segunda fecha a janela. Na <b>caixa de procura</b> das Transações o Esc <b>apaga</b> o texto (e o cursor fica lá) — o mesmo que o <b>✕</b> dentro da caixa.</li>'+
@@ -5197,7 +5234,7 @@
         '<li><b>A despesa por categoria</b> conta só o que <b>saiu a mais do que entrou</b>: uma categoria onde devolveu mais do que gastou, ou uma entrada sem categoria, não aparecem — não são despesa. Mostra as <b>15 maiores</b> do período; as restantes somam-se numa linha <b>«Outras N categorias»</b>, sempre no fim — mesmo quando a soma delas dá uma barra maior do que alguma acima, porque é um total e não uma categoria. No computador, o rato por cima dela diz quais são e quanto vale cada uma.</li>'+
       '<li><b>A evolução por categoria</b>, no fim, põe lado a lado as categorias que escolher, ao longo dos meses: escolhem-se nas <b>bolinhas</b> por baixo do gráfico, que aparecem pela mesma ordem do ecrã <b>Orçamento</b>, e a cor de cada uma acompanha-a. Se nunca escolheu nenhuma, a aplicação propõe as de maior despesa.</li>'+
         '<li><b>Gasto ou Atribuído:</b> o mesmo gráfico lê-se de duas maneiras — o que <b>saiu de facto</b> em cada mês, ou o que <b>pôs lá</b> em cada mês. Ver os dois é a maneira mais rápida de perceber se um alvo está bem calibrado.</li>'+
-        '<li><b>As categorias escolhidas acompanham o orçamento</b> e chegam aos outros aparelhos. O <b>período</b> e o modo <b>Gasto/Atribuído</b> ficam em cada aparelho, como o mês em que está.</li>'+
+        '<li><b>As categorias escolhidas acompanham o orçamento</b> e chegam aos outros aparelhos — tal como o <b>período</b> e o modo <b>Gasto/Atribuído</b>. O mês em vista é que fica em cada aparelho.</li>'+
       '</ul>'+
 
       sec("Organizar")+
@@ -5303,6 +5340,13 @@
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.86", "novembro 2026", [
+        'No <b>computador</b>, o <b>Atribuído</b> escreve-se no próprio campo, sem o teclado de ecrã — como a Saída/Entrada das transações. Aceita contas (<b>120+35</b>, com «= 155,00» por baixo); <b>Enter</b> aplica, <b>Esc</b> desiste, <b>Tab</b> aplica e passa à categoria seguinte. No telemóvel fica igual.',
+        '<b>🎯 Financiar alvos → Repartir → «Escolher à mão»</b>: marque categoria a categoria, ou grupos inteiros, e veja em tempo real quanto vai atribuir e quanto fica por atribuir. Cada categoria marcada recebe o que o seu alvo pede.',
+      ])+
+      ver("1.85", "novembro 2026", [
+        'Alvos <b>«Repor» com prazo</b> (até uma data; trimestral, semestral ou anual com mês da despesa): <b>pagar a despesa no próprio mês</b> já não faz o alvo pedir o total outra vez. Exemplo: IMI de 271,24 € com 232,36 € juntos, pago a 1 de novembro por 271,27 € — pedia 310,15 €, agora pede os 38,91 € que deixam a categoria a zero.',
+      ])+
       ver("1.84", "outubro 2026", [
         'A sincronização passou a distinguir um <b>token que já não vale</b> de uma <b>pausa pedida pelo GitHub</b> (demasiados pedidos seguidos) — antes, os dois davam «o GitHub recusou o token». Numa pausa, a aplicação espera sozinha até à hora indicada e retoma; em «Sincronização» fica escrito o último problema, com a mensagem do próprio GitHub.',
       ])+
@@ -5463,6 +5507,16 @@
     numeraSeccoes();
   }
 
+  // Seleção do «Escolher à mão» do Financiar alvos. Só desta sessão (não é guardada): é uma
+  // escolha para ESTE financiamento, e começa vazia de cada vez que se abre a janela.
+  var _fundSel = {}, _fundScroll = 0;
+  function fundToggle(tipo, id, ligar){
+    var m = state.ui.month, ids = [];
+    if (tipo === "grupo") categoriesOfGroup(id).forEach(function(c){ var ti = targetInfo(c, m); if (ti && ti.need > 0) ids.push(c.id); });
+    else if (tipo === "todas") fundingPlan("full", m).entries.forEach(function(e){ ids.push(e.catId); });
+    else ids = [id];
+    ids.forEach(function(c){ if (ligar) _fundSel[c] = true; else delete _fundSel[c]; });
+  }
   function fundModal() {
     var m = state.ui.month;
     var mode = state.ui._fundMode || "full";
@@ -5472,10 +5526,35 @@
     var anyNeed = fullPlan.entries.length>0;
     var after = plan.rtaAfter;
     var afterCls = after < -0.005 ? "neg" : (after>0.005 ? "pos" : "");
-    var afterMsg = after < -0.005 ? ("⚠️ Ficaria negativo em "+fmt(-after)+" — não tem dinheiro para cobrir todos os alvos.")
+    var afterMsg = (mode==="cap" && strat==="manual" && !plan.entries.length) ? "Marque as categorias ou os grupos que quer financiar."
+                 : after < -0.005 ? ("⚠️ Ficaria negativo em "+fmt(-after)+" — "+((mode==="cap" && strat==="manual") ? "as categorias marcadas pedem mais do que tem por atribuir." : "não tem dinheiro para cobrir todos os alvos."))
                  : (after>0.005 ? ("Sobrariam "+fmt(after)+" por atribuir.") : "Ficaria exatamente a zero. 🎯");
+    var manual = (mode==="cap" && strat==="manual");
     var rows;
-    if (plan.entries.length) rows = plan.entries.map(function(e){
+    if (manual && anyNeed) {
+      // Lista para escolher: as categorias com alvo por cumprir, arrumadas pelos grupos do
+      // orçamento, com uma caixa por grupo (marca/desmarca o grupo inteiro).
+      var porGrupo = {};
+      fullPlan.entries.forEach(function(e){ var c = categoryById(e.catId); var g = c ? c.groupId : ""; (porGrupo[g] = porGrupo[g] || []).push(e); });
+      rows = '<div style="display:flex;gap:8px;margin:2px 0 8px;"><button class="btn sm" data-action="fund-sel-todas">Marcar todas</button><button class="btn sm" data-action="fund-sel-nenhuma">Desmarcar todas</button></div>';
+      state.groups.forEach(function(g){
+        var es = porGrupo[g.id]; if (!es) return;
+        var todasG = es.every(function(e){ return _fundSel[e.catId]; }), algumaG = es.some(function(e){ return _fundSel[e.catId]; });
+        var somaG = 0; es.forEach(function(e){ somaG += e.add; });
+        rows += '<label class="opcao" style="display:flex;align-items:center;gap:8px;padding:8px 2px 4px;font-weight:700;border-bottom:1px solid var(--border);cursor:pointer;">'+
+                  '<input type="checkbox" data-fgrp="'+g.id+'" style="width:auto;"'+(todasG?" checked":"")+(algumaG&&!todasG?' data-meio="1"':'')+'>'+
+                  '<span style="flex:1;">'+esc(g.name)+(algumaG&&!todasG?' <span class="muted" style="font-weight:500;">(algumas)</span>':'')+'</span>'+
+                  '<span class="muted" style="font-variant-numeric:tabular-nums;">'+fmt(round2(somaG))+'</span></label>';
+        es.forEach(function(e){
+          var pl = (e.prio && e.prio!=="normal") ? ' <span class="tag">('+PRIO_LABEL[e.prio]+')</span>' : '';
+          rows += '<label class="opcao" style="display:flex;align-items:center;gap:8px;padding:6px 2px 6px 22px;border-bottom:1px solid var(--border);cursor:pointer;">'+
+                    '<input type="checkbox" data-fsel="'+e.catId+'" style="width:auto;"'+(_fundSel[e.catId]?" checked":"")+'>'+
+                    '<span style="flex:1;">'+esc(e.name)+pl+'</span>'+
+                    '<b style="font-variant-numeric:tabular-nums;">'+fmt(e.add)+'</b></label>';
+        });
+      });
+    }
+    else if (plan.entries.length) rows = plan.entries.map(function(e){
       var pl = (e.prio && e.prio!=="normal") ? ' <span class="tag">('+PRIO_LABEL[e.prio]+')</span>' : '';
       return '<div style="display:flex;justify-content:space-between;padding:7px 2px;border-bottom:1px solid var(--border);"><span>'+esc(e.name)+pl+'</span><b style="font-variant-numeric:tabular-nums;">+'+fmt(e.add)+'</b></div>';
     }).join("");
@@ -5499,14 +5578,32 @@
             '<option value="priority"'+(strat==="priority"?" selected":"")+'>Por prioridade — serve primeiro as Altas, depois as Normais, depois as Baixas</option>'+
             '<option value="prop"'+(strat==="prop"?" selected":"")+'>Proporcional — todas ficam igualmente perto do alvo (quem precisa mais, leva mais)</option>'+
             '<option value="order"'+(strat==="order"?" selected":"")+'>Pela ordem da lista — completa de cima para baixo até acabar o dinheiro</option>'+
-          '</select><div class="hint">A prioridade define-se em cada categoria (lápis ✎).</div></div>' : '')+
+            '<option value="manual"'+(strat==="manual"?" selected":"")+'>Escolher à mão — marco as categorias ou grupos a financiar</option>'+
+          '</select><div class="hint">'+(manual ? 'Cada categoria marcada recebe o que o alvo dela pede. O total e o que fica por atribuir atualizam-se à medida que marca.' : 'A prioridade define-se em cada categoria (lápis ✎).')+'</div></div>' : '')+
         opKpis("Por atribuir", fmt(plan.rtaBefore), "", "financiar", fmt(plan.total), fmt(after), afterCls)+
         '<div class="hint" style="margin-bottom:12px;">'+afterMsg+'</div>'+
-        '<div style="max-height:220px;overflow:auto;">'+rows+'</div>'+
+        '<div id="fundLista" style="max-height:'+(manual?'300':'220')+'px;overflow:auto;">'+rows+'</div>'+
+        // No «Escolher à mão», o resumo também fica por BAIXO da lista: é lá que se está a olhar.
+        (manual && anyNeed ? '<div class="hint" style="margin-top:10px;font-size:13px;">Marcadas: <b>'+plan.entries.length+'</b> '+(plan.entries.length===1?'categoria':'categorias')+' — <b>'+fmt(plan.total)+'</b> · fica por atribuir <b class="'+afterCls+'">'+fmt(after)+'</b></div>' : '')+
       '</div>'+
       '<div class="modal-foot"><span></span>'+
         '<span><button class="btn" data-action="close">Cancelar</button> '+
         (plan.entries.length?'<button class="btn primary" data-action="apply-funding">Financiar '+fmt(plan.total)+'</button>':'')+'</span></div>');
+    // Caixas do «Escolher à mão»: cada clique refaz a janela (totais em tempo real) e devolve a
+    // lista ao sítio onde estava — senão saltava para o topo a cada caixa marcada.
+    var lista = el("fundLista");
+    if (lista && manual) {
+      if (_fundScroll) { try { lista.scrollTop = _fundScroll; } catch(e){} }
+      lista.addEventListener("change", function(ev){
+        var t = ev.target; if (!t || !t.getAttribute) return;
+        var c = t.getAttribute("data-fsel"), g = t.getAttribute("data-fgrp");
+        if (!c && !g) return;
+        fundToggle(c ? "cat" : "grupo", c || g, !!t.checked);
+        _fundScroll = lista.scrollTop; fundModal();
+      });
+      var meios = lista.querySelectorAll ? lista.querySelectorAll('[data-meio="1"]') : [];
+      for (var mi=0; mi<meios.length; mi++) try { meios[mi].indeterminate = true; } catch(e){}
+    }
     var seg=el("fundMode");
     seg.addEventListener("click", function(e){ var b=e.target.closest("button"); if(!b) return; state.ui._fundMode=b.getAttribute("data-m"); fundModal(); });
     var fs=el("fundStrat");
@@ -6781,7 +6878,9 @@
       }
       financiar();
     },
-    "fund-preview": function(){ if(!state.categories.length){ toast("Crie categorias com alvos primeiro."); return; } state.ui._fundMode="full"; fundModal(); },
+    "fund-preview": function(){ if(!state.categories.length){ toast("Crie categorias com alvos primeiro."); return; } state.ui._fundMode="full"; _fundSel={}; _fundScroll=0; fundModal(); },
+    "fund-sel-todas": function(){ fundToggle("todas", null, true); fundModal(); },
+    "fund-sel-nenhuma": function(){ _fundSel={}; fundModal(); },
     "recover-preview": function(){ recoverModal(); },
     "surplus-preview": function(){ surplusModal(); },
     "surplus-toggle-semalvo": function(){ state.ui.surplusSemAlvo = !state.ui.surplusSemAlvo; vistaMudou(); save(); surplusModal(); },
@@ -6820,6 +6919,7 @@
         var e=plan.entries[i], key=e.catId+"|"+m;
         poeAtribuicao(key, (state.assignments[key]||0)+e.add);
       }
+      _fundSel = {};
       logMove("🎯 Financiou alvos ("+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+")", plan.total,
         "para " + nomesDeOrigem(plan.entries.map(function(e){ return {nome:e.name, valor:e.add}; })));
       closeModal(); save(); render();
@@ -8956,6 +9056,8 @@
     var t = e.target;
     if (t && t.classList && t.classList.contains("money") && avaliaExpr(t.value)!==null){
       fechaConta(t); e.preventDefault(); e.stopPropagation();
+      // No Atribuído, um Enter chega: resolve a conta E aplica (sair do campo grava).
+      if (t.hasAttribute && t.hasAttribute("data-assign")) { try { t.blur(); } catch(_e){} }
     }
   }, true);
   // Última rede: qualquer campo de dinheiro ainda com uma conta por resolver é resolvido antes
@@ -9052,10 +9154,40 @@
   var TOQUE = false;
   try { TOQUE = window.matchMedia && window.matchMedia("(pointer: coarse)").matches; } catch(e){}
   // Abrir ao focar/tocar num campo de atribuição (o inputmode="none" evita o teclado nativo).
+  // Só num ecrã de TOQUE. No computador (desde a 1.86) o Atribuído escreve-se no próprio campo,
+  // como a Saída/Entrada das transações: aceita a conta («120+35»), mostra «= 155,00» por baixo,
+  // Enter aplica, Esc desiste, Tab aplica e passa à categoria seguinte. O teclado de ecrã só
+  // servia para ter + e − — e o teclado físico já os tem.
+  var _focoSeguinte = null;   // categoria a focar depois do redesenho que o Tab provoca
   document.addEventListener("focusin", function(e){
     var inp = e.target.closest && e.target.closest(".assign-input");
-    if (inp) kpOpen(inp);
+    if (!inp) return;
+    if (TOQUE) { kpOpen(inp); return; }
+    _focoSeguinte = null;
+    try { inp.setAttribute("data-antes", inp.value); setTimeout(function(){ try { inp.select(); } catch(_e){} }, 0); } catch(_e){}   // escrever substitui, como no teclado de ecrã
   });
+  document.addEventListener("keydown", function(e){
+    if (TOQUE || _kp) return;
+    var inp = e.target && e.target.closest && e.target.closest(".assign-input");
+    if (!inp) return;
+    if (e.key === "Escape") {                        // desiste: volta o que lá estava
+      inp.value = inp.getAttribute("data-antes") || ""; escondeDica();
+      e.preventDefault(); e.stopPropagation(); try { inp.blur(); } catch(_e){}
+      return;
+    }
+    if (e.key === "Tab") {
+      // Aplicar redesenha o orçamento e o campo seguinte deixa de ser o mesmo elemento: guarda-se
+      // QUAL é, para o focar outra vez depois do redesenho (ver o «change» do Atribuído).
+      var todos = Array.prototype.slice.call(document.querySelectorAll(".assign-input"));
+      var i = todos.indexOf(inp), prox = todos[i + (e.shiftKey ? -1 : 1)];
+      _focoSeguinte = prox ? prox.getAttribute("data-assign") : null;
+    }
+  }, true);
+  function focaSeguinte(){
+    var id = _focoSeguinte; _focoSeguinte = null;
+    if (!id || TOQUE) return;
+    setTimeout(function(){ var n = document.querySelector('.assign-input[data-assign="'+id+'"]'); if (n) try { n.focus(); } catch(_e){} }, 0);
+  }
   // Nos restantes campos de dinheiro num ecrã de toque: apanha-se o toque ANTES de o campo
   // receber o foco. Sem isto o teclado do sistema abria e ficavam os dois a disputar o ecrã.
   document.addEventListener("pointerdown", function(e){
@@ -9324,7 +9456,7 @@
       // Ilegível: não vale zero (apagava a atribuição). Avisa e repõe o que lá estava.
       var _va = parseAmount(inp.value);
       if (isNaN(_va) && /\d/.test(String(inp.value))) { toast("«"+String(inp.value).trim()+"» não é um valor válido — ficou o que estava."); render(); return; }
-      applyAssign(inp.getAttribute("data-assign"), _va); return;
+      applyAssign(inp.getAttribute("data-assign"), _va); focaSeguinte(); return;
     }
     // Mexer num filtro dá outra lista: ficar a meio da altura da lista anterior costuma deixar
     // o ecrã em branco (a nova é mais curta) ou a olhar para o meio de uma coisa nova.
@@ -9361,8 +9493,9 @@
       // O campo do orçamento tem teclado próprio (o visor dele já mostra a conta); os restantes
       // aceitam a conta escrita no próprio campo.
       var ehAssign = alvo.classList.contains("assign-input");
-      var limpo2 = ehAssign ? limpaValor(bruto, alvo.hasAttribute("data-neg"))
-                            : limpaExpr(bruto, alvo.hasAttribute("data-neg"));
+      // No telemóvel o Atribuído é escrito pelo teclado próprio; no computador aceita a conta.
+      var limpo2 = (ehAssign && TOQUE) ? limpaValor(bruto, alvo.hasAttribute("data-neg"))
+                                       : limpaExpr(bruto, alvo.hasAttribute("data-neg"));
       if (limpo2 !== bruto) {
         var pos = alvo.selectionStart, delta = bruto.length - limpo2.length;
         alvo.value = limpo2;
