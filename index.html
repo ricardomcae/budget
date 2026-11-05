@@ -1278,7 +1278,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.86";
+  var APP_VERSION = "1.87";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -2293,11 +2293,15 @@
   var PRIO_CICLO = ["alta","normal","baixa"];        // cada clique desce um nível; do fundo volta ao topo
   // mode "full" = cobre a totalidade dos alvos em falta.
   // mode "cap"  = financia só até esgotar o Pronto a atribuir, segundo a estratégia:
-  //   "order"    – pela ordem do orçamento (enche cada uma até acabar o dinheiro)
+  //   ("order", pela ordem da lista, saiu na 1.87 a pedido — quem a tinha escolhida passa a «priority»)
+  //   "manual"   – só as categorias marcadas à mão, cada uma com o que o alvo pede
+  // limite (opcional, só no "cap" por prioridade ou proporcional): reparte no máximo este valor,
+  // mesmo havendo mais por atribuir — «tenho 1.000, quero distribuir 800». O resto fica por atribuir.
   //   "priority" – primeiro as de prioridade Alta, depois Normal, depois Baixa
   //   "prop"     – reparte proporcionalmente ao que falta em cada categoria
-  function fundingPlan(mode, m, strategy) {
+  function fundingPlan(mode, m, strategy, limite) {
     strategy = strategy || "priority";        // predefinição num sítio só, não em cada chamada
+    if (strategy === "order") strategy = "priority";
     var list = orderedCategories();
     var rta = readyToAssign(m);
     var needs = [];
@@ -2315,21 +2319,22 @@
       entries = needs.filter(function(n){ return !!_fundSel[n.catId]; })
                      .map(function(n){ return {catId:n.catId, name:n.name, add:n.need, prio:n.prio}; });
     } else if (rta > 0.005) {
+      var dinheiro = (limite > 0.005) ? Math.min(rta, round2(limite)) : rta;
       if (strategy === "prop") {
         var totalNeed = 0; needs.forEach(function(n){ totalNeed += n.need; });
-        if (totalNeed <= rta + 0.005) {
+        if (totalNeed <= dinheiro + 0.005) {
           entries = needs.map(function(n){ return {catId:n.catId, name:n.name, add:n.need, prio:n.prio}; });
         } else {
-          entries = needs.map(function(n){ return {catId:n.catId, name:n.name, add:round2(rta*(n.need/totalNeed)), prio:n.prio}; });
+          entries = needs.map(function(n){ return {catId:n.catId, name:n.name, add:round2(dinheiro*(n.need/totalNeed)), prio:n.prio}; });
           var sum=0; entries.forEach(function(e){ sum+=e.add; });
-          var diff = round2(rta - sum);
+          var diff = round2(dinheiro - sum);
           if (entries.length && Math.abs(diff) >= 0.005) entries[entries.length-1].add = round2(entries[entries.length-1].add + diff);
           entries = entries.filter(function(e){ return e.add > 0.005; });
         }
       } else {
         var order = needs.slice();
         if (strategy === "priority") order.sort(function(a,b){ return (PRIO_RANK[a.prio]==null?1:PRIO_RANK[a.prio]) - (PRIO_RANK[b.prio]==null?1:PRIO_RANK[b.prio]); });
-        var remaining = rta;
+        var remaining = dinheiro;
         for (var j=0;j<order.length;j++){
           if (remaining <= 0.005) break;
           var add = Math.min(order[j].need, round2(remaining));
@@ -5195,7 +5200,7 @@
 
       sec("Distribuir o dinheiro")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
-        '<li><b>🎯 Financiar alvos</b> — <i>Pronto a atribuir → categorias.</i> Está sempre disponível. Dá a cada categoria o que lhe falta para cumprir o alvo do mês. Pode <b>financiar tudo</b>, ou <b>repartir só o que está por atribuir</b> — esta nunca o deixa negativo, e reparte de três maneiras: <b>por prioridade</b> (serve as Altas primeiro), <b>proporcional</b> (todas ficam igualmente perto do alvo — quem precisa de mais leva mais) ou <b>pela ordem da lista</b> (completa de cima para baixo até acabar).</li>'+
+        '<li><b>🎯 Financiar alvos</b> — <i>Pronto a atribuir → categorias.</i> Está sempre disponível. Dá a cada categoria o que lhe falta para cumprir o alvo do mês. Pode <b>financiar tudo</b>, ou <b>repartir só o que está por atribuir</b> — esta nunca o deixa negativo, e reparte de três maneiras: <b>por prioridade</b> (serve as Altas primeiro), <b>proporcional</b> (todas ficam igualmente perto do alvo — quem precisa de mais leva mais) ou <b>escolhendo à mão</b> as categorias e grupos. Nas duas primeiras pode pôr um teto em <b>«Até quanto distribuir»</b> — com 1.000 € por atribuir, repartir só 800 € e deixar 200 € livres.</li>'+
         '<li><b>↩ Repor a zero</b> — <i>categorias → Pronto a atribuir.</i> Aparece quando atribuiu mais do que tinha e o «Pronto a atribuir» ficou <b>negativo</b>. Retira às categorias com dinheiro parado até voltar a zero, com as mesmas três maneiras de repartir — mas ao contrário: <b>por prioridade</b> tira primeiro das <b>Baixas</b>, para proteger as Altas. Nenhuma categoria fica negativa.</li>'+
         '<li><b>🧹 Libertar excedente</b> — <i>categorias → Pronto a atribuir.</i> Aparece quando alguma categoria tem <b>mais do que o alvo dela pede</b> — por exemplo «repor até 200 €» com 500 € lá dentro. No <b>cartão de crédito</b>, o teto é o que falta liquidar: se atribuiu 500 € e só deve 200 €, liberta os 300 € de folga. Estar <b>adiantado</b> num objetivo com data não conta como excedente: se quer 3.000 € e já juntou 2.000 €, o dinheiro é seu e fica onde está — esticar o prazo apenas <b>baixa a mensalidade</b>. As de «reservar todos os meses» nunca entram, porque aí o dinheiro é mesmo para acumular.</li>'+
         '<li><b>🩹 Cobrir</b> — <i>outras categorias → uma categoria.</i> Aparece na linha de uma categoria que ficou <b>negativa</b>, por ter gasto nela mais do que lá tinha. O objetivo é <b>trazê-la a zero</b>. Mostra o que falta e quem tem dinheiro parado, cada um com um cursor. Escolha de onde tirar: <b>primeiro das prioridades mais baixas</b> (sai de onde é menos importante), <b>primeiro de quem tem mais folga</b> (mexe em menos categorias), <b>primeiro de quem precisa do dinheiro mais tarde</b> (dá mais tempo para repor — tira antes das férias do próximo verão do que do seguro que vence para o mês), ou <b>manual</b>. O que ainda não está atribuído é sempre gasto primeiro. Ao cartão de crédito só se tira a folga, nunca o que é preciso para o liquidar.</li>'+
@@ -5340,6 +5345,10 @@
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.87", "novembro 2026", [
+        '<b>🎯 Financiar alvos → Repartir</b>: novo campo <b>«Até quanto distribuir»</b>. Com 1.000 € por atribuir, pode repartir só 800 € por prioridades (ou proporcionalmente) — os outros 200 € ficam por atribuir. Vazio, reparte tudo, como sempre.',
+        'Saiu a forma de repartir <b>«Pela ordem da lista»</b>. Quem a tinha escolhida passa a <b>«Por prioridade»</b>.',
+      ])+
       ver("1.86", "novembro 2026", [
         'No <b>computador</b>, o <b>Atribuído</b> escreve-se no próprio campo, sem o teclado de ecrã — como a Saída/Entrada das transações. Aceita contas (<b>120+35</b>, com «= 155,00» por baixo); <b>Enter</b> aplica, <b>Esc</b> desiste, <b>Tab</b> aplica e passa à categoria seguinte. No telemóvel fica igual.',
         '<b>🎯 Financiar alvos → Repartir → «Escolher à mão»</b>: marque categoria a categoria, ou grupos inteiros, e veja em tempo real quanto vai atribuir e quanto fica por atribuir. Cada categoria marcada recebe o que o seu alvo pede.',
@@ -5510,6 +5519,7 @@
   // Seleção do «Escolher à mão» do Financiar alvos. Só desta sessão (não é guardada): é uma
   // escolha para ESTE financiamento, e começa vazia de cada vez que se abre a janela.
   var _fundSel = {}, _fundScroll = 0;
+  var _fundLimite = 0;   // «até quanto distribuir» — só desta janela; 0 = tudo o que está por atribuir
   function fundToggle(tipo, id, ligar){
     var m = state.ui.month, ids = [];
     if (tipo === "grupo") categoriesOfGroup(id).forEach(function(c){ var ti = targetInfo(c, m); if (ti && ti.need > 0) ids.push(c.id); });
@@ -5521,7 +5531,9 @@
     var m = state.ui.month;
     var mode = state.ui._fundMode || "full";
     var strat = state.ui.fundStrategy || "priority";   // só para marcar a opção escolhida no menu
-    var plan = fundingPlan(mode, m, strat);
+    if (strat === "order") strat = "priority";          // opção retirada na 1.87
+    var comLimite = (mode==="cap" && strat!=="manual");
+    var plan = fundingPlan(mode, m, strat, comLimite ? _fundLimite : 0);
     var fullPlan = fundingPlan("full", m, strat);
     var anyNeed = fullPlan.entries.length>0;
     var after = plan.rtaAfter;
@@ -5577,9 +5589,17 @@
           '<select id="fundStrat">'+
             '<option value="priority"'+(strat==="priority"?" selected":"")+'>Por prioridade — serve primeiro as Altas, depois as Normais, depois as Baixas</option>'+
             '<option value="prop"'+(strat==="prop"?" selected":"")+'>Proporcional — todas ficam igualmente perto do alvo (quem precisa mais, leva mais)</option>'+
-            '<option value="order"'+(strat==="order"?" selected":"")+'>Pela ordem da lista — completa de cima para baixo até acabar o dinheiro</option>'+
             '<option value="manual"'+(strat==="manual"?" selected":"")+'>Escolher à mão — marco as categorias ou grupos a financiar</option>'+
           '</select><div class="hint">'+(manual ? 'Cada categoria marcada recebe o que o alvo dela pede. O total e o que fica por atribuir atualizam-se à medida que marca.' : 'A prioridade define-se em cada categoria (lápis ✎).')+'</div></div>' : '')+
+        // Até quanto distribuir: um teto opcional ao que se reparte. Vazio = tudo o que está por
+        // atribuir (o comportamento de sempre). Não se aplica ao «Escolher à mão», onde é quem
+        // escolhe que decide o total.
+        (comLimite ?
+          '<div class="field" style="margin-bottom:12px;"><label>Até quanto distribuir <span class="muted">(opcional)</span></label>'+
+          '<input id="fundLimite" class="money" maxlength="24" type="text" inputmode="decimal" placeholder="'+amtStr2(Math.max(0, plan.rtaBefore))+' — tudo" value="'+(_fundLimite>0.005?amtStr2(_fundLimite):'')+'">'+
+          '<div class="hint">'+(_fundLimite>0.005 && _fundLimite < plan.rtaBefore - 0.005
+              ? 'Reparte no máximo <b>'+fmt(_fundLimite)+'</b>; o resto fica por atribuir.'
+              : 'Deixe vazio para repartir tudo o que está por atribuir.')+'</div></div>' : '')+
         opKpis("Por atribuir", fmt(plan.rtaBefore), "", "financiar", fmt(plan.total), fmt(after), afterCls)+
         '<div class="hint" style="margin-bottom:12px;">'+afterMsg+'</div>'+
         '<div id="fundLista" style="max-height:'+(manual?'300':'220')+'px;overflow:auto;">'+rows+'</div>'+
@@ -5608,6 +5628,19 @@
     seg.addEventListener("click", function(e){ var b=e.target.closest("button"); if(!b) return; state.ui._fundMode=b.getAttribute("data-m"); fundModal(); });
     var fs=el("fundStrat");
     if(fs) fs.addEventListener("change", function(){ state.ui.fundStrategy=fs.value; vistaMudou(); save(); fundModal(); });
+    // O teto aplica-se ao sair do campo, com Enter, ou com o ✓ do teclado próprio (todos dão
+    // «change»). O Enter aqui NÃO confirma o financiamento — só fixa o teto, para se ver o
+    // resultado antes de carregar no botão.
+    var fl=el("fundLimite");
+    if(fl){
+      var aplicaTeto = function(){
+        var bruto = String(fl.value||"").trim(), v = bruto ? parseAmount(bruto) : 0;
+        if (bruto && (isNaN(v) || v < 0)) { toast("«"+bruto+"» não é um valor válido."); return; }
+        _fundLimite = round2(v||0); fundModal();
+      };
+      fl.addEventListener("change", aplicaTeto);
+      fl.addEventListener("keydown", function(e){ if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); fechaConta(fl); aplicaTeto(); } });
+    }
   }
 
   function recoverModal() {
@@ -6878,7 +6911,7 @@
       }
       financiar();
     },
-    "fund-preview": function(){ if(!state.categories.length){ toast("Crie categorias com alvos primeiro."); return; } state.ui._fundMode="full"; _fundSel={}; _fundScroll=0; fundModal(); },
+    "fund-preview": function(){ if(!state.categories.length){ toast("Crie categorias com alvos primeiro."); return; } state.ui._fundMode="full"; _fundSel={}; _fundScroll=0; _fundLimite=0; fundModal(); },
     "fund-sel-todas": function(){ fundToggle("todas", null, true); fundModal(); },
     "fund-sel-nenhuma": function(){ _fundSel={}; fundModal(); },
     "recover-preview": function(){ recoverModal(); },
@@ -6912,14 +6945,14 @@
     },
     "apply-funding": function(){
       var m=state.ui.month, mode=state.ui._fundMode||"full";
-      var plan=fundingPlan(mode,m,state.ui.fundStrategy);
+      var plan=fundingPlan(mode,m,state.ui.fundStrategy,(mode==="cap" && state.ui.fundStrategy!=="manual") ? _fundLimite : 0);   // o mesmo plano que a janela mostra
       if(!plan.entries.length){ toast("Não há nada a financiar."); return; }
       pushUndo("Alvos financiados.");
       for(var i=0;i<plan.entries.length;i++){
         var e=plan.entries[i], key=e.catId+"|"+m;
         poeAtribuicao(key, (state.assignments[key]||0)+e.add);
       }
-      _fundSel = {};
+      _fundSel = {}; _fundLimite = 0;
       logMove("🎯 Financiou alvos ("+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+")", plan.total,
         "para " + nomesDeOrigem(plan.entries.map(function(e){ return {nome:e.name, valor:e.add}; })));
       closeModal(); save(); render();
