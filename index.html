@@ -1278,7 +1278,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.87";
+  var APP_VERSION = "1.89";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -2109,6 +2109,39 @@
   // que falta para a categoria não ficar negativa (a conta pode vir uns cêntimos acima do
   // previsto). Sem gasto este mês, dá exactamente o mesmo que antes. Só se aplica no mês do
   // pagamento: nos meses anteriores, um gasto continua a ter de ser reposto até à data.
+  // «faltam X de Y» com X maior do que Y lia-se como um erro («faltam 1.250 de 1.200»). Acontece
+  // quando a categoria está negativa: além do objetivo, é preciso tapar o que se gastou a mais.
+  // O número está certo — o que faltava era dizer de onde vem a diferença.
+  function txtFalta(falta, amt){
+    if (falta > amt + 0.005) return "faltam "+fmt(falta)+" — os "+fmt(amt)+" do objetivo e "+fmt(round2(falta-amt))+" gastos a mais";
+    return "faltam "+fmt(falta)+" de "+fmt(amt);
+  }
+  // Prazo de um alvo «Repor» com data: «até uma data», ou trimestral/semestral/anual com mês da
+  // despesa (já avançado para o período em curso). null em todos os outros alvos.
+  function prazoDoAlvo(cat, m){
+    var tg = cat && cat.target; if (!tg || !(tg.amount>0) || (tg.fund||"refill")==="setAside") return null;
+    if (tg.type==="byDate") return tg.date || m;
+    if ((tg.type==="quarterly"||tg.type==="semiannual"||tg.type==="yearly") && tg.due) {
+      var per = tg.type==="quarterly"?3:(tg.type==="semiannual"?6:12), d = tg.due, g = 0;
+      while (monthsBetween(m, d) < 0 && g++ < 4000) d = shiftMonth(d, per);
+      return d;
+    }
+    return null;
+  }
+  // DESPESA PAGA ANTES DO PRAZO (marcada com «já paguei»). Um alvo «Repor» lê o saldo: pagar o
+  // IMI em outubro com prazo em novembro baixava o saldo e o alvo voltava a pedir o total todo
+  // até novembro — dinheiro para uma despesa que já não ia acontecer. A aplicação não pode
+  // adivinhar se um gasto a meio é a despesa ou outra coisa (num «Repor» gastar a meio quer
+  // normalmente dizer «reponha-me isto»), por isso pergunta-se: quem pagou carrega em «já paguei»
+  // e, até ao prazo, o alvo só pede o que deixa a categoria a zero. Passado o prazo, o alvo segue
+  // como sempre (o «até uma data» cala-se; o anual começa a juntar para o ano seguinte).
+  function alvoPago(m, avail, pago, prazo){
+    var need = Math.max(0, round2(-avail));
+    return { need:need, met: need<=0.005, doMes: need<=0.005, pagoAntes:true, progress:1,
+      label: need > 0.005
+        ? ("✅ Despesa paga em "+monthLabel(pago.mes)+" — falta "+fmt(need)+" para a categoria ficar a zero")
+        : ("🎯 Despesa paga em "+monthLabel(pago.mes)+" — nada a juntar até "+monthLabel(prazo)) };
+  }
   function alvoNoMesDoPagamento(cat, m, amt, avail, dataTxt){
     var act = activityFor(cat.id, m);
     if (!(act < -0.005)) return null;                 // nada gasto este mês: regra normal
@@ -2124,6 +2157,15 @@
         : ("🎯 Pago — "+fmt(gasto)+" em "+dataTxt+", com o dinheiro juntado") };
   }
   function targetInfo(cat, m) {
+    var r = targetInfoBase(cat, m);
+    if (r && !r.pagoAntes && !r.expirado && !r.snoozed) {
+      var pz = prazoDoAlvo(cat, m);
+      if (pz && monthsBetween(m, pz) > 0 &&
+          (activityFor(cat.id, m) < -0.005 || activityFor(cat.id, shiftMonth(m,-1)) < -0.005)) r.podeMarcarPago = pz;
+    }
+    return r;
+  }
+  function targetInfoBase(cat, m) {
     if (!cat.target || !(cat.target.amount>0)) return null;
     var tg = cat.target, type = tg.type || "monthly", amt = tg.amount;
     var avail = availableFor(cat.id, m);
@@ -2184,6 +2226,7 @@
       var dueEff = tg.due || null, gd = 0;
       while (dueEff && monthsBetween(m, dueEff) < 0 && gd++ < 4000) dueEff = shiftMonth(dueEff, per);
 
+      if (dueEff && tg.pago && tg.pago.para === dueEff && m >= tg.pago.mes) return alvoPago(m, avail, tg.pago, dueEff);
       if (dueEff && monthsBetween(m, dueEff) === 0) {
         var pg = alvoNoMesDoPagamento(cat, m, amt, avail, monthLabel(dueEff));
         if (pg) return pg;
@@ -2210,10 +2253,10 @@
       var needQ = Math.max(0, round2(Math.min(fatia - postoQ, falta)));
       var lbl;
       if (needQ > 0.005) {
-        lbl = dueEff ? ("Juntar "+fmt(needQ)+" este mês até "+monthLabel(dueEff)+" — faltam "+fmt(falta)+" de "+fmt(amt))
+        lbl = dueEff ? ("Juntar "+fmt(needQ)+" este mês até "+monthLabel(dueEff)+" — "+txtFalta(falta, amt))
                      : ("Reservar "+fmt(needQ)+" este mês — "+fmt(fatia)+"/mês para "+fmt(amt)+"/"+cad);
       } else {
-        lbl = "✅ Reservado o deste mês — faltam "+fmt(falta)+" de "+fmt(amt)+(dueEff?(" até "+monthLabel(dueEff)):"");
+        lbl = "✅ Reservado o deste mês — "+txtFalta(falta, amt)+(dueEff?(" até "+monthLabel(dueEff)):"");
       }
       return { need:needQ, met: falta<=0.005, doMes: needQ<=0.005, progress: Math.max(0,Math.min(1, amt>0?avail/amt:0)), label: lbl };
     }
@@ -2236,6 +2279,11 @@
                           : ("✅ Reservado o deste mês — "+fmt(slFix)+"/mês até "+monthLabel(target)) };
       }
       var diff = monthsBetween(m, target), left = diff>=0 ? diff+1 : 1;
+      if (tg.pago && tg.pago.para === target && m >= tg.pago.mes) {
+        if (diff < 0) return { need:0, met:true, doMes:true, expirado:true, progress:1,
+          label: "\ud83c\udfaf Despesa paga em "+monthLabel(tg.pago.mes)+" — prazo terminado ("+monthLabel(target)+")" };
+        return alvoPago(m, avail, tg.pago, target);
+      }
       if (diff === 0) {
         var pg3 = alvoNoMesDoPagamento(cat, m, amt, avail, monthLabel(target));
         if (pg3) return pg3;
@@ -2274,9 +2322,9 @@
       var lbl3;
       if (remain <= 0.005) lbl3 = "🎯 Objetivo atingido ("+fmt(amt)+")";
       // Já com parte posta este mês, o que falta NÃO é a mensalidade: diz-se as duas coisas.
-      else if (need3 > 0.005 && posto3 > 0.005) lbl3 = "Juntar mais "+fmt(need3)+" este mês ("+fmt(fatia3)+"/mês até "+monthLabel(target)+") — faltam "+fmt(remain)+" de "+fmt(amt);
-      else if (need3 > 0.005) lbl3 = "Juntar "+fmt(need3)+"/mês até "+monthLabel(target)+" — faltam "+fmt(remain)+" de "+fmt(amt);
-      else lbl3 = "✅ Reservado o deste mês — faltam "+fmt(remain)+" de "+fmt(amt)+" até "+monthLabel(target);
+      else if (need3 > 0.005 && posto3 > 0.005) lbl3 = "Juntar mais "+fmt(need3)+" este mês ("+fmt(fatia3)+"/mês até "+monthLabel(target)+") — "+txtFalta(remain, amt);
+      else if (need3 > 0.005) lbl3 = "Juntar "+fmt(need3)+"/mês até "+monthLabel(target)+" — "+txtFalta(remain, amt);
+      else lbl3 = "✅ Reservado o deste mês — "+txtFalta(remain, amt)+" até "+monthLabel(target);
       return { need:need3, met: remain<=0.005, doMes: need3<=0.005, progress: Math.max(0,Math.min(1, avail/amt)), label: lbl3 };
     }
     return null;
@@ -2400,6 +2448,7 @@
         if (tg && typeof tg === "object") {
           if (tg.due != null && !MES.test(String(tg.due))) delete tg.due;
           if (tg.date != null && !MES.test(String(tg.date)) && !DIA.test(String(tg.date))) delete tg.date;
+          if (tg.pago != null && !(tg.pago && MES.test(String(tg.pago.mes)) && MES.test(String(tg.pago.para)))) delete tg.pago;
         }
       });
       (o.accounts||[]).forEach(function(a){ if (a && ["budget","credit","tracking"].indexOf(a.type) < 0) a.type = "budget"; });
@@ -2641,6 +2690,7 @@
   // financiamento, onde as Altas são as primeiras a ser servidas.
   function recoverPlan(m, strategy) {
     strategy = strategy || "priority";
+    if (strategy === "order") strategy = "priority";   // «pela ordem da lista» saiu na 1.88, como no Financiar
     var rta = readyToAssign(m), falta = round2(-rta);
     if (falta <= 0.005) return { entries:[], total:0, rtaBefore:rta, rtaAfter:rta, disponivel:0 };
 
@@ -2664,8 +2714,10 @@
       }
     } else {
       var ordem = podem.slice();
-      if (strategy === "priority") ordem.sort(function(a,b){ return (PRIO_RANK[b.prio]==null?1:PRIO_RANK[b.prio]) - (PRIO_RANK[a.prio]==null?1:PRIO_RANK[a.prio]); });
-      else ordem.reverse();                          // pela ordem da lista, mas de baixo para cima
+      // Por prioridade: tira primeiro das Baixas. Entre iguais, de baixo para cima na lista (o
+      // sort é estável, por isso inverte-se ANTES): as do fundo costumam ser as menos essenciais.
+      ordem.reverse();
+      ordem.sort(function(a,b){ return (PRIO_RANK[b.prio]==null?1:PRIO_RANK[b.prio]) - (PRIO_RANK[a.prio]==null?1:PRIO_RANK[a.prio]); });
       var resta = falta;
       for (var j=0;j<ordem.length;j++){
         if (resta <= 0.005) break;
@@ -3285,7 +3337,10 @@
           var barCls = cstat==="neg" ? "neg" : (ti.snoozed ? "snoozed" : (ti.met ? "full" : (okMes ? "ok" : "warn")));
           var barW = cstat==="neg" ? 100 : ti.progress*100;
           targetHtml = '<div class="target-bar"><span class="'+barCls+'" style="width:'+barW+'%"></span></div>' +
-            '<div class="target-note">' + ti.label + '</div>';
+            '<div class="target-note">' + ti.label +
+              (ti.podeMarcarPago ? ' · <a href="#" data-action="alvo-pago" data-id="'+cat.id+'" title="Já paguei a despesa deste alvo, antes do prazo ('+esc(monthLabel(ti.podeMarcarPago))+')">já paguei</a>' : '') +
+              (ti.pagoAntes ? ' · <a href="#" data-action="alvo-pago-anular" data-id="'+cat.id+'" title="Afinal ainda não paguei">anular</a>' : '') +
+            '</div>';
         } else if (cstat==="neg") {
           targetHtml = '<div class="target-bar"><span class="neg" style="width:100%"></span></div>' +
             '<div class="target-note">Excesso de '+fmt(Math.abs(avail))+' — atribua mais a esta categoria</div>';
@@ -5201,7 +5256,7 @@
       sec("Distribuir o dinheiro")+
       '<ul style="margin:0;padding-inline-start:18px;">'+
         '<li><b>🎯 Financiar alvos</b> — <i>Pronto a atribuir → categorias.</i> Está sempre disponível. Dá a cada categoria o que lhe falta para cumprir o alvo do mês. Pode <b>financiar tudo</b>, ou <b>repartir só o que está por atribuir</b> — esta nunca o deixa negativo, e reparte de três maneiras: <b>por prioridade</b> (serve as Altas primeiro), <b>proporcional</b> (todas ficam igualmente perto do alvo — quem precisa de mais leva mais) ou <b>escolhendo à mão</b> as categorias e grupos. Nas duas primeiras pode pôr um teto em <b>«Até quanto distribuir»</b> — com 1.000 € por atribuir, repartir só 800 € e deixar 200 € livres.</li>'+
-        '<li><b>↩ Repor a zero</b> — <i>categorias → Pronto a atribuir.</i> Aparece quando atribuiu mais do que tinha e o «Pronto a atribuir» ficou <b>negativo</b>. Retira às categorias com dinheiro parado até voltar a zero, com as mesmas três maneiras de repartir — mas ao contrário: <b>por prioridade</b> tira primeiro das <b>Baixas</b>, para proteger as Altas. Nenhuma categoria fica negativa.</li>'+
+        '<li><b>↩ Repor a zero</b> — <i>categorias → Pronto a atribuir.</i> Aparece quando atribuiu mais do que tinha e o «Pronto a atribuir» ficou <b>negativo</b>. Retira às categorias com dinheiro parado até voltar a zero, de duas maneiras: <b>por prioridade</b> — tira primeiro das <b>Baixas</b>, para proteger as Altas (entre iguais, das que estão mais abaixo na lista) — ou <b>proporcional</b>. Nenhuma categoria fica negativa.</li>'+
         '<li><b>🧹 Libertar excedente</b> — <i>categorias → Pronto a atribuir.</i> Aparece quando alguma categoria tem <b>mais do que o alvo dela pede</b> — por exemplo «repor até 200 €» com 500 € lá dentro. No <b>cartão de crédito</b>, o teto é o que falta liquidar: se atribuiu 500 € e só deve 200 €, liberta os 300 € de folga. Estar <b>adiantado</b> num objetivo com data não conta como excedente: se quer 3.000 € e já juntou 2.000 €, o dinheiro é seu e fica onde está — esticar o prazo apenas <b>baixa a mensalidade</b>. As de «reservar todos os meses» nunca entram, porque aí o dinheiro é mesmo para acumular.</li>'+
         '<li><b>🩹 Cobrir</b> — <i>outras categorias → uma categoria.</i> Aparece na linha de uma categoria que ficou <b>negativa</b>, por ter gasto nela mais do que lá tinha. O objetivo é <b>trazê-la a zero</b>. Mostra o que falta e quem tem dinheiro parado, cada um com um cursor. Escolha de onde tirar: <b>primeiro das prioridades mais baixas</b> (sai de onde é menos importante), <b>primeiro de quem tem mais folga</b> (mexe em menos categorias), <b>primeiro de quem precisa do dinheiro mais tarde</b> (dá mais tempo para repor — tira antes das férias do próximo verão do que do seguro que vence para o mês), ou <b>manual</b>. O que ainda não está atribuído é sempre gasto primeiro. Ao cartão de crédito só se tira a folga, nunca o que é preciso para o liquidar.</li>'+
         '<li><b>🎯 na linha de uma categoria</b> — <i>Pronto a atribuir → essa categoria.</i> Faz num toque o que a janela acima faz para todas: junta-lhe de uma vez o que falta para o <b>alvo do mês</b>. Se o «Pronto a atribuir» não chegar, <b>avisa antes</b> de o deixar negativo.</li>'+
@@ -5345,6 +5400,14 @@
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.89", "novembro 2026", [
+        'Alvos <b>«Repor» com prazo</b> (até uma data; trimestral, semestral ou anual com mês da despesa): se <b>pagar a despesa antes do prazo</b>, aparece <b>«já paguei»</b> por baixo da categoria. Marcando-o, o alvo deixa de pedir o total outra vez — até ao prazo, só pede o que deixar a categoria a zero. Há um <b>«anular»</b> ao lado, e o ↩ também desfaz.',
+        'Numa categoria com alvo que ficou negativa, o texto já não diz «faltam 1.250,00 € de 1.200,00 €»: diz quanto é do objetivo e quanto é do que se gastou a mais.',
+        'Sincronização: se um aparelho tiver uma <b>palavra-passe diferente</b>, a aplicação diz isso mesmo e não envia nada. Antes podia aparecer como um conflito, e escolher «Manter este aparelho» deixava o outro aparelho sem conseguir abrir a cópia.',
+      ])+
+      ver("1.88", "novembro 2026", [
+        '<b>«Pela ordem da lista»</b> saiu também do <b>↩ Repor a zero</b>, como já tinha saído do Financiar. Quem a tinha escolhida passa a <b>«Por prioridade»</b> — que, entre categorias da mesma prioridade, continua a tirar primeiro das que estão mais abaixo.',
+      ])+
       ver("1.87", "novembro 2026", [
         '<b>🎯 Financiar alvos → Repartir</b>: novo campo <b>«Até quanto distribuir»</b>. Com 1.000 € por atribuir, pode repartir só 800 € por prioridades (ou proporcionalmente) — os outros 200 € ficam por atribuir. Vazio, reparte tudo, como sempre.',
         'Saiu a forma de repartir <b>«Pela ordem da lista»</b>. Quem a tinha escolhida passa a <b>«Por prioridade»</b>.',
@@ -5646,6 +5709,7 @@
   function recoverModal() {
     var m = state.ui.month;
     var strat = state.ui.recoverStrategy || "priority";
+    if (strat === "order") strat = "priority";          // opção retirada na 1.88
     var plan = recoverPlan(m, strat);
     var falta = round2(-plan.rtaBefore);
     var chega = plan.rtaAfter > -0.005;
@@ -5667,7 +5731,6 @@
         '<select id="recStrat">'+
           '<option value="priority"'+(strat==="priority"?" selected":"")+'>Por prioridade — tira primeiro das Baixas, para proteger as Altas</option>'+
           '<option value="prop"'+(strat==="prop"?" selected":"")+'>Proporcional — todas perdem a mesma percentagem do que têm</option>'+
-          '<option value="order"'+(strat==="order"?" selected":"")+'>Pela ordem da lista — tira de baixo para cima</option>'+
         '</select></div>'+
         opKpis("Por atribuir", fmt(plan.rtaBefore), "neg", "repor", fmt(plan.total), fmt(plan.rtaAfter), chega?"":"neg")+
         '<div class="hint" style="margin-bottom:12px;">'+(chega
@@ -6763,6 +6826,18 @@
 
     "add-category": function(id){ categoryModal(null, id); },
     "edit-category": function(id){ var c=categoryById(id); if(c&&c.cardId){ toast("Categoria de pagamento de cartão (automática)."); return; } categoryModal(c); },
+    "alvo-pago": function(id){
+      var c = categoryById(id); if (!c || !c.target) return;
+      var pz = prazoDoAlvo(c, state.ui.month); if (!pz) return;
+      pushUndo("Despesa marcada como paga.");
+      c.target.pago = { mes: state.ui.month, para: pz };
+      save(); render(); toast("Marcada como paga em "+monthLabel(state.ui.month)+" — até "+monthLabel(pz)+" só pede o que deixar a categoria a zero.");
+    },
+    "alvo-pago-anular": function(id){
+      var c = categoryById(id); if (!c || !c.target || !c.target.pago) return;
+      pushUndo("Já não está marcada como paga.");
+      delete c.target.pago; save(); render();
+    },
     "save-category": function(id){
       if (valorInvalido(["catTarget"])) return;
       var name=valLim("catName", LIM_NOME); if(!name){ toast("Indique um nome."); return; }
@@ -6797,6 +6872,10 @@
       // Nota vazia é nota nenhuma: apaga-se o campo em vez de o guardar a "". Ter duas
       // representações da mesma coisa dava diferenças de assinatura na sincronização — e na
       // importação da configuração — sem nada ter mudado de facto.
+      // A marca «já paguei» sobrevive a editar a categoria, desde que o prazo continue o mesmo
+      // (mudar a data ou o tipo é começar um objetivo novo).
+      if (id && target) { var cAnt = categoryById(id), pgA = cAnt && cAnt.target && cAnt.target.pago;
+        if (pgA && prazoDoAlvo({ target:target }, state.ui.month) === pgA.para) target.pago = pgA; }
       if (id){ var c=categoryById(id); c.name=name; c.groupId=groupId; c.target=target; c.priority=prio;
                if(note) c.note=note; else delete c.note; }
       else { var nc={id:uid(), name:name, groupId:groupId, target:target, priority:prio};
@@ -7812,7 +7891,7 @@
     if (e && e.limite)         return "O GitHub pediu uma pausa (demasiados pedidos seguidos). Volto a tentar sozinho às "+horaDe(e.esperaAte)+" — os dados ficam guardados neste aparelho.";
     if (/\(401\)/.test(m))      return "O GitHub não reconhece o token: expirou ou foi revogado. Crie um novo e use «🔑 Atualizar token».";
     if (/\(403\)/.test(m))      return "O GitHub recusou o pedido" + (e && e.ghMsg ? ": «"+e.ghMsg+"»" : ".") + " Veja se o token tem a permissão «gist».";
-    if (/decrypt|Unexpected token|palavra-passe/i.test(m)) return "Não foi possível abrir a cópia da nuvem — a palavra-passe pode ser diferente.";
+    if (/decrypt|Unexpected token|palavra-passe/i.test(m)) return "Não consegui abrir a cópia da nuvem com a palavra-passe deste aparelho — confirme que é a mesma do outro aparelho. Nada foi enviado nem alterado.";
     if (/Failed to fetch|NetworkError|network/i.test(m)) return "Não foi possível chegar ao GitHub. Verifique a ligação à Internet.";
     return "Não foi possível concluir a sincronização. Tente novamente daqui a pouco.";
   }
@@ -7967,11 +8046,17 @@
           adoptRemote(await decEnvelope(outer.enc, _sync.pass), remoteRev);
           setSyncStatus("Atualizado da nuvem ✓"); toast("Sincronizado — dados atualizados da nuvem.");
         } else {
+          // Abre-se a versão da nuvem antes de mostrar o conflito. Se ESTE aparelho tem outra
+          // palavra-passe, não há conflito nenhum para decidir — há uma configuração errada. Antes
+          // mostrava-se o conflito na mesma, e «Manter este aparelho» escrevia por cima da nuvem
+          // com a outra palavra-passe: o outro aparelho deixava de a conseguir abrir. Pára aqui
+          // e diz o que se passa (o catch mais abaixo traduz a mensagem).
+          var remotoAberto = null;
+          try { remotoAberto = await decEnvelope(outer.enc, _sync.pass); }
+          catch(e){ if (/palavra-passe/.test((e && e.message) || "")) throw e; }
           _pendingConflict = { remoteRev:remoteRev, enc:outer.enc, remoteAt:outer.updatedAt };
-          // Abre a versão da nuvem só para CONTAR as diferenças — ajuda a escolher qual manter.
-          // Se falhar (palavra-passe diferente, pacote antigo), mostra-se o conflito na mesma:
-          // é uma ajuda, não uma condição para poder decidir.
-          try { _pendingConflict.dif = compararComNuvem(await decEnvelope(outer.enc, _sync.pass)); }
+          // Contar as diferenças é só uma ajuda para escolher qual manter.
+          try { _pendingConflict.dif = remotoAberto ? compararComNuvem(remotoAberto) : null; }
           catch(e){ _pendingConflict.dif = null; }
           setSyncStatus("Conflito ⚠️"); _syncing = false; abrirAvisoSync(conflictModal, opts); return;
         }
@@ -8029,7 +8114,8 @@
         if (!opts.silent) toast("Outro aparelho está a sincronizar agora. Tente daqui a pouco.");
         _syncing = false; return;
       }
-      setSyncStatus("Sincronização falhou ⚠️"); toast(msgSync(e));
+      setSyncStatus(/palavra-passe/.test((e && e.message)||"") ? "Palavra-passe diferente ⚠️" : "Sincronização falhou ⚠️"); toast(msgSync(e));
+      _sync.ultimoErro = { at:new Date().toISOString(), texto: msgSync(e), gh: "", status: "" }; saveSyncCfg();
     }
     _syncing = false;
   }
