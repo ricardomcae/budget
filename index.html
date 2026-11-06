@@ -1278,7 +1278,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.91";
+  var APP_VERSION = "1.92";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -2316,10 +2316,13 @@
         // dizia "faltaram 854,07" a quem juntou os 854,07 e os gastou — o oposto da verdade.
         var juntou3 = assignedUpTo(cat.id, m);
         var cumpriu3 = juntou3 >= amt - 0.005;
+        // Com dinheiro parado, diz-se o que fazer com ele: o alvo já não pede nada, e sem aviso
+        // ficava esquecido (ou, pior, o fundo que era para manter deixava de ser reposto).
+        var sobra3 = avail > 0.005 ? (" — sobram "+fmt(avail)+". Se é para manter, mude o alvo para Mensal; se não, liberte-os no 🧹") : "";
         return { need:0, met:cumpriu3, doMes:true, expirado:true,
           progress: cumpriu3 ? 1 : Math.max(0, Math.min(1, amt>0 ? juntou3/amt : 0)),
-          label: cumpriu3 ? ("\ud83c\udfaf Objetivo cumprido — prazo terminado ("+monthLabel(target)+")")
-                          : ("Prazo terminado ("+monthLabel(target)+") — juntou "+fmt(juntou3)+" de "+fmt(amt)) };
+          label: cumpriu3 ? ("\ud83c\udfaf Objetivo cumprido — prazo terminado ("+monthLabel(target)+")"+sobra3)
+                          : ("Prazo terminado ("+monthLabel(target)+") — juntou "+fmt(juntou3)+" de "+fmt(amt)+sobra3) };
       }
       // Descontar o que já foi atribuído ESTE mês, senão cada financiamento voltava a pedir uma
       // fatia nova e atribuía a mais em silêncio. Mas conta SÓ o que se PÔS (positivo): se este
@@ -2769,8 +2772,22 @@
 
   // Dinheiro que está numa categoria ACIMA do que o alvo dela exige. Devolvê-lo ao
   // «Pronto a atribuir» não mexe em contas nem em transações — só desfaz a atribuição.
+  // META DE UMA VEZ SÓ COM O PRAZO TERMINADO (alvo «até uma data», Repor, mês em vista depois do
+  // prazo, sem a marca «cumprida» — essa já liberta tudo, ver tetoDaCategoria). O dinheiro que lá
+  // fica deixou de ter alvo; mas pode não ser sobra: a Manutenção Casa ia mudar para «Mensal»
+  // em janeiro para MANTER os 4.000 €, e uma viagem pode ser paga um mês depois do prazo. Por
+  // isso estas aparecem no 🧹 numa secção à parte, DESMARCADAS, e fora do total do botão do
+  // cartão — nada sai num clique por engano. Devolve o mês do prazo, ou null.
+  function metaTerminada(c, m){
+    var tg = c && c.target;
+    if (!tg || tg.type !== "byDate" || (tg.fund||"refill") === "setAside" || !(tg.amount > 0) || c.cardId) return null;
+    if (tg.pago && tg.pago.para === (tg.date || m) && m >= tg.pago.mes) return null;
+    var d = tg.date || m;
+    return monthsBetween(m, d) < 0 ? d : null;
+  }
+  var _surplusSel = {};   // metas terminadas marcadas na janela do 🧹 (só desta sessão)
   function surplusPlan(m, incluirSemAlvo) {
-    var list = orderedCategories(), entries = [], total = 0;
+    var list = orderedCategories(), entries = [], total = 0, expirados = [];
     for (var i=0;i<list.length;i++){
       var c = list[i];
       var tem = availableFor(c.id, m);
@@ -2780,10 +2797,15 @@
       if (t.tipo === "sem") { if (!incluirSemAlvo) continue; excesso = tem; }
       else excesso = round2(tem - t.teto);
       if (excesso > 0.005) { entries.push({ catId:c.id, name:c.name, add:round2(-excesso), tem:round2(tem), teto:t.teto }); total -= excesso; }
+      else if (metaTerminada(c, m)) expirados.push({ catId:c.id, name:c.name, add:round2(-tem), tem:round2(tem), prazo:metaTerminada(c, m) });
     }
     total = round2(total);
     var rta = readyToAssign(m);
-    return { entries:entries, total:total, rtaBefore:rta, rtaAfter:round2(rta - total) };
+    // «expirados» NÃO entram no total nem no botão do cartão: só saem se forem marcados à mão,
+    // na janela (ver surplusModal). O total da janela soma-lhes os marcados (totalComSel).
+    var sel = 0; expirados.forEach(function(e){ if (_surplusSel[e.catId]) sel += e.add; });
+    return { entries:entries, total:total, rtaBefore:rta, rtaAfter:round2(rta - total), expirados:expirados,
+             totalComSel: round2(total + sel), rtaAfterSel: round2(rta - total - sel) };
   }
 
   // Tem mais do que o alvo pede? Mesma regra do surplusPlan, por categoria (para o filtro «Com
@@ -3135,7 +3157,8 @@
   function renderRTA() {
     var rta = readyToAssign(state.ui.month);
     var adiantado = round2(rtaContabil(state.ui.month) - rta);   // reservado por meses seguintes
-    var excedente = surplusPlan(state.ui.month, !!state.ui.surplusSemAlvo).total;
+    var _sp = surplusPlan(state.ui.month, !!state.ui.surplusSemAlvo);
+    var excedente = _sp.total, temMetasTerminadas = _sp.expirados.length > 0;
     var temAtribuido = clearPlan(state.ui.month).entries.length > 0;
     // Categorias excedidas (disponível negativo). Contadas ANTES do balão, mas só para lhe
     // TIRAR a festa: com contas por acertar, «cada euro tem uma função 🎉» era uma boa notícia a
@@ -3198,7 +3221,8 @@
         '<div class="rta-actions">' +
           (rta < -0.005 ? '<button data-action="recover-preview">↩ Repor a zero…</button>'
                         : '<button data-action="fund-preview">🎯 Financiar alvos…</button>') +
-          (excedente < -0.005 ? '<button data-action="surplus-preview">🧹 Libertar '+fmt(-excedente)+'…</button>' : '') +
+          (excedente < -0.005 ? '<button data-action="surplus-preview">🧹 Libertar '+fmt(-excedente)+'…</button>'
+                              : (temMetasTerminadas ? '<button data-action="surplus-preview" title="Há metas com prazo terminado com dinheiro parado">🧹 Libertar…</button>' : '')) +
           (temAtribuido ? '<button data-action="clear-preview" title="Devolver tudo o que atribuiu neste mês">🧽 Limpar atribuições…</button>' : '') +
         '</div>' +
       '</div>' + over + aviso + futuro;
@@ -5421,6 +5445,9 @@
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.92", "novembro 2026", [
+        'Metas <b>«até uma data»</b> com o <b>prazo terminado</b> e dinheiro parado: aparecem no <b>🧹 Libertar excedente</b>, numa secção à parte, <b>desmarcadas</b> — só sai o que marcar, e não entram no total do botão. A linha da categoria passa a dizer quanto sobra e o que fazer («se é para manter, mude o alvo para Mensal»).',
+      ])+
       ver("1.91", "novembro 2026", [
         'Num alvo <b>«até uma data»</b> dado por <b>cumprido</b>, o que sobra na categoria passa a aparecer no <b>🧹 Libertar excedente</b> — a meta era de uma vez só, e esse dinheiro já não tem função. Nos alvos que se repetem (anual, semestral, trimestral) não: o que sobra conta para o ciclo seguinte.',
       ])+
@@ -5776,7 +5803,8 @@
     var m = state.ui.month;
     var incluir = !!state.ui.surplusSemAlvo;
     var plan = surplusPlan(m, incluir);
-    var totalLivre = round2(-plan.total);
+    var totalLivre = round2(-plan.totalComSel);
+    var temAlgo = plan.entries.length || plan.expirados.length;
 
     var rows = plan.entries.length ? plan.entries.map(function(e){
       var det = (e.teto===null) ? "sem alvo" : ("tem "+fmt(e.tem)+", precisa de "+fmt(e.teto));
@@ -5784,6 +5812,16 @@
         '<span><b>'+esc(e.name)+'</b><br><span class="tag">'+det+'</span></span>'+
         '<b class="tx-amt in" style="font-variant-numeric:tabular-nums;">'+fmt(-e.add)+'</b></div>';
     }).join("") : '<div class="muted" style="padding:14px 0;text-align:center;">Nenhuma categoria passou do que o alvo dela pede. 👍</div>';
+    if (plan.expirados.length) {
+      rows += '<div style="margin-top:14px;font-weight:700;">Metas com prazo terminado</div>'+
+        '<div class="hint" style="margin:2px 0 6px;">O alvo já não pede nada, mas o dinheiro pode ter outro destino (pagamento que ainda vai sair, fundo que quer manter). Só sai o que marcar.</div>'+
+        plan.expirados.map(function(e){
+          return '<label class="opcao" style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--border);cursor:pointer;">'+
+            '<input type="checkbox" data-ssel="'+e.catId+'" style="width:auto;"'+(_surplusSel[e.catId]?" checked":"")+'>'+
+            '<span style="flex:1;"><b>'+esc(e.name)+'</b><br><span class="tag">prazo: '+esc(monthLabel(e.prazo))+'</span></span>'+
+            '<b class="tx-amt in" style="font-variant-numeric:tabular-nums;">'+fmt(e.tem)+'</b></label>';
+        }).join("");
+    }
 
     openModal(
       '<div class="modal-head"><h2>🧹 Libertar excedente — '+monthLabel(m)+'</h2><button class="x" data-action="close" aria-label="Fechar">×</button></div>'+
@@ -5792,16 +5830,26 @@
             ? ('Há <b>'+fmt(totalLivre)+'</b> parado em categorias que já têm mais do que o alvo delas pede. Isto devolve essa folga para a poder usar noutro sítio.')
             : 'Nenhuma categoria tem mais do que o alvo dela pede.',
           "Categorias", "Pronto a atribuir")+
-        opKpis("Por atribuir", fmt(plan.rtaBefore), "", "libertar", fmt(totalLivre), fmt(plan.rtaAfter), "pos")+
+        opKpis("Por atribuir", fmt(plan.rtaBefore), "", "libertar", fmt(totalLivre), fmt(plan.rtaAfterSel), "pos")+
         '<label class="opcao" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px;">'+
           '<input type="checkbox" data-action="surplus-toggle-semalvo" '+(incluir?"checked":"")+' style="width:auto;"> Incluir também as categorias sem alvo</label>'+
         '<div class="hint" style="margin-bottom:12px;">Sem alvo definido não há como saber o que é de mais, por isso essas ficam de fora por predefinição — ligando isto, é retirado <b>tudo</b> o que lá está. As de «reservar todos os meses» nunca entram: nessas o dinheiro é para juntar.</div>'+
-        '<div style="max-height:230px;overflow:auto;">'+rows+'</div>'+
+        '<div id="surplusLista" style="max-height:300px;overflow:auto;">'+rows+'</div>'+
       '</div>'+
       '<div class="modal-foot"><span></span>'+
         '<span><button class="btn" data-action="close">Cancelar</button> '+
-        (plan.entries.length?'<button class="btn primary" data-action="apply-surplus">Libertar '+fmt(totalLivre)+'</button>':'')+'</span></div>');
+        (totalLivre > 0.005 ?'<button class="btn primary" data-action="apply-surplus">Libertar '+fmt(totalLivre)+'</button>':'')+'</span></div>');
+    var sl = el("surplusLista");
+    if (sl && temAlgo) {
+      if (_surplusScroll) { try { sl.scrollTop = _surplusScroll; } catch(e){} }
+      sl.addEventListener("change", function(ev){
+        var id = ev.target && ev.target.getAttribute && ev.target.getAttribute("data-ssel"); if (!id) return;
+        if (ev.target.checked) _surplusSel[id] = true; else delete _surplusSel[id];
+        _surplusScroll = sl.scrollTop; surplusModal();
+      });
+    }
   }
+  var _surplusScroll = 0;
 
   var _covSel = null, _covAlvo = null, _covFalta = 0, _covFontes = null;
 
@@ -7022,20 +7070,22 @@
     "fund-sel-todas": function(){ fundToggle("todas", null, true); fundModal(); },
     "fund-sel-nenhuma": function(){ _fundSel={}; fundModal(); },
     "recover-preview": function(){ recoverModal(); },
-    "surplus-preview": function(){ surplusModal(); },
+    "surplus-preview": function(){ _surplusSel = {}; _surplusScroll = 0; surplusModal(); },
     "surplus-toggle-semalvo": function(){ state.ui.surplusSemAlvo = !state.ui.surplusSemAlvo; vistaMudou(); save(); surplusModal(); },
     "apply-surplus": function(){
       var m=state.ui.month, plan=surplusPlan(m, !!state.ui.surplusSemAlvo);
-      if(!plan.entries.length){ toast("Não há nada a libertar."); return; }
+      var lista = plan.entries.concat(plan.expirados.filter(function(e){ return _surplusSel[e.catId]; }));
+      if(!lista.length){ toast("Não há nada a libertar."); return; }
       pushUndo("Excedente libertado.");
-      for(var i=0;i<plan.entries.length;i++){
-        var e=plan.entries[i], key=e.catId+"|"+m;
+      for(var i=0;i<lista.length;i++){
+        var e=lista[i], key=e.catId+"|"+m;
         poeAtribuicao(key, (state.assignments[key]||0)+e.add);
       }
-      logMove("🧹 Libertou excedente de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias"), plan.total,
-        "de " + nomesDeOrigem(plan.entries.map(function(e){ return {nome:e.name, valor:e.add}; })));
+      _surplusSel = {};
+      logMove("🧹 Libertou excedente de "+lista.length+(lista.length===1?" categoria":" categorias"), plan.totalComSel,
+        "de " + nomesDeOrigem(lista.map(function(e){ return {nome:e.name, valor:e.add}; })));
       closeModal(); save(); render();
-      toast("Libertado "+fmt(-plan.total)+" de "+plan.entries.length+(plan.entries.length===1?" categoria":" categorias")+" — pode anular no topo.");
+      toast("Libertado "+fmt(-plan.totalComSel)+" de "+lista.length+(lista.length===1?" categoria":" categorias")+" — pode anular no topo.");
     },
     "apply-recover": function(){
       var m=state.ui.month, plan=recoverPlan(m, state.ui.recoverStrategy);
