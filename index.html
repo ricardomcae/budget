@@ -1278,7 +1278,7 @@
   }
 
   // ---------- Estado ----------
-  var APP_VERSION = "1.89";
+  var APP_VERSION = "1.90";
   // As cores da aplicação. O "id" é o que fica guardado (e sincronizado, porque as
   // definições vão no mesmo pacote dos dados); a "amostra" é só para desenhar a bolinha.
   var TEMAS = [
@@ -2128,19 +2128,33 @@
     }
     return null;
   }
-  // DESPESA PAGA ANTES DO PRAZO (marcada com «já paguei»). Um alvo «Repor» lê o saldo: pagar o
+  // DESPESA FEITA ANTES DO PRAZO (marcada com «✔ Dar por cumprida» — até à 1.89 dizia «já paguei»). Um alvo «Repor» lê o saldo: pagar o
   // IMI em outubro com prazo em novembro baixava o saldo e o alvo voltava a pedir o total todo
   // até novembro — dinheiro para uma despesa que já não ia acontecer. A aplicação não pode
   // adivinhar se um gasto a meio é a despesa ou outra coisa (num «Repor» gastar a meio quer
-  // normalmente dizer «reponha-me isto»), por isso pergunta-se: quem pagou carrega em «já paguei»
+  // normalmente dizer «reponha-me isto»), por isso pergunta-se: quem pagou carrega em «✔ Dar por cumprida»
   // e, até ao prazo, o alvo só pede o que deixa a categoria a zero. Passado o prazo, o alvo segue
   // como sempre (o «até uma data» cala-se; o anual começa a juntar para o ano seguinte).
+  // O mês a MOSTRAR é o do último pagamento feito na categoria até ao mês em que se marcou
+  // («em»), e não o mês em que se carregou no botão: a prenda comprada a 11 de outubro e marcada
+  // em novembro dizia «paga em Novembro». A LÓGICA continua a usar «mes» (desde quando o alvo se
+  // cala) — mudar isso para o mês do pagamento faria meses já fechados mudarem de pedido sem
+  // ninguém mexer neles. Marcas antigas, sem «em», mostram «mes», como antes.
+  function mesPagoTxt(pago){ return monthLabel(pago.em || pago.mes); }
+  function ultimoPagamento(catId, ateMes){
+    var melhor = null;
+    for (var i=0;i<state.transactions.length;i++){ var t=state.transactions[i];
+      if (t.categoryId !== catId || !((t.outflow||0) > 0.005)) continue;
+      var mt = monthOf(t.date); if (mt > ateMes) continue;
+      if (!melhor || t.date > melhor) melhor = t.date; }
+    return melhor ? monthOf(melhor) : null;
+  }
   function alvoPago(m, avail, pago, prazo){
     var need = Math.max(0, round2(-avail));
     return { need:need, met: need<=0.005, doMes: need<=0.005, pagoAntes:true, progress:1,
       label: need > 0.005
-        ? ("✅ Despesa paga em "+monthLabel(pago.mes)+" — falta "+fmt(need)+" para a categoria ficar a zero")
-        : ("🎯 Despesa paga em "+monthLabel(pago.mes)+" — nada a juntar até "+monthLabel(prazo)) };
+        ? ("✅ Cumprida em "+mesPagoTxt(pago)+" — falta "+fmt(need)+" para a categoria ficar a zero")
+        : ("✅ Cumprida em "+mesPagoTxt(pago)+" — nada a juntar até "+monthLabel(prazo)) };
   }
   function alvoNoMesDoPagamento(cat, m, amt, avail, dataTxt){
     var act = activityFor(cat.id, m);
@@ -2281,7 +2295,7 @@
       var diff = monthsBetween(m, target), left = diff>=0 ? diff+1 : 1;
       if (tg.pago && tg.pago.para === target && m >= tg.pago.mes) {
         if (diff < 0) return { need:0, met:true, doMes:true, expirado:true, progress:1,
-          label: "\ud83c\udfaf Despesa paga em "+monthLabel(tg.pago.mes)+" — prazo terminado ("+monthLabel(target)+")" };
+          label: "\ud83c\udfaf Cumprida em "+mesPagoTxt(tg.pago)+" — prazo terminado ("+monthLabel(target)+")" };
         return alvoPago(m, avail, tg.pago, target);
       }
       if (diff === 0) {
@@ -2449,6 +2463,7 @@
           if (tg.due != null && !MES.test(String(tg.due))) delete tg.due;
           if (tg.date != null && !MES.test(String(tg.date)) && !DIA.test(String(tg.date))) delete tg.date;
           if (tg.pago != null && !(tg.pago && MES.test(String(tg.pago.mes)) && MES.test(String(tg.pago.para)))) delete tg.pago;
+          if (tg.pago && tg.pago.em != null && !MES.test(String(tg.pago.em))) delete tg.pago.em;
         }
       });
       (o.accounts||[]).forEach(function(a){ if (a && ["budget","credit","tracking"].indexOf(a.type) < 0) a.type = "budget"; });
@@ -3338,8 +3353,9 @@
           var barW = cstat==="neg" ? 100 : ti.progress*100;
           targetHtml = '<div class="target-bar"><span class="'+barCls+'" style="width:'+barW+'%"></span></div>' +
             '<div class="target-note">' + ti.label +
-              (ti.podeMarcarPago ? ' · <a href="#" data-action="alvo-pago" data-id="'+cat.id+'" title="Já paguei a despesa deste alvo, antes do prazo ('+esc(monthLabel(ti.podeMarcarPago))+')">já paguei</a>' : '') +
-              (ti.pagoAntes ? ' · <a href="#" data-action="alvo-pago-anular" data-id="'+cat.id+'" title="Afinal ainda não paguei">anular</a>' : '') +
+              (ti.podeMarcarPago ? (function(){ var up = ultimoPagamento(cat.id, m);
+                  return ' · <a href="#" data-action="alvo-pago" data-id="'+cat.id+'" title="A despesa deste alvo já foi feita, antes do prazo ('+esc(monthLabel(ti.podeMarcarPago))+'): até lá, só pede o que deixar a categoria a zero">✔ Dar por cumprida'+(up ? ' em '+esc(monthLabel(up)) : '')+'</a>'; })() : '') +
+              (ti.pagoAntes ? ' · <a href="#" data-action="alvo-pago-anular" data-id="'+cat.id+'" title="Afinal a despesa ainda não foi feita">anular</a>' : '') +
             '</div>';
         } else if (cstat==="neg") {
           targetHtml = '<div class="target-bar"><span class="neg" style="width:100%"></span></div>' +
@@ -5249,6 +5265,7 @@
         '<li>No mensal, «<b>Repor até X</b>» acrescenta só o que falta para ter X disponível; «<b>Reservar X</b>» acrescenta sempre X, mesmo que já o tenha.</li>'+
         '<li>Trimestral, <b>semestral</b> e anual <b>param de pedir</b> quando já tiver o total. Indicando o mês da despesa, repartem o que falta até lá. O <b>mês da despesa</b> é quando o dinheiro <b>sai da conta</b>, não a data do acontecimento — se costuma comprar no mês anterior, ponha esse. Passado o mês, o alvo <b>roda sozinho</b> para o período seguinte.</li>'+
         '<li><b>Até uma data</b> é uma meta de <b>uma vez só</b>, não uma cadência: uma viagem, uma obra, um móvel. Passada a data, <b>deixa de pedir</b> e a linha passa a dizer <b>«prazo terminado»</b> — mesmo que já tenha gasto o dinheiro. O alvo <b>não se apaga sozinho</b>: fica lá, calado, e é quem o criou que decide se o remove, se arquiva a categoria, ou se estica a data para uma meta nova.</li>'+
+        '<li><b>Despesa feita antes do prazo.</b> Num alvo <b>Repor</b> com prazo (até uma data, ou periódico com mês da despesa), gastar a meio quer normalmente dizer «reponha-me isto» — e o alvo repõe. Se esse gasto foi <b>a própria despesa</b>, feita mais cedo (a prenda comprada em outubro para fevereiro), carregue em <b>«✔ Dar por cumprida em <i>mês</i>»</b>, por baixo da categoria: até ao prazo, o alvo só pede o que deixar a categoria a zero. A ligação aparece quando houve gasto na categoria este mês ou no anterior, antes do mês do prazo. No próprio mês do prazo não é preciso — aí a aplicação já percebe sozinha. Há um <b>«anular»</b> ao lado.</li>'+
         '<li><b>Nos alvos com prazo, o método decide quem manda.</b> Em <b>Repor</b>, a data é que manda: a mensalidade é refeita todos os meses com o que falta e o tempo que resta, por isso <b>falhar um mês ou gastar a meio faz subir os seguintes</b> — e chega lá. Em <b>Reservar</b>, manda a mensalidade: é congelada quando grava e nunca muda, por isso é previsível mas <b>pode chegar ao prazo curto, sem avisar</b>. Na dúvida, Repor.</li>'+
         '<li><b>😴 Adiar este mês:</b> num alvo que ainda pede dinheiro, o <b>😴</b> na linha da categoria diz para <b>não chatear só este mês</b> — deixa de aparecer a amarelo e sai do «Financiar alvos». No mês seguinte volta ao normal, ou reative antes com o <b>☀️</b>. Para ver de uma vez tudo o que adiou, use o filtro <b>😴 Adiadas</b> na barra do orçamento — adiadas não são nem «abaixo do alvo» nem «cumpridas», por isso não aparecem nesses.</li>'+
       '</ul>'+
@@ -5400,8 +5417,11 @@
       // coisa que ainda se está a fazer é parte de a fazer, e não uma versão nova: uma fila de
       // sete números para o mesmo assunto não diz nada a quem lê, e faz parecer que há sete
       // coisas para aprender onde há uma.
+      ver("1.90", "novembro 2026", [
+        'O «já paguei» passou a <b>«✔ Dar por cumprida em <i>mês</i>»</b>, com o mês do último gasto na categoria — para se ver a que gasto se refere. Depois de marcada, a categoria diz <b>«✅ Cumprida em <i>mês</i>»</b>, com o mês em que gastou (e não o mês em que carregou no botão).',
+      ])+
       ver("1.89", "novembro 2026", [
-        'Alvos <b>«Repor» com prazo</b> (até uma data; trimestral, semestral ou anual com mês da despesa): se <b>pagar a despesa antes do prazo</b>, aparece <b>«já paguei»</b> por baixo da categoria. Marcando-o, o alvo deixa de pedir o total outra vez — até ao prazo, só pede o que deixar a categoria a zero. Há um <b>«anular»</b> ao lado, e o ↩ também desfaz.',
+        'Alvos <b>«Repor» com prazo</b> (até uma data; trimestral, semestral ou anual com mês da despesa): se <b>pagar a despesa antes do prazo</b>, aparece <b>«já paguei»</b> (desde a 1.90, <b>«✔ Dar por cumprida»</b>) por baixo da categoria. Marcando-o, o alvo deixa de pedir o total outra vez — até ao prazo, só pede o que deixar a categoria a zero. Há um <b>«anular»</b> ao lado, e o ↩ também desfaz.',
         'Numa categoria com alvo que ficou negativa, o texto já não diz «faltam 1.250,00 € de 1.200,00 €»: diz quanto é do objetivo e quanto é do que se gastou a mais.',
         'Sincronização: se um aparelho tiver uma <b>palavra-passe diferente</b>, a aplicação diz isso mesmo e não envia nada. Antes podia aparecer como um conflito, e escolher «Manter este aparelho» deixava o outro aparelho sem conseguir abrir a cópia.',
       ])+
@@ -6829,13 +6849,14 @@
     "alvo-pago": function(id){
       var c = categoryById(id); if (!c || !c.target) return;
       var pz = prazoDoAlvo(c, state.ui.month); if (!pz) return;
-      pushUndo("Despesa marcada como paga.");
+      pushUndo("Dada por cumprida.");
       c.target.pago = { mes: state.ui.month, para: pz };
-      save(); render(); toast("Marcada como paga em "+monthLabel(state.ui.month)+" — até "+monthLabel(pz)+" só pede o que deixar a categoria a zero.");
+      var em = ultimoPagamento(id, state.ui.month); if (em) c.target.pago.em = em;
+      save(); render(); toast("Cumprida em "+mesPagoTxt(c.target.pago)+" — até "+monthLabel(pz)+" só pede o que deixar a categoria a zero.");
     },
     "alvo-pago-anular": function(id){
       var c = categoryById(id); if (!c || !c.target || !c.target.pago) return;
-      pushUndo("Já não está marcada como paga.");
+      pushUndo("Já não está dada por cumprida.");
       delete c.target.pago; save(); render();
     },
     "save-category": function(id){
@@ -6872,7 +6893,7 @@
       // Nota vazia é nota nenhuma: apaga-se o campo em vez de o guardar a "". Ter duas
       // representações da mesma coisa dava diferenças de assinatura na sincronização — e na
       // importação da configuração — sem nada ter mudado de facto.
-      // A marca «já paguei» sobrevive a editar a categoria, desde que o prazo continue o mesmo
+      // A marca «cumprida» sobrevive a editar a categoria, desde que o prazo continue o mesmo
       // (mudar a data ou o tipo é começar um objetivo novo).
       if (id && target) { var cAnt = categoryById(id), pgA = cAnt && cAnt.target && cAnt.target.pago;
         if (pgA && prazoDoAlvo({ target:target }, state.ui.month) === pgA.para) target.pago = pgA; }
